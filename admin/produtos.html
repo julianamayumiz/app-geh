@@ -10,7 +10,7 @@
 </head>
 <body>
   <main class="admin">
-    <h2 style="color:var(--azul);margin-bottom:1rem;">📦 Produtos</h2>
+    <h2 style="color:var(--azul);margin-bottom:1rem;display:inline-flex;align-items:center;gap:0.5rem;"><span data-icon="package" data-size="24"></span> Produtos</h2>
 
     <div class="card">
       <h3 class="card-title" id="form-titulo">Adicionar produto</h3>
@@ -39,7 +39,7 @@
       </div>
       <div class="form-group" style="display:flex;align-items:center;gap:0.5rem;">
         <input type="checkbox" id="prod-promocao" style="width:20px;height:20px;cursor:pointer;">
-        <label for="prod-promocao" style="cursor:pointer;margin-bottom:0;">🏷️ Marcar como promoção agora</label>
+        <label for="prod-promocao" style="cursor:pointer;margin-bottom:0;display:inline-flex;align-items:center;gap:0.35rem;"><span data-icon="tag" data-size="16"></span> Marcar como promoção agora</label>
       </div>
       <div id="alerta" class="alert hidden"></div>
       <div style="display:flex;gap:0.5rem;">
@@ -78,8 +78,10 @@ Suco de Laranja, 5.00, 50, Bebidas
   <script type="module">
     import { montarNav, fmtBRL } from "./_nav.js";
     import { db, collection, doc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, writeBatch } from "../js/firebase-config.js";
+    import { icon, renderIcons } from "../js/icons.js";
 
     montarNav('produtos.html');
+    renderIcons();
 
     const $ = (id) => document.getElementById(id);
     const alerta = $('alerta');
@@ -181,7 +183,7 @@ Suco de Laranja, 5.00, 50, Bebidas
       await batch.commit();
 
       $('lote-produtos').value = '';
-      alertaLote.textContent = `✓ ${produtos.length} produtos cadastrados!`;
+      alertaLote.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} ${produtos.length} produtos cadastrados!</span>`;
       alertaLote.className = 'alert alert-success';
       $('btn-lote').disabled = false;
       $('btn-lote').innerHTML = 'Importar lote';
@@ -200,12 +202,12 @@ Suco de Laranja, 5.00, 50, Bebidas
         const tr = document.createElement('tr');
         const ESTOQUE_BAIXO = 10;
         const badgePromo = p.promocao
-          ? `<span style="background:var(--vermelho);color:white;font-size:0.7rem;padding:2px 6px;border-radius:999px;margin-left:4px;">🏷️ PROMO</span>`
+          ? `<span style="background:var(--vermelho);color:white;font-size:0.7rem;padding:2px 6px;border-radius:999px;margin-left:4px;display:inline-flex;align-items:center;gap:3px;">${icon('tag', { size: 11 })} PROMO</span>`
           : '';
         const badgeEstoque = p.estoque <= 0
           ? `<span style="background:#6B7280;color:white;font-size:0.7rem;padding:2px 6px;border-radius:999px;margin-left:4px;">SEM ESTOQUE</span>`
           : p.estoque <= ESTOQUE_BAIXO
-          ? `<span style="background:var(--amarelo);color:#333;font-size:0.7rem;padding:2px 6px;border-radius:999px;margin-left:4px;">⚠️ BAIXO</span>`
+          ? `<span style="background:var(--amarelo);color:#333;font-size:0.7rem;padding:2px 6px;border-radius:999px;margin-left:4px;display:inline-flex;align-items:center;gap:3px;">${icon('alert-triangle', { size: 11 })} BAIXO</span>`
           : '';
         const precoHtml = p.promocao && p.precoPromo
           ? `<span style="text-decoration:line-through;color:var(--cinza);font-size:0.85rem;">${fmtBRL(p.preco)}</span> <strong style="color:var(--vermelho);">${fmtBRL(p.precoPromo)}</strong>`

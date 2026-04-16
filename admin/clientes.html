@@ -10,7 +10,7 @@
 </head>
 <body>
   <main class="admin">
-    <h2 style="color:var(--azul);margin-bottom:1rem;">👥 Clientes</h2>
+    <h2 style="color:var(--azul);margin-bottom:1rem;display:inline-flex;align-items:center;gap:0.5rem;"><span data-icon="users" data-size="24"></span> Clientes</h2>
 
     <div class="card">
       <h3 class="card-title">Cadastrar cliente</h3>
@@ -40,7 +40,7 @@
 
     <div class="card">
       <div class="form-group" style="margin-bottom:0;">
-        <label>🔍 Buscar cliente</label>
+        <label style="display:inline-flex;align-items:center;gap:0.35rem;"><span data-icon="search" data-size="16"></span> Buscar cliente</label>
         <input type="text" id="busca" placeholder="Digite o ID...">
       </div>
     </div>
@@ -58,8 +58,10 @@
   <script type="module">
     import { montarNav, fmtBRL } from "./_nav.js";
     import { db, collection, doc, setDoc, getDoc, getDocs, deleteDoc, onSnapshot, writeBatch } from "../js/firebase-config.js";
+    import { icon, renderIcons } from "../js/icons.js";
 
     montarNav('clientes.html');
+    renderIcons();
 
     const $ = (id) => document.getElementById(id);
     const alerta = $('alerta');
@@ -82,7 +84,7 @@
         }
         await setDoc(ref, { saldo: 0 });
         $('cli-id').value = '';
-        alerta.textContent = `✓ Cliente "${id}" cadastrado.`;
+        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} Cliente "${id}" cadastrado.</span>`;
         alerta.className = 'alert alert-success';
         setTimeout(() => alerta.classList.add('hidden'), 2000);
       } catch (err) {
@@ -150,7 +152,7 @@
       }
 
       $('lote-ids').value = '';
-      alertaLote.textContent = `✓ ${criados} cadastrados, ${ignorados} já existiam.`;
+      alertaLote.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} ${criados} cadastrados, ${ignorados} já existiam.</span>`;
       alertaLote.className = 'alert alert-success';
       $('btn-lote').disabled = false;
       $('btn-lote').innerHTML = 'Importar lote';

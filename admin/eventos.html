@@ -10,12 +10,12 @@
 </head>
 <body>
   <main class="admin">
-    <h2 style="color:var(--azul);margin-bottom:1rem;">📅 Eventos</h2>
+    <h2 style="color:var(--azul);margin-bottom:1rem;display:inline-flex;align-items:center;gap:0.5rem;"><span data-icon="calendar" data-size="24"></span> Eventos</h2>
 
     <div id="evento-ativo-box" class="card hidden" style="border-left:4px solid var(--verde);">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <div>
-          <div style="font-size:0.8rem;color:var(--verde);font-weight:700;text-transform:uppercase;">● Evento ativo agora</div>
+          <div style="font-size:0.8rem;color:var(--verde);font-weight:700;text-transform:uppercase;display:inline-flex;align-items:center;gap:0.4rem;"><span style="width:8px;height:8px;background:var(--verde);border-radius:50%;display:inline-block;"></span> Evento ativo agora</div>
           <div style="font-size:1.25rem;font-weight:700;" id="nome-ativo">—</div>
           <div style="font-size:0.85rem;color:var(--cinza);" id="data-ativo">—</div>
         </div>
@@ -54,8 +54,10 @@
       db, collection, doc, setDoc, getDoc, updateDoc, getDocs,
       addDoc, onSnapshot, query, orderBy, where, serverTimestamp
     } from "../js/firebase-config.js";
+    import { icon, renderIcons } from "../js/icons.js";
 
     montarNav('eventos.html');
+    renderIcons();
     const $ = id => document.getElementById(id);
     const alerta = $('alerta');
 
@@ -87,7 +89,7 @@
         });
         await setDoc(doc(db, 'config', 'eventoAtivo'), { id: ref.id, nome, data });
         $('ev-nome').value = '';
-        alerta.textContent = `✓ Evento "${nome}" criado e ativado!`;
+        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} Evento "${nome}" criado e ativado!</span>`;
         alerta.className = 'alert alert-success';
         carregarAtivo();
       } catch (err) {

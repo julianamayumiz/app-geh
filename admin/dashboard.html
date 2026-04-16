@@ -13,8 +13,9 @@
     <h2 style="color:var(--azul);margin-bottom:0.25rem;">Visão geral do evento</h2>
     <p id="evento-label" style="color:var(--cinza);margin-bottom:1rem;">Verificando evento ativo...</p>
 
-    <div id="sem-evento" class="alert alert-warning hidden" style="margin-bottom:1rem;">
-      ⚠️ Nenhum evento ativo. Crie e ative um evento em <a href="eventos.html" style="color:var(--azul);font-weight:600;">Eventos</a> para começar a vender.
+    <div id="sem-evento" class="alert alert-warning hidden" style="margin-bottom:1rem;display:flex;align-items:center;gap:0.5rem;">
+      <span data-icon="alert-triangle" data-size="20"></span>
+      <span>Nenhum evento ativo. Crie e ative um evento em <a href="eventos.html" style="color:var(--azul);font-weight:600;">Eventos</a> para começar a vender.</span>
     </div>
 
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;">
@@ -75,7 +76,7 @@
         return;
       }
 
-      $('evento-label').innerHTML = `<strong style="color:var(--verde);">● ${eventoAtivo.nome}</strong> <span style="color:var(--cinza);">— números deste evento</span>`;
+      $('evento-label').innerHTML = `<strong style="color:var(--verde);display:inline-flex;align-items:center;gap:0.4rem;"><span style="width:8px;height:8px;background:var(--verde);border-radius:50%;display:inline-block;"></span>${eventoAtivo.nome}</strong> <span style="color:var(--cinza);">— números deste evento</span>`;
 
       // Vendas DO EVENTO ATIVO em tempo real (limite 50 pra não baixar tudo em eventos grandes)
       const vendasQuery = query(

@@ -36,7 +36,7 @@
       <p id="print-subtitulo">Relatório Financeiro</p>
       <p>Gerado em: <span id="print-data"></span></p>
     </div>
-    <h2 style="color:var(--azul);margin-bottom:1rem;">📈 Relatório Financeiro</h2>
+    <h2 style="color:var(--azul);margin-bottom:1rem;display:inline-flex;align-items:center;gap:0.5rem;"><span data-icon="trending-up" data-size="24"></span> Relatório Financeiro</h2>
 
     <div class="card" style="margin-bottom:1rem;">
       <div class="form-group" style="margin-bottom:0;">
@@ -83,16 +83,18 @@
     </div>
 
     <div style="display:flex;gap:1rem;flex-wrap:wrap;">
-      <button class="btn btn-primary" id="btn-export" style="max-width:280px;">⬇️ Exportar CSV</button>
-      <button class="btn btn-secondary" id="btn-print" style="max-width:280px;">🖨️ Imprimir / Salvar PDF</button>
+      <button class="btn btn-primary" id="btn-export" style="max-width:280px;"><span data-icon="download" data-size="18"></span> Exportar CSV</button>
+      <button class="btn btn-secondary" id="btn-print" style="max-width:280px;"><span data-icon="printer" data-size="18"></span> Imprimir / Salvar PDF</button>
     </div>
   </main>
 
   <script type="module">
     import { montarNav, fmtBRL } from "./_nav.js";
     import { db, collection, getDocs, query, where, orderBy } from "../js/firebase-config.js";
+    import { renderIcons } from "../js/icons.js";
 
     montarNav('relatorio.html');
+    renderIcons();
 
     const $ = (id) => document.getElementById(id);
 

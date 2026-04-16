@@ -10,7 +10,7 @@
 </head>
 <body>
   <main class="admin">
-    <h2 style="color:var(--azul);margin-bottom:1rem;">🔍 Histórico por Cliente</h2>
+    <h2 style="color:var(--azul);margin-bottom:1rem;display:inline-flex;align-items:center;gap:0.5rem;"><span data-icon="search" data-size="24"></span> Histórico por Cliente</h2>
 
     <div class="card">
       <div style="display:flex;gap:0.75rem;align-items:flex-end;">
@@ -62,8 +62,10 @@
     import {
       db, collection, doc, getDoc, getDocs, query, where, orderBy
     } from "../js/firebase-config.js";
+    import { renderIcons } from "../js/icons.js";
 
     montarNav('historico.html');
+    renderIcons();
 
     const $ = (id) => document.getElementById(id);
     let todosClientes = [];

@@ -44,13 +44,15 @@
         Entrar com Google
       </button>
 
-      <a href="../index.html" class="btn btn-secondary">← Voltar</a>
+      <a href="../index.html" class="btn btn-secondary"><span data-icon="arrow-left" data-size="18"></span> Voltar</a>
     </div>
   </div>
+  <script type="module" src="../js/icons.js"></script>
 
   <script type="module">
     import { auth, signInWithEmailAndPassword, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from "../js/firebase-config.js";
     import { sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { icon } from "../js/icons.js";
 
     const alerta = document.getElementById('alerta');
     const alertaOk = document.getElementById('alerta-ok');
@@ -83,7 +85,7 @@
       }
       try {
         await sendPasswordResetEmail(auth, email);
-        alertaOk.textContent = `✓ Link de redefinição enviado para ${email}. Confira sua caixa de entrada.`;
+        alertaOk.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 18 })} Link de redefinição enviado para ${email}. Confira sua caixa de entrada.</span>`;
         alertaOk.classList.remove('hidden');
       } catch (err) {
         alerta.textContent = `Erro: ${err.message}`;

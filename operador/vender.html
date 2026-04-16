@@ -236,7 +236,7 @@
     async function carregarCliente() {
       const snap = await getDoc(doc(db, 'clientes', clienteId));
       if (!snap.exists()) {
-        $('cliente-nome').textContent = '❌ Não cadastrado';
+        $('cliente-nome').innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('x-circle', { size: 20 })} Não cadastrado</span>`;
         mostrarAlerta(`Cliente ${clienteId} não encontrado.`, 'danger');
         return;
       }

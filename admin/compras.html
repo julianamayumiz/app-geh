@@ -10,12 +10,12 @@
 </head>
 <body>
   <main class="admin">
-    <h2 style="color:var(--azul);margin-bottom:1rem;">🛒 Compras / Entrada de estoque</h2>
+    <h2 style="color:var(--azul);margin-bottom:1rem;display:inline-flex;align-items:center;gap:0.5rem;"><span data-icon="shopping-bag" data-size="24"></span> Compras / Entrada de estoque</h2>
     <p class="text-muted mb-2">Registre aqui a compra de produtos para o evento. O estoque é atualizado automaticamente.</p>
 
     <div class="card">
       <h3 class="card-title">Nova entrada</h3>
-      <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:1rem;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;">
         <div class="form-group">
           <label>Produto</label>
           <select id="compra-produto"><option value="">Selecione...</option></select>
@@ -54,8 +54,10 @@
       db, collection, doc, getDoc, addDoc, updateDoc, onSnapshot,
       query, orderBy, limit, serverTimestamp, runTransaction
     } from "../js/firebase-config.js";
+    import { icon, renderIcons } from "../js/icons.js";
 
     montarNav('compras.html');
+    renderIcons();
 
     const $ = (id) => document.getElementById(id);
     const alerta = $('alerta');
@@ -108,7 +110,7 @@
         $('compra-qtd').value = '';
         $('compra-custo').value = '';
         $('compra-fornecedor').value = '';
-        alerta.textContent = '✓ Compra registrada e estoque atualizado.';
+        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} Compra registrada e estoque atualizado.</span>`;
         alerta.className = 'alert alert-success';
         setTimeout(() => alerta.classList.add('hidden'), 2000);
       } catch (err) {
