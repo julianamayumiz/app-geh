@@ -120,21 +120,25 @@ URL de produção: **https://app-geh-cc577.web.app**
 
 ## Regras do Firestore
 
-O operador não tem login — as regras permitem leitura/escrita pública nas coleções operacionais. O controle de acesso é físico (só operadores credenciados têm o link no evento).
+As regras estão versionadas em [`firestore.rules`](firestore.rules) e os índices compostos em [`firestore.indexes.json`](firestore.indexes.json).
 
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /produtos/{doc}            { allow read, write: if true; }
-    match /clientes/{doc}            { allow read, write: if true; }
-    match /vendas/{doc}              { allow read, write: if true; }
-    match /movimentacoes_saldo/{doc} { allow read, write: if true; }
-    match /compras/{doc}             { allow read, write: if true; }
-    match /eventos/{doc}             { allow read, write: if true; }
-    match /config/{doc}              { allow read, write: if true; }
-  }
-}
+**Modelo de acesso:**
+- **Operador** (sem login) lê tudo e só consegue escrever o necessário pra vender/carregar: `UPDATE` em `produtos` (estoque) e `clientes` (saldo), `CREATE` em `vendas` e `movimentacoes_saldo`.
+- **Admin** (autenticado) pode tudo. Apagar/criar produtos, clientes, eventos, config e compras exige login.
+
+Isso bloqueia ataques drive-by (delete em massa, hijack do evento ativo) sem quebrar o fluxo do operador. Fluxos sensíveis que ainda ficam abertos (ex.: criar venda falsa, zerar saldo via DevTools) exigiriam Cloud Functions.
+
+**Deploy das regras e índices:**
+
+```bash
+# Deploy só das regras
+firebase deploy --only firestore:rules
+
+# Deploy dos índices (demora ~1min na primeira vez)
+firebase deploy --only firestore:indexes
+
+# Ou ambos junto
+firebase deploy --only firestore
 ```
 
 ---

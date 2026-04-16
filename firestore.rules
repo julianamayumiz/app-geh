@@ -1,0 +1,65 @@
+rules_version = '2';
+
+// Regras Firestore — App GEH
+//
+// Modelo de acesso:
+// - OPERADOR (sem login, usa no celular): precisa ler tudo, e só escrever nas
+//   operações do evento — criar venda, criar recarga, alterar estoque e saldo.
+// - ADMIN (com login, diretoria): pode fazer qualquer coisa.
+//
+// O controle físico dos operadores (só quem está no evento tem o link) deixa
+// de ser a única barreira — agora ataques drive-by de delete/create em massa
+// em produtos, clientes, eventos, config e compras exigem autenticação.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Produtos — operador precisa UPDATE para decrementar estoque na venda.
+    // Admin cria, deleta e edita preços/promoções.
+    match /produtos/{doc} {
+      allow read: if true;
+      allow update: if true;
+      allow create, delete: if request.auth != null;
+    }
+
+    // Clientes — operador precisa UPDATE para alterar saldo (vender/carregar).
+    // Admin cria (cadastro via admin/clientes.html) e deleta.
+    match /clientes/{doc} {
+      allow read: if true;
+      allow update: if true;
+      allow create, delete: if request.auth != null;
+    }
+
+    // Vendas — operador cria durante a venda. Nenhum caminho no app altera
+    // ou deleta uma venda, então bloqueamos isso para quem não está logado.
+    match /vendas/{doc} {
+      allow read, create: if true;
+      allow update, delete: if request.auth != null;
+    }
+
+    // Movimentações de saldo (recargas) — operador cria. Idem vendas.
+    match /movimentacoes_saldo/{doc} {
+      allow read, create: if true;
+      allow update, delete: if request.auth != null;
+    }
+
+    // Eventos — só admin manipula (criar, ativar, encerrar).
+    match /eventos/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Config (inclui /config/eventoAtivo) — só admin escreve. Protege contra
+    // alguém "roubar" o evento ativo e redirecionar vendas.
+    match /config/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Compras (entrada de estoque) — só admin registra.
+    match /compras/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+}
