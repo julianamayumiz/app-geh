@@ -11,8 +11,8 @@
 </head>
 <body>
   <header class="header">
-    <a href="index.html" class="back">←</a>
-    <h1 id="titulo">💰 Carregar Saldo</h1>
+    <a href="index.html" class="back" aria-label="Voltar"><span data-icon="arrow-left" data-size="24"></span></a>
+    <h1 id="titulo" style="display:inline-flex;align-items:center;gap:0.5rem;"><span data-icon="wallet" data-size="22"></span> Carregar Saldo</h1>
   </header>
 
   <main>
@@ -37,14 +37,16 @@
           <option value="cartao">Cartão</option>
         </select>
       </div>
-      <button id="btn-carregar" class="btn btn-success">+ Adicionar saldo</button>
+      <button id="btn-carregar" class="btn btn-success"><span data-icon="plus" data-size="18"></span> Adicionar saldo</button>
     </div>
   </main>
+  <script type="module" src="../js/icons.js"></script>
 
   <script type="module">
     import {
       db, doc, getDoc, collection, addDoc, serverTimestamp, runTransaction
     } from "../js/firebase-config.js";
+    import { icon } from "../js/icons.js";
 
     const params = new URLSearchParams(window.location.search);
     const clienteId = params.get('cliente');
@@ -52,7 +54,7 @@
     if (!clienteId) window.location.href = 'index.html';
 
     if (somenteConsulta) {
-      document.getElementById('titulo').textContent = '👁️ Saldo do cliente';
+      document.getElementById('titulo').innerHTML = `${icon('eye', { size: 22 })} Saldo do cliente`;
       document.getElementById('form-recarga').classList.add('hidden');
     }
 
@@ -74,7 +76,7 @@
       const ref = doc(db, 'clientes', clienteId);
       const snap = await getDoc(ref);
       if (!snap.exists()) {
-        $('cliente-nome').textContent = '❌ Cliente não cadastrado';
+        $('cliente-nome').innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('x-circle', { size: 20 })} Cliente não cadastrado</span>`;
         mostrarAlerta(`Cliente ${clienteId} não encontrado. Cadastre no admin antes.`, 'danger');
         return null;
       }
@@ -113,13 +115,15 @@
         });
 
         vibrar([40, 60, 40, 60, 80]);
-        mostrarAlerta(`✅ R$ ${valor.toFixed(2).replace('.', ',')} adicionados!`, 'success');
+        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 18 })} R$ ${valor.toFixed(2).replace('.', ',')} adicionados!</span>`;
+        alerta.className = 'alert alert-success';
+        alerta.classList.remove('hidden');
         setTimeout(() => window.location.href = 'index.html', 1500);
       } catch (err) {
         vibrar([100, 50, 100]);
         mostrarAlerta(`Erro: ${err.message}`, 'danger');
         $('btn-carregar').disabled = false;
-        $('btn-carregar').innerHTML = '+ Adicionar saldo';
+        $('btn-carregar').innerHTML = `${icon('plus', { size: 18 })} Adicionar saldo`;
       }
     });
 

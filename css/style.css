@@ -115,6 +115,19 @@ main.admin {
 
 .btn:active { transform: scale(0.98); }
 
+/* Ícones SVG inline */
+.icon {
+  flex-shrink: 0;
+  display: inline-block;
+  vertical-align: middle;
+}
+.btn .icon { pointer-events: none; }
+.btn-lg {
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.btn-lg .icon { width: 32px; height: 32px; }
+
 .btn:focus-visible,
 .form-group input:focus-visible,
 .form-group select:focus-visible,

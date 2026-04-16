@@ -43,9 +43,11 @@
       font-size: 1.25rem;
       font-weight: 700;
       cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
+      display: inline-flex; align-items: center; justify-content: center;
       transition: transform 0.1s;
+      padding: 0;
     }
+    .btn-qtd .icon { display: block; }
     .btn-qtd:active { transform: scale(0.9); }
     .btn-menos { background: var(--cinza-claro); color: var(--cinza-escuro); }
     .btn-mais  { background: var(--azul); color: white; }
@@ -67,6 +69,10 @@
       font-weight: 600;
       cursor: pointer;
       font-size: 0.9rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.3rem;
     }
 
     /* Carrinho flutuante */
@@ -153,8 +159,8 @@
 </head>
 <body>
   <header class="header">
-    <a href="index.html" class="back">←</a>
-    <h1>🛒 Venda</h1>
+    <a href="index.html" class="back" aria-label="Voltar"><span data-icon="arrow-left" data-size="24"></span></a>
+    <h1 style="display:inline-flex;align-items:center;gap:0.5rem;"><span data-icon="shopping-cart" data-size="22"></span> Venda</h1>
   </header>
 
   <main style="padding-bottom: 6rem;">
@@ -174,7 +180,7 @@
 
   <!-- Botão flutuante do carrinho -->
   <button class="carrinho-fab hidden" id="fab-carrinho">
-    <span>🛒 Ver carrinho</span>
+    <span style="display:inline-flex;align-items:center;gap:0.4rem;"><span data-icon="shopping-cart" data-size="18"></span> Ver carrinho</span>
     <span class="badge" id="fab-qtd">0</span>
     <span id="fab-total">R$ 0,00</span>
   </button>
@@ -183,8 +189,8 @@
   <div class="modal-overlay" id="modal-overlay">
     <div class="modal-box">
       <div class="modal-titulo">
-        <span>🛒 Carrinho</span>
-        <button onclick="fecharModal()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:var(--cinza);">✕</button>
+        <span style="display:inline-flex;align-items:center;gap:0.4rem;"><span data-icon="shopping-cart" data-size="20"></span> Carrinho</span>
+        <button onclick="fecharModal()" aria-label="Fechar" style="background:none;border:none;cursor:pointer;color:var(--cinza);display:inline-flex;padding:0.25rem;"><span data-icon="x" data-size="22"></span></button>
       </div>
       <div id="modal-itens"></div>
       <div class="modal-total">
@@ -192,8 +198,8 @@
         <span id="modal-total-val">R$ 0,00</span>
       </div>
       <div id="alerta-modal" class="alert hidden"></div>
-      <button id="btn-finalizar" class="btn btn-success">✓ Finalizar Venda</button>
-      <button onclick="limparCarrinho()" class="btn btn-secondary mt-1" style="font-size:0.85rem;">🗑️ Limpar carrinho</button>
+      <button id="btn-finalizar" class="btn btn-success"><span data-icon="check" data-size="20"></span> Finalizar Venda</button>
+      <button onclick="limparCarrinho()" class="btn btn-secondary mt-1" style="font-size:0.85rem;"><span data-icon="trash-2" data-size="16"></span> Limpar carrinho</button>
     </div>
   </div>
 
@@ -201,6 +207,7 @@
     import {
       db, doc, getDoc, collection, getDocs, serverTimestamp, runTransaction
     } from "../js/firebase-config.js";
+    import { icon, renderIcons } from "../js/icons.js";
 
     // Evento ativo
     let eventoAtivo = null;
@@ -267,26 +274,31 @@
       card.id = `card-${p.id}`;
 
       const badgePromo = p.promocao
-        ? `<span style="background:var(--vermelho);color:white;font-size:0.65rem;font-weight:700;padding:1px 6px;border-radius:999px;">🏷️ PROMO</span>`
+        ? `<span style="background:var(--vermelho);color:white;font-size:0.65rem;font-weight:700;padding:1px 6px;border-radius:999px;display:inline-flex;align-items:center;gap:3px;">${icon('tag', { size: 10 })} PROMO</span>`
         : '';
       const precoHtml = p.promocao && p.precoPromo
         ? `<div class="prod-preco-old">R$ ${Number(p.preco).toFixed(2).replace('.', ',')}</div>
            <div class="prod-preco promo">R$ ${Number(p.precoFinal).toFixed(2).replace('.', ',')}</div>`
         : `<div class="prod-preco">R$ ${Number(p.preco).toFixed(2).replace('.', ',')}</div>`;
 
+      const estoqueHtml = semEstoque
+        ? 'Sem estoque'
+        : estoqueBaixo
+          ? `${icon('alert-triangle', { size: 12 })} Restam ${p.estoque}`
+          : `Est: ${p.estoque}`;
       card.innerHTML = `
         ${badgePromo}
         <div class="prod-nome">${p.nome}</div>
         ${precoHtml}
-        <div class="prod-estoque" style="${estoqueBaixo ? 'color:var(--vermelho);font-weight:600;' : ''}">
-          ${semEstoque ? 'Sem estoque' : estoqueBaixo ? `⚠️ Restam ${p.estoque}` : `Est: ${p.estoque}`}
+        <div class="prod-estoque" style="${estoqueBaixo ? 'color:var(--vermelho);font-weight:600;display:inline-flex;align-items:center;gap:3px;' : ''}">
+          ${estoqueHtml}
         </div>
         <div class="prod-controle hidden" id="ctrl-${p.id}">
-          <button class="btn-qtd btn-menos" data-id="${p.id}">−</button>
+          <button class="btn-qtd btn-menos" data-id="${p.id}" aria-label="Diminuir">${icon('minus', { size: 18 })}</button>
           <span class="qtd-display" id="qtd-${p.id}">0</span>
-          <button class="btn-qtd btn-mais" data-id="${p.id}">+</button>
+          <button class="btn-qtd btn-mais" data-id="${p.id}" aria-label="Aumentar">${icon('plus', { size: 18 })}</button>
         </div>
-        <button class="btn-adicionar" id="add-${p.id}">+ Adicionar</button>
+        <button class="btn-adicionar" id="add-${p.id}">${icon('plus', { size: 16 })} Adicionar</button>
       `;
 
       card.querySelector(`#add-${p.id}`).onclick = () => adicionar(p);
@@ -381,14 +393,17 @@
         const preco = produto.precoFinal ?? produto.preco;
         const div = document.createElement('div');
         div.className = 'modal-item';
+        const promoTag = produto.promocao
+          ? ` <span style="color:var(--vermelho);display:inline-flex;vertical-align:middle;">${icon('tag', { size: 12 })}</span>`
+          : '';
         div.innerHTML = `
-          <div class="modal-item-nome">${produto.nome}${produto.promocao ? ' 🏷️' : ''}<br>
+          <div class="modal-item-nome">${produto.nome}${promoTag}<br>
             <span style="font-size:0.8rem;color:var(--cinza);">${fmtBRL(preco)} cada</span>
           </div>
           <div class="modal-item-ctrl">
-            <button class="btn-qtd btn-menos" data-mid="${produto.id}">−</button>
+            <button class="btn-qtd btn-menos" data-mid="${produto.id}" aria-label="Diminuir">${icon('minus', { size: 18 })}</button>
             <span class="qtd-display">${qtd}</span>
-            <button class="btn-qtd btn-mais" data-mid="${produto.id}">+</button>
+            <button class="btn-qtd btn-mais" data-mid="${produto.id}" aria-label="Aumentar">${icon('plus', { size: 18 })}</button>
           </div>
           <div style="font-weight:700;min-width:64px;text-align:right;">${fmtBRL(preco * qtd)}</div>
         `;
@@ -463,14 +478,20 @@
 
         vibrar([40, 60, 40, 60, 80]); // padrão de sucesso
         fecharModal();
-        mostrarAlerta(`✅ Venda concluída! Total: ${fmtBRL(total)}`, 'success');
+        const alertaEl = $('alerta');
+        alertaEl.innerHTML = `${icon('check-circle', { size: 18 })} Venda concluída! Total: ${fmtBRL(total)}`;
+        alertaEl.className = 'alert alert-success';
+        alertaEl.style.display = 'inline-flex';
+        alertaEl.style.alignItems = 'center';
+        alertaEl.style.gap = '0.4rem';
+        alertaEl.classList.remove('hidden');
         setTimeout(() => window.location.href = 'index.html', 1800);
       } catch (err) {
         vibrar([100, 50, 100]); // padrão de erro
         $('alerta-modal').textContent = `Erro: ${err.message}`;
         $('alerta-modal').className = 'alert alert-danger';
         $('btn-finalizar').disabled = false;
-        $('btn-finalizar').innerHTML = '✓ Finalizar Venda';
+        $('btn-finalizar').innerHTML = `${icon('check', { size: 20 })} Finalizar Venda`;
       }
     };
 

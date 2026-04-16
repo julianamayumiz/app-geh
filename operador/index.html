@@ -11,7 +11,7 @@
 </head>
 <body>
   <header class="header">
-    <a href="../index.html" class="back">←</a>
+    <a href="../index.html" class="back" aria-label="Voltar"><span data-icon="arrow-left" data-size="24"></span></a>
     <img src="../assets/logo.png" alt="GEH" onerror="this.style.display='none'">
     <h1>Operador de Venda</h1>
   </header>
@@ -23,25 +23,30 @@
 
     <div class="grid-acoes">
       <a href="scanner.html?acao=vender" class="btn btn-primary btn-lg">
-        🛒<br>Vender
+        <span data-icon="shopping-cart" data-size="32"></span>
+        Vender
       </a>
       <a href="scanner.html?acao=carregar" class="btn btn-accent btn-lg">
-        💰<br>Carregar Saldo
+        <span data-icon="wallet" data-size="32"></span>
+        Carregar Saldo
       </a>
       <a href="scanner.html?acao=consultar" class="btn btn-secondary btn-lg">
-        👁️<br>Consultar Saldo
+        <span data-icon="eye" data-size="32"></span>
+        Consultar Saldo
       </a>
     </div>
   </main>
+  <script type="module" src="../js/icons.js"></script>
   <script type="module">
     import { db, doc, getDoc } from "../js/firebase-config.js";
     const snap = await getDoc(doc(db, 'config', 'eventoAtivo'));
     const label = document.getElementById('evento-label');
     const box = document.getElementById('evento-box');
     if (snap.exists() && snap.data().id) {
-      label.innerHTML = `<strong style="color:var(--verde);">● ${snap.data().nome}</strong><br><span style="font-size:0.8rem;color:var(--cinza);">Evento ativo</span>`;
+      label.innerHTML = `<strong style="color:var(--verde);display:inline-flex;align-items:center;gap:0.4rem;"><span style="width:8px;height:8px;background:var(--verde);border-radius:50%;display:inline-block;"></span>${snap.data().nome}</strong><br><span style="font-size:0.8rem;color:var(--cinza);">Evento ativo</span>`;
     } else {
-      label.innerHTML = `<span style="color:var(--vermelho);">⚠️ Nenhum evento ativo. Avise a diretoria.</span>`;
+      const { icon } = await import('../js/icons.js');
+      label.innerHTML = `<span style="color:var(--vermelho);display:inline-flex;align-items:center;gap:0.4rem;justify-content:center;">${icon('alert-triangle', { size: 18 })} Nenhum evento ativo. Avise a diretoria.</span>`;
       box.style.borderLeft = '4px solid var(--vermelho)';
     }
   </script>

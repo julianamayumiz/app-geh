@@ -12,7 +12,7 @@
 </head>
 <body>
   <header class="header">
-    <a href="index.html" class="back">←</a>
+    <a href="index.html" class="back" aria-label="Voltar"><span data-icon="arrow-left" data-size="24"></span></a>
     <h1 id="titulo-acao">Escanear QR</h1>
   </header>
 
@@ -26,7 +26,10 @@
       <div id="alerta" class="alert alert-info mt-2 hidden"></div>
 
       <div class="mt-2">
-        <button id="btn-manual" class="btn btn-secondary">⌨️ Digitar ID manualmente</button>
+        <button id="btn-manual" class="btn btn-secondary">
+          <span data-icon="keyboard" data-size="18"></span>
+          Digitar ID manualmente
+        </button>
       </div>
 
       <div id="manual-form" class="hidden mt-2">
@@ -38,17 +41,24 @@
       </div>
     </div>
   </main>
+  <script type="module" src="../js/icons.js"></script>
 
   <script type="module">
     const params = new URLSearchParams(window.location.search);
     const acao = params.get('acao') || 'consultar';
 
+    const { icon } = await import('../js/icons.js');
     const titulos = {
-      vender: '🛒 Vender para cliente',
-      carregar: '💰 Carregar saldo',
-      consultar: '👁️ Consultar saldo'
+      vender:    { ic: 'shopping-cart', txt: 'Vender para cliente' },
+      carregar:  { ic: 'wallet', txt: 'Carregar saldo' },
+      consultar: { ic: 'eye', txt: 'Consultar saldo' }
     };
-    document.getElementById('titulo-acao').textContent = titulos[acao];
+    const t = titulos[acao];
+    const h1 = document.getElementById('titulo-acao');
+    h1.innerHTML = `${icon(t.ic, { size: 20 })} ${t.txt}`;
+    h1.style.display = 'inline-flex';
+    h1.style.alignItems = 'center';
+    h1.style.gap = '0.5rem';
 
     const alerta = document.getElementById('alerta');
 
