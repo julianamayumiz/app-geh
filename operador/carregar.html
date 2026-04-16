@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1E3A8A">
+  <title>Carregar Saldo — App GEH</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="manifest" href="../manifest.json">
+  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+</head>
+<body>
+  <header class="header">
+    <a href="index.html" class="back">←</a>
+    <h1 id="titulo">💰 Carregar Saldo</h1>
+  </header>
+
+  <main>
+    <div class="cliente-info">
+      <div class="nome" id="cliente-nome">Carregando...</div>
+      <div class="saldo-label">Saldo atual</div>
+      <div class="saldo" id="cliente-saldo">R$ 0,00</div>
+    </div>
+
+    <div id="alerta" class="alert hidden"></div>
+
+    <div id="form-recarga" class="card">
+      <div class="form-group">
+        <label>Valor a carregar (R$)</label>
+        <input type="number" id="valor" step="0.50" min="0" placeholder="Ex: 20,00" inputmode="decimal">
+      </div>
+      <div class="form-group">
+        <label>Forma de pagamento</label>
+        <select id="forma-pagto">
+          <option value="dinheiro">Dinheiro</option>
+          <option value="pix">Pix</option>
+          <option value="cartao">Cartão</option>
+        </select>
+      </div>
+      <button id="btn-carregar" class="btn btn-success">+ Adicionar saldo</button>
+    </div>
+  </main>
+
+  <script type="module">
+    import {
+      db, doc, getDoc, collection, addDoc, serverTimestamp, runTransaction
+    } from "../js/firebase-config.js";
+
+    const params = new URLSearchParams(window.location.search);
+    const clienteId = params.get('cliente');
+    const somenteConsulta = params.get('somente') === '1';
+    if (!clienteId) window.location.href = 'index.html';
+
+    if (somenteConsulta) {
+      document.getElementById('titulo').textContent = '👁️ Saldo do cliente';
+      document.getElementById('form-recarga').classList.add('hidden');
+    }
+
+    // Evento ativo — precisa estar no doc da movimentação pra relatório filtrar por evento
+    let eventoAtivo = null;
+    getDoc(doc(db, 'config', 'eventoAtivo')).then(s => { if (s.exists()) eventoAtivo = s.data(); });
+
+    const $ = (id) => document.getElementById(id);
+    const alerta = $('alerta');
+    const vibrar = (padrao) => { try { navigator.vibrate?.(padrao); } catch(_) {} };
+
+    function mostrarAlerta(msg, tipo = 'info') {
+      alerta.textContent = msg;
+      alerta.className = `alert alert-${tipo}`;
+      alerta.classList.remove('hidden');
+    }
+
+    async function carregarCliente() {
+      const ref = doc(db, 'clientes', clienteId);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) {
+        $('cliente-nome').textContent = '❌ Cliente não cadastrado';
+        mostrarAlerta(`Cliente ${clienteId} não encontrado. Cadastre no admin antes.`, 'danger');
+        return null;
+      }
+      const dados = { id: clienteId, ...snap.data() };
+      $('cliente-nome').textContent = clienteId;
+      $('cliente-saldo').textContent = `R$ ${Number(dados.saldo || 0).toFixed(2).replace('.', ',')}`;
+      return dados;
+    }
+
+    $('btn-carregar')?.addEventListener('click', async () => {
+      const valor = parseFloat($('valor').value);
+      if (!valor || valor <= 0) return mostrarAlerta('Digite um valor maior que zero', 'warning');
+
+      const forma = $('forma-pagto').value;
+      $('btn-carregar').disabled = true;
+      $('btn-carregar').innerHTML = '<div class="loader"></div> Processando...';
+
+      try {
+        await runTransaction(db, async (tx) => {
+          const ref = doc(db, 'clientes', clienteId);
+          const snap = await tx.get(ref);
+          if (!snap.exists()) throw new Error('Cliente não encontrado');
+          const saldo = snap.data().saldo || 0;
+          tx.update(ref, { saldo: saldo + valor });
+
+          const movRef = doc(collection(db, 'movimentacoes_saldo'));
+          tx.set(movRef, {
+            clienteId,
+            tipo: 'recarga',
+            valor,
+            forma,
+            eventoId: eventoAtivo?.id || null,
+            eventoNome: eventoAtivo?.nome || null,
+            criadoEm: serverTimestamp()
+          });
+        });
+
+        vibrar([40, 60, 40, 60, 80]);
+        mostrarAlerta(`✅ R$ ${valor.toFixed(2).replace('.', ',')} adicionados!`, 'success');
+        setTimeout(() => window.location.href = 'index.html', 1500);
+      } catch (err) {
+        vibrar([100, 50, 100]);
+        mostrarAlerta(`Erro: ${err.message}`, 'danger');
+        $('btn-carregar').disabled = false;
+        $('btn-carregar').innerHTML = '+ Adicionar saldo';
+      }
+    });
+
+    carregarCliente();
+  </script>
+</body>
+</html>

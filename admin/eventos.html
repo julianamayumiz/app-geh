@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eventos — Admin GEH</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="manifest" href="../manifest.json">
+  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+</head>
+<body>
+  <main class="admin">
+    <h2 style="color:var(--azul);margin-bottom:1rem;">📅 Eventos</h2>
+
+    <div id="evento-ativo-box" class="card hidden" style="border-left:4px solid var(--verde);">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-size:0.8rem;color:var(--verde);font-weight:700;text-transform:uppercase;">● Evento ativo agora</div>
+          <div style="font-size:1.25rem;font-weight:700;" id="nome-ativo">—</div>
+          <div style="font-size:0.85rem;color:var(--cinza);" id="data-ativo">—</div>
+        </div>
+        <button id="btn-encerrar" class="btn btn-danger" style="width:auto;padding:0.5rem 1rem;">Encerrar</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 class="card-title">Criar novo evento</h3>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:1rem;">
+        <div class="form-group">
+          <label>Nome do evento</label>
+          <input type="text" id="ev-nome" placeholder="Ex: Festa Junina 2025">
+        </div>
+        <div class="form-group">
+          <label>Data</label>
+          <input type="date" id="ev-data">
+        </div>
+      </div>
+      <div id="alerta" class="alert hidden"></div>
+      <button id="btn-criar" class="btn btn-primary" style="max-width:220px;">Criar e ativar evento</button>
+    </div>
+
+    <h3 style="color:var(--azul);margin:1.5rem 0 0.75rem;">Histórico de eventos</h3>
+    <div class="table-wrapper">
+      <table>
+        <thead><tr><th>Nome</th><th>Data</th><th>Status</th><th>Vendas</th><th>Receita</th><th></th></tr></thead>
+        <tbody id="tbl"><tr><td colspan="6" class="text-center text-muted">Carregando...</td></tr></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script type="module">
+    import { montarNav, fmtBRL } from "./_nav.js";
+    import {
+      db, collection, doc, setDoc, getDoc, updateDoc, getDocs,
+      addDoc, onSnapshot, query, orderBy, where, serverTimestamp
+    } from "../js/firebase-config.js";
+
+    montarNav('eventos.html');
+    const $ = id => document.getElementById(id);
+    const alerta = $('alerta');
+
+    // Data padrão = hoje
+    $('ev-data').value = new Date().toISOString().slice(0, 10);
+
+    async function carregarAtivo() {
+      const snap = await getDoc(doc(db, 'config', 'eventoAtivo'));
+      if (snap.exists() && snap.data().id) {
+        const ev = await getDoc(doc(db, 'eventos', snap.data().id));
+        if (ev.exists()) {
+          const d = ev.data();
+          $('nome-ativo').textContent = d.nome;
+          $('data-ativo').textContent = d.data ? new Date(d.data + 'T12:00').toLocaleDateString('pt-BR') : '—';
+          $('evento-ativo-box').classList.remove('hidden');
+        }
+      }
+    }
+
+    $('btn-criar').onclick = async () => {
+      const nome = $('ev-nome').value.trim();
+      const data = $('ev-data').value;
+      if (!nome) { alerta.textContent = 'Digite o nome do evento.'; alerta.className = 'alert alert-warning'; return; }
+
+      $('btn-criar').disabled = true;
+      try {
+        const ref = await addDoc(collection(db, 'eventos'), {
+          nome, data, status: 'ativo', criadoEm: serverTimestamp()
+        });
+        await setDoc(doc(db, 'config', 'eventoAtivo'), { id: ref.id, nome, data });
+        $('ev-nome').value = '';
+        alerta.textContent = `✓ Evento "${nome}" criado e ativado!`;
+        alerta.className = 'alert alert-success';
+        carregarAtivo();
+      } catch (err) {
+        alerta.textContent = `Erro: ${err.message}`;
+        alerta.className = 'alert alert-danger';
+      }
+      $('btn-criar').disabled = false;
+    };
+
+    $('btn-encerrar').onclick = async () => {
+      if (!confirm('Encerrar o evento ativo? As vendas ficam salvas.')) return;
+      const snap = await getDoc(doc(db, 'config', 'eventoAtivo'));
+      if (snap.exists() && snap.data().id) {
+        await updateDoc(doc(db, 'eventos', snap.data().id), { status: 'encerrado' });
+      }
+      await setDoc(doc(db, 'config', 'eventoAtivo'), { id: null, nome: null });
+      $('evento-ativo-box').classList.add('hidden');
+    };
+
+    // Ativar evento antigo
+    async function ativarEvento(id, nome, data) {
+      if (!confirm(`Reativar "${nome}"?`)) return;
+      await updateDoc(doc(db, 'eventos', id), { status: 'ativo' });
+      await setDoc(doc(db, 'config', 'eventoAtivo'), { id, nome, data });
+      carregarAtivo();
+    }
+
+    onSnapshot(query(collection(db, 'eventos'), orderBy('criadoEm', 'desc')), async (snap) => {
+      const tbody = $('tbl');
+      tbody.innerHTML = '';
+      if (snap.empty) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Nenhum evento ainda.</td></tr>';
+        return;
+      }
+      for (const d of snap.docs) {
+        const ev = { id: d.id, ...d.data() };
+        // Contar vendas do evento
+        const vendasSnap = await getDocs(query(collection(db, 'vendas'), where('eventoId', '==', ev.id)));
+        let receita = 0;
+        vendasSnap.forEach(v => receita += v.data().total || 0);
+        const dataFmt = ev.data ? new Date(ev.data + 'T12:00').toLocaleDateString('pt-BR') : '—';
+        const badge = ev.status === 'ativo'
+          ? `<span style="background:var(--verde);color:white;padding:2px 8px;border-radius:999px;font-size:0.8rem;">Ativo</span>`
+          : `<span style="background:var(--cinza);color:white;padding:2px 8px;border-radius:999px;font-size:0.8rem;">Encerrado</span>`;
+        tbody.innerHTML += `
+          <tr>
+            <td><strong>${ev.nome}</strong></td>
+            <td>${dataFmt}</td>
+            <td>${badge}</td>
+            <td>${vendasSnap.size}</td>
+            <td>${fmtBRL(receita)}</td>
+            <td>${ev.status !== 'ativo' ? `<button class="btn btn-secondary" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" onclick="window._ativar('${ev.id}','${ev.nome}','${ev.data||''}')">Reativar</button>` : ''}</td>
+          </tr>`;
+      }
+      window._ativar = ativarEvento;
+    });
+
+    carregarAtivo();
+  </script>
+</body>
+</html>

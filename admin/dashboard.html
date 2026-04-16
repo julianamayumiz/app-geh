@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — Admin GEH</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="manifest" href="../manifest.json">
+  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+</head>
+<body>
+  <main class="admin">
+    <h2 style="color:var(--azul);margin-bottom:0.25rem;">Visão geral do evento</h2>
+    <p id="evento-label" style="color:var(--cinza);margin-bottom:1rem;">Verificando evento ativo...</p>
+
+    <div id="sem-evento" class="alert alert-warning hidden" style="margin-bottom:1rem;">
+      ⚠️ Nenhum evento ativo. Crie e ative um evento em <a href="eventos.html" style="color:var(--azul);font-weight:600;">Eventos</a> para começar a vender.
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;">
+      <div class="card">
+        <div class="text-muted">Total vendido</div>
+        <div style="font-size:2rem;font-weight:700;color:var(--verde);" id="total-vendido">R$ 0,00</div>
+      </div>
+      <div class="card">
+        <div class="text-muted">Nº de vendas</div>
+        <div style="font-size:2rem;font-weight:700;color:var(--azul);" id="num-vendas">0</div>
+      </div>
+      <div class="card">
+        <div class="text-muted">Saldo em circulação</div>
+        <div style="font-size:2rem;font-weight:700;color:var(--amarelo);" id="saldo-circulacao">R$ 0,00</div>
+      </div>
+      <div class="card">
+        <div class="text-muted">Clientes ativos</div>
+        <div style="font-size:2rem;font-weight:700;color:var(--azul);" id="num-clientes">0</div>
+      </div>
+    </div>
+
+    <h3 style="color:var(--azul);margin:1.5rem 0 0.75rem;">Últimas vendas</h3>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr><th>Quando</th><th>Cliente</th><th>Itens</th><th>Total</th></tr>
+        </thead>
+        <tbody id="tbl-vendas"><tr><td colspan="4" class="text-center text-muted">Carregando...</td></tr></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script type="module">
+    import { montarNav, fmtBRL } from "./_nav.js";
+    import { db, doc, getDoc, collection, onSnapshot, query, where, orderBy } from "../js/firebase-config.js";
+
+    montarNav('dashboard.html');
+
+    const $ = (id) => document.getElementById(id);
+
+    (async function init() {
+      const snap = await getDoc(doc(db, 'config', 'eventoAtivo'));
+      const eventoAtivo = snap.exists() && snap.data().id ? snap.data() : null;
+
+      if (!eventoAtivo) {
+        $('evento-label').textContent = 'Sem evento ativo';
+        $('sem-evento').classList.remove('hidden');
+        $('total-vendido').textContent = 'R$ 0,00';
+        $('num-vendas').textContent = '0';
+        $('tbl-vendas').innerHTML = '<tr><td colspan="4" class="text-center text-muted">Nenhum evento ativo.</td></tr>';
+        // Saldo em circulação e clientes ativos continuam sendo totais globais (independem de evento)
+        onSnapshot(collection(db, 'clientes'), (s) => {
+          let saldoTotal = 0;
+          s.forEach(d => saldoTotal += d.data().saldo || 0);
+          $('saldo-circulacao').textContent = fmtBRL(saldoTotal);
+          $('num-clientes').textContent = s.size;
+        });
+        return;
+      }
+
+      $('evento-label').innerHTML = `<strong style="color:var(--verde);">● ${eventoAtivo.nome}</strong> <span style="color:var(--cinza);">— números deste evento</span>`;
+
+      // Vendas DO EVENTO ATIVO em tempo real (limite 50 pra não baixar tudo em eventos grandes)
+      const vendasQuery = query(
+        collection(db, 'vendas'),
+        where('eventoId', '==', eventoAtivo.id),
+        orderBy('criadoEm', 'desc')
+      );
+      onSnapshot(vendasQuery, (snap) => {
+        let total = 0;
+        const tbody = $('tbl-vendas');
+        tbody.innerHTML = '';
+        const docs = snap.docs;
+        docs.forEach(d => total += (d.data().total || 0));
+        // Mostrar só as 50 mais recentes na tabela
+        docs.slice(0, 50).forEach(d => {
+          const v = d.data();
+          const qtdItens = (v.itens || []).reduce((s, i) => s + (i.qtd || 0), 0);
+          const quando = v.criadoEm?.toDate?.()?.toLocaleTimeString('pt-BR') || '—';
+          tbody.innerHTML += `
+            <tr>
+              <td>${quando}</td>
+              <td>${v.clienteId}</td>
+              <td>${qtdItens}</td>
+              <td>${fmtBRL(v.total)}</td>
+            </tr>
+          `;
+        });
+        if (snap.empty) tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Sem vendas ainda neste evento.</td></tr>';
+        $('total-vendido').textContent = fmtBRL(total);
+        $('num-vendas').textContent = snap.size;
+      });
+
+      // Saldo em circulação e clientes ativos — globais (o QR é da pessoa, carrega entre eventos)
+      onSnapshot(collection(db, 'clientes'), (s) => {
+        let saldoTotal = 0;
+        s.forEach(d => saldoTotal += d.data().saldo || 0);
+        $('saldo-circulacao').textContent = fmtBRL(saldoTotal);
+        $('num-clientes').textContent = s.size;
+      });
+    })();
+  </script>
+</body>
+</html>

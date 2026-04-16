@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Histórico — Admin GEH</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="manifest" href="../manifest.json">
+  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+</head>
+<body>
+  <main class="admin">
+    <h2 style="color:var(--azul);margin-bottom:1rem;">🔍 Histórico por Cliente</h2>
+
+    <div class="card">
+      <div style="display:flex;gap:0.75rem;align-items:flex-end;">
+        <div class="form-group" style="flex:1;margin-bottom:0;">
+          <label>ID do cliente (QR code)</label>
+          <input type="text" id="busca-id" placeholder="Ex: GEH001" autocomplete="off">
+        </div>
+        <button id="btn-buscar" class="btn btn-primary" style="width:auto;padding:0.75rem 1.25rem;">Buscar</button>
+      </div>
+
+      <div id="clientes-lista" class="hidden" style="margin-top:0.75rem;">
+        <p style="font-size:0.85rem;color:var(--cinza);margin-bottom:0.5rem;">Clientes cadastrados:</p>
+        <div id="chips" style="display:flex;flex-wrap:wrap;gap:0.5rem;"></div>
+      </div>
+    </div>
+
+    <div id="resultado" class="hidden">
+      <div class="cliente-info" style="margin-bottom:1rem;">
+        <div class="nome" id="res-id">—</div>
+        <div class="saldo-label">Saldo atual</div>
+        <div class="saldo" id="res-saldo">R$ 0,00</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+        <div class="card" style="margin-bottom:0;">
+          <div class="text-muted">Total recarregado</div>
+          <div style="font-size:1.5rem;font-weight:700;color:var(--verde);" id="res-total-recarga">R$ 0,00</div>
+        </div>
+        <div class="card" style="margin-bottom:0;">
+          <div class="text-muted">Total gasto</div>
+          <div style="font-size:1.5rem;font-weight:700;color:var(--vermelho);" id="res-total-gasto">R$ 0,00</div>
+        </div>
+      </div>
+
+      <h3 style="color:var(--azul);margin-bottom:0.75rem;">Movimentações</h3>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Quando</th><th>Tipo</th><th>Detalhe</th><th>Valor</th></tr></thead>
+          <tbody id="tbl-mov"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="sem-resultado" class="alert alert-warning hidden">Cliente não encontrado.</div>
+  </main>
+
+  <script type="module">
+    import { montarNav, fmtBRL } from "./_nav.js";
+    import {
+      db, collection, doc, getDoc, getDocs, query, where, orderBy
+    } from "../js/firebase-config.js";
+
+    montarNav('historico.html');
+
+    const $ = (id) => document.getElementById(id);
+    let todosClientes = [];
+
+    // Carregar lista de IDs pra sugestão
+    async function carregarClientes() {
+      const snap = await getDocs(collection(db, 'clientes'));
+      todosClientes = [];
+      snap.forEach(d => todosClientes.push(d.id));
+      todosClientes.sort();
+      renderChips('');
+      $('clientes-lista').classList.remove('hidden');
+    }
+
+    function renderChips(filtro) {
+      const chips = $('chips');
+      chips.innerHTML = '';
+      const lista = filtro
+        ? todosClientes.filter(id => id.toLowerCase().includes(filtro.toLowerCase()))
+        : todosClientes;
+      lista.slice(0, 20).forEach(id => {
+        const btn = document.createElement('button');
+        btn.textContent = id;
+        btn.style.cssText = 'background:var(--azul-claro);color:white;border:none;padding:0.3rem 0.75rem;border-radius:999px;cursor:pointer;font-size:0.85rem;';
+        btn.onclick = () => { $('busca-id').value = id; buscar(id); };
+        chips.appendChild(btn);
+      });
+      if (lista.length > 20) {
+        chips.innerHTML += `<span class="text-muted" style="font-size:0.8rem;">+${lista.length - 20} clientes</span>`;
+      }
+    }
+
+    $('busca-id').oninput = () => renderChips($('busca-id').value);
+    $('btn-buscar').onclick = () => buscar($('busca-id').value.trim());
+    $('busca-id').onkeydown = (e) => { if (e.key === 'Enter') buscar($('busca-id').value.trim()); };
+
+    async function buscar(id) {
+      if (!id) return;
+      $('resultado').classList.add('hidden');
+      $('sem-resultado').classList.add('hidden');
+
+      const clienteSnap = await getDoc(doc(db, 'clientes', id));
+      if (!clienteSnap.exists()) {
+        $('sem-resultado').classList.remove('hidden');
+        return;
+      }
+
+      const saldo = clienteSnap.data().saldo || 0;
+      $('res-id').textContent = id;
+      $('res-saldo').textContent = fmtBRL(saldo);
+
+      // Buscar movimentações de saldo (recargas)
+      const movSnap = await getDocs(query(
+        collection(db, 'movimentacoes_saldo'),
+        where('clienteId', '==', id),
+        orderBy('criadoEm', 'desc')
+      ));
+
+      // Buscar vendas
+      const vendasSnap = await getDocs(query(
+        collection(db, 'vendas'),
+        where('clienteId', '==', id),
+        orderBy('criadoEm', 'desc')
+      ));
+
+      // Montar lista unificada
+      const movimentos = [];
+      let totalRecarga = 0, totalGasto = 0;
+
+      movSnap.forEach(d => {
+        const m = d.data();
+        totalRecarga += m.valor || 0;
+        movimentos.push({
+          quando: m.criadoEm?.toDate?.() || new Date(0),
+          tipo: 'recarga',
+          detalhe: `Via ${m.forma || '—'}`,
+          valor: m.valor,
+          positivo: true
+        });
+      });
+
+      vendasSnap.forEach(d => {
+        const v = d.data();
+        totalGasto += v.total || 0;
+        const itens = (v.itens || []).map(i => `${i.qtd}× ${i.nome}`).join(', ');
+        movimentos.push({
+          quando: v.criadoEm?.toDate?.() || new Date(0),
+          tipo: 'venda',
+          detalhe: itens,
+          valor: v.total,
+          positivo: false
+        });
+      });
+
+      movimentos.sort((a, b) => b.quando - a.quando);
+
+      $('res-total-recarga').textContent = fmtBRL(totalRecarga);
+      $('res-total-gasto').textContent = fmtBRL(totalGasto);
+
+      const tbody = $('tbl-mov');
+      tbody.innerHTML = '';
+      if (movimentos.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Sem movimentações.</td></tr>';
+      } else {
+        movimentos.forEach(m => {
+          const cor = m.positivo ? 'var(--verde)' : 'var(--vermelho)';
+          const sinal = m.positivo ? '+' : '-';
+          tbody.innerHTML += `
+            <tr>
+              <td>${m.quando.toLocaleString('pt-BR')}</td>
+              <td><span style="background:${cor};color:white;padding:2px 8px;border-radius:999px;font-size:0.8rem;">${m.tipo}</span></td>
+              <td style="font-size:0.875rem;">${m.detalhe}</td>
+              <td style="font-weight:700;color:${cor};">${sinal} ${fmtBRL(m.valor)}</td>
+            </tr>
+          `;
+        });
+      }
+
+      $('resultado').classList.remove('hidden');
+    }
+
+    carregarClientes();
+  </script>
+</body>
+</html>

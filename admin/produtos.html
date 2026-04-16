@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Produtos — Admin GEH</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="manifest" href="../manifest.json">
+  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+</head>
+<body>
+  <main class="admin">
+    <h2 style="color:var(--azul);margin-bottom:1rem;">📦 Produtos</h2>
+
+    <div class="card">
+      <h3 class="card-title" id="form-titulo">Adicionar produto</h3>
+      <input type="hidden" id="prod-id">
+      <div class="form-group">
+        <label>Nome</label>
+        <input type="text" id="prod-nome" placeholder="Ex: Brigadeiro">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:1rem;">
+        <div class="form-group">
+          <label>Preço (R$)</label>
+          <input type="number" id="prod-preco" step="0.50" min="0">
+        </div>
+        <div class="form-group">
+          <label>Preço promo (R$)</label>
+          <input type="number" id="prod-preco-promo" step="0.50" min="0" placeholder="Opcional">
+        </div>
+        <div class="form-group">
+          <label>Estoque inicial</label>
+          <input type="number" id="prod-estoque" min="0" step="1">
+        </div>
+        <div class="form-group">
+          <label>Categoria</label>
+          <input type="text" id="prod-categoria" placeholder="Ex: Doces">
+        </div>
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:0.5rem;">
+        <input type="checkbox" id="prod-promocao" style="width:20px;height:20px;cursor:pointer;">
+        <label for="prod-promocao" style="cursor:pointer;margin-bottom:0;">🏷️ Marcar como promoção agora</label>
+      </div>
+      <div id="alerta" class="alert hidden"></div>
+      <div style="display:flex;gap:0.5rem;">
+        <button id="btn-salvar" class="btn btn-primary">Salvar</button>
+        <button id="btn-cancelar" class="btn btn-secondary hidden">Cancelar</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 class="card-title">Cadastrar em lote (CSV)</h3>
+      <p class="text-muted" style="font-size:0.85rem;margin-bottom:0.75rem;">
+        Cole uma linha por produto no formato: <code style="background:var(--cinza-claro);padding:2px 6px;border-radius:4px;">Nome, Preço, Estoque, Categoria</code><br>
+        Categoria é opcional. Exemplo:
+      </p>
+      <pre style="background:var(--cinza-claro);padding:0.75rem;border-radius:8px;font-size:0.8rem;margin-bottom:0.75rem;">Brigadeiro, 3.50, 100, Doces
+Suco de Laranja, 5.00, 50, Bebidas
+Bolo de Cenoura, 4.00, 30</pre>
+      <div class="form-group">
+        <label>Lista de produtos</label>
+        <textarea id="lote-produtos" rows="8" style="font-family:monospace;font-size:0.875rem;" placeholder="Nome, Preço, Estoque, Categoria"></textarea>
+      </div>
+      <div id="alerta-lote" class="alert hidden"></div>
+      <button id="btn-lote" class="btn btn-primary" style="max-width:220px;">Importar lote</button>
+    </div>
+
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr><th>Nome</th><th>Categoria</th><th>Preço</th><th>Estoque</th><th></th></tr>
+        </thead>
+        <tbody id="tbl"><tr><td colspan="5" class="text-center text-muted">Carregando...</td></tr></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script type="module">
+    import { montarNav, fmtBRL } from "./_nav.js";
+    import { db, collection, doc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, writeBatch } from "../js/firebase-config.js";
+
+    montarNav('produtos.html');
+
+    const $ = (id) => document.getElementById(id);
+    const alerta = $('alerta');
+
+    function resetForm() {
+      $('prod-id').value = '';
+      $('prod-nome').value = '';
+      $('prod-preco').value = '';
+      $('prod-preco-promo').value = '';
+      $('prod-estoque').value = '';
+      $('prod-categoria').value = '';
+      $('prod-promocao').checked = false;
+      $('form-titulo').textContent = 'Adicionar produto';
+      $('btn-cancelar').classList.add('hidden');
+      alerta.classList.add('hidden');
+    }
+    $('btn-cancelar').onclick = resetForm;
+
+    $('btn-salvar').onclick = async () => {
+      const id = $('prod-id').value;
+      const precoPromo = parseFloat($('prod-preco-promo').value);
+      const promocao = $('prod-promocao').checked;
+      const dados = {
+        nome: $('prod-nome').value.trim(),
+        preco: parseFloat($('prod-preco').value) || 0,
+        precoPromo: precoPromo > 0 ? precoPromo : null,
+        promocao: promocao,
+        estoque: parseInt($('prod-estoque').value) || 0,
+        categoria: $('prod-categoria').value.trim() || 'Geral'
+      };
+      if (!dados.nome || dados.preco <= 0) {
+        alerta.textContent = 'Preencha nome e preço válido.';
+        alerta.className = 'alert alert-warning';
+        return;
+      }
+      try {
+        if (id) {
+          await updateDoc(doc(db, 'produtos', id), dados);
+        } else {
+          await addDoc(collection(db, 'produtos'), dados);
+        }
+        resetForm();
+      } catch (err) {
+        alerta.textContent = `Erro: ${err.message}`;
+        alerta.className = 'alert alert-danger';
+      }
+    };
+
+    $('btn-lote').onclick = async () => {
+      const texto = $('lote-produtos').value.trim();
+      if (!texto) return;
+
+      const linhas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      const alertaLote = $('alerta-lote');
+      const erros = [];
+      const produtos = [];
+
+      linhas.forEach((linha, i) => {
+        const partes = linha.split(',').map(p => p.trim());
+        const nome = partes[0];
+        const preco = parseFloat(partes[1]);
+        const estoque = parseInt(partes[2]) || 0;
+        const categoria = partes[3] || 'Geral';
+        if (!nome || isNaN(preco) || preco <= 0) {
+          erros.push(`Linha ${i + 1}: "${linha}" — nome ou preço inválido`);
+        } else {
+          produtos.push({ nome, preco, estoque, categoria });
+        }
+      });
+
+      if (erros.length > 0) {
+        alertaLote.innerHTML = `Corrija os erros antes de importar:<br>${erros.join('<br>')}`;
+        alertaLote.className = 'alert alert-danger';
+        return;
+      }
+
+      if (!confirm(`Importar ${produtos.length} produtos?`)) return;
+
+      $('btn-lote').disabled = true;
+      $('btn-lote').innerHTML = '<div class="loader" style="border-top-color:white"></div> Importando...';
+
+      const batch = writeBatch(db);
+      produtos.forEach(p => batch.set(doc(collection(db, 'produtos')), p));
+      await batch.commit();
+
+      $('lote-produtos').value = '';
+      alertaLote.textContent = `✓ ${produtos.length} produtos cadastrados!`;
+      alertaLote.className = 'alert alert-success';
+      $('btn-lote').disabled = false;
+      $('btn-lote').innerHTML = 'Importar lote';
+      setTimeout(() => alertaLote.classList.add('hidden'), 3000);
+    };
+
+    onSnapshot(collection(db, 'produtos'), (snap) => {
+      const tbody = $('tbl');
+      tbody.innerHTML = '';
+      if (snap.empty) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Sem produtos ainda.</td></tr>';
+        return;
+      }
+      snap.forEach(d => {
+        const p = { id: d.id, ...d.data() };
+        const tr = document.createElement('tr');
+        const ESTOQUE_BAIXO = 10;
+        const badgePromo = p.promocao
+          ? `<span style="background:var(--vermelho);color:white;font-size:0.7rem;padding:2px 6px;border-radius:999px;margin-left:4px;">🏷️ PROMO</span>`
+          : '';
+        const badgeEstoque = p.estoque <= 0
+          ? `<span style="background:#6B7280;color:white;font-size:0.7rem;padding:2px 6px;border-radius:999px;margin-left:4px;">SEM ESTOQUE</span>`
+          : p.estoque <= ESTOQUE_BAIXO
+          ? `<span style="background:var(--amarelo);color:#333;font-size:0.7rem;padding:2px 6px;border-radius:999px;margin-left:4px;">⚠️ BAIXO</span>`
+          : '';
+        const precoHtml = p.promocao && p.precoPromo
+          ? `<span style="text-decoration:line-through;color:var(--cinza);font-size:0.85rem;">${fmtBRL(p.preco)}</span> <strong style="color:var(--vermelho);">${fmtBRL(p.precoPromo)}</strong>`
+          : fmtBRL(p.preco);
+        tr.innerHTML = `
+          <td>${p.nome}${badgePromo}${badgeEstoque}</td>
+          <td>${p.categoria || '—'}</td>
+          <td>${precoHtml}</td>
+          <td>${p.estoque}</td>
+          <td>
+            <button class="btn btn-secondary" style="width:auto;padding:0.35rem 0.75rem;font-size:0.85rem;" data-edit="${p.id}">Editar</button>
+            <button class="btn btn-danger"   style="width:auto;padding:0.35rem 0.75rem;font-size:0.85rem;" data-del="${p.id}">Excluir</button>
+          </td>
+        `;
+        tr.querySelector('[data-edit]').onclick = () => {
+          $('prod-id').value = p.id;
+          $('prod-nome').value = p.nome;
+          $('prod-preco').value = p.preco;
+          $('prod-preco-promo').value = p.precoPromo || '';
+          $('prod-promocao').checked = p.promocao || false;
+          $('prod-estoque').value = p.estoque;
+          $('prod-categoria').value = p.categoria || '';
+          $('form-titulo').textContent = `Editando "${p.nome}"`;
+          $('btn-cancelar').classList.remove('hidden');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+        tr.querySelector('[data-del]').onclick = async () => {
+          if (!confirm(`Excluir "${p.nome}"?`)) return;
+          await deleteDoc(doc(db, 'produtos', p.id));
+        };
+        tbody.appendChild(tr);
+      });
+    });
+  </script>
+</body>
+</html>

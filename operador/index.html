@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1E3A8A">
+  <title>Operador — App GEH</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="manifest" href="../manifest.json">
+  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+</head>
+<body>
+  <header class="header">
+    <a href="../index.html" class="back">←</a>
+    <img src="../assets/logo.png" alt="GEH" onerror="this.style.display='none'">
+    <h1>Operador de Venda</h1>
+  </header>
+
+  <main>
+    <div class="card" id="evento-box">
+      <p class="text-muted text-center" id="evento-label">Verificando evento ativo...</p>
+    </div>
+
+    <div class="grid-acoes">
+      <a href="scanner.html?acao=vender" class="btn btn-primary btn-lg">
+        🛒<br>Vender
+      </a>
+      <a href="scanner.html?acao=carregar" class="btn btn-accent btn-lg">
+        💰<br>Carregar Saldo
+      </a>
+      <a href="scanner.html?acao=consultar" class="btn btn-secondary btn-lg">
+        👁️<br>Consultar Saldo
+      </a>
+    </div>
+  </main>
+  <script type="module">
+    import { db, doc, getDoc } from "../js/firebase-config.js";
+    const snap = await getDoc(doc(db, 'config', 'eventoAtivo'));
+    const label = document.getElementById('evento-label');
+    const box = document.getElementById('evento-box');
+    if (snap.exists() && snap.data().id) {
+      label.innerHTML = `<strong style="color:var(--verde);">● ${snap.data().nome}</strong><br><span style="font-size:0.8rem;color:var(--cinza);">Evento ativo</span>`;
+    } else {
+      label.innerHTML = `<span style="color:var(--vermelho);">⚠️ Nenhum evento ativo. Avise a diretoria.</span>`;
+      box.style.borderLeft = '4px solid var(--vermelho)';
+    }
+  </script>
+</body>
+</html>

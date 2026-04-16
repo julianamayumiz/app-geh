@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Relatório — Admin GEH</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    @media print {
+      nav, .btn, select, label, #btn-export, #btn-print { display: none !important; }
+      header { box-shadow: none; position: static; }
+      body { background: white; }
+      .card { box-shadow: none; border: 1px solid #ddd; }
+      main { max-width: 100%; padding: 0; }
+      .table-wrapper { box-shadow: none; }
+      #print-header { display: block !important; }
+    }
+    #print-header {
+      display: none;
+      text-align: center;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 2px solid #1E3A8A;
+    }
+    #print-header h1 { color: #1E3A8A; font-size: 1.5rem; }
+    #print-header p { color: #666; font-size: 0.9rem; }
+  </style>
+  <link rel="manifest" href="../manifest.json">
+  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+</head>
+<body>
+  <main class="admin">
+    <div id="print-header">
+      <img src="../assets/logo.png" style="width:80px;margin-bottom:0.5rem;" onerror="this.style.display='none'">
+      <h1>Grupo Escoteiro Hokkaido</h1>
+      <p id="print-subtitulo">Relatório Financeiro</p>
+      <p>Gerado em: <span id="print-data"></span></p>
+    </div>
+    <h2 style="color:var(--azul);margin-bottom:1rem;">📈 Relatório Financeiro</h2>
+
+    <div class="card" style="margin-bottom:1rem;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label>Filtrar por evento</label>
+        <select id="sel-evento">
+          <option value="">Todos os eventos</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1.5rem;">
+      <div class="card">
+        <div class="text-muted">Receita total</div>
+        <div style="font-size:1.75rem;font-weight:700;color:var(--verde);" id="receita">R$ 0,00</div>
+      </div>
+      <div class="card">
+        <div class="text-muted">Custo total (compras)</div>
+        <div style="font-size:1.75rem;font-weight:700;color:var(--vermelho);" id="custo">R$ 0,00</div>
+      </div>
+      <div class="card">
+        <div class="text-muted">Lucro bruto</div>
+        <div style="font-size:1.75rem;font-weight:700;color:var(--azul);" id="lucro">R$ 0,00</div>
+      </div>
+      <div class="card">
+        <div class="text-muted">Saldo em circulação</div>
+        <div style="font-size:1.75rem;font-weight:700;color:var(--amarelo);" id="saldo-circ">R$ 0,00</div>
+      </div>
+    </div>
+
+    <h3 style="color:var(--azul);margin-bottom:0.75rem;">Mais vendidos</h3>
+    <div class="table-wrapper mb-2">
+      <table>
+        <thead><tr><th>Produto</th><th>Qtd vendida</th><th>Receita</th></tr></thead>
+        <tbody id="tbl-mais"><tr><td colspan="3" class="text-center text-muted">Carregando...</td></tr></tbody>
+      </table>
+    </div>
+
+    <h3 style="color:var(--azul);margin-bottom:0.75rem;">Recargas por forma de pagamento</h3>
+    <div class="table-wrapper mb-2">
+      <table>
+        <thead><tr><th>Forma</th><th>Qtd</th><th>Total</th></tr></thead>
+        <tbody id="tbl-pagto"><tr><td colspan="3" class="text-center text-muted">Carregando...</td></tr></tbody>
+      </table>
+    </div>
+
+    <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+      <button class="btn btn-primary" id="btn-export" style="max-width:280px;">⬇️ Exportar CSV</button>
+      <button class="btn btn-secondary" id="btn-print" style="max-width:280px;">🖨️ Imprimir / Salvar PDF</button>
+    </div>
+  </main>
+
+  <script type="module">
+    import { montarNav, fmtBRL } from "./_nav.js";
+    import { db, collection, getDocs, query, where, orderBy } from "../js/firebase-config.js";
+
+    montarNav('relatorio.html');
+
+    const $ = (id) => document.getElementById(id);
+
+    // Carregar eventos no select
+    async function carregarEventos() {
+      const snap = await getDocs(collection(db, 'eventos'));
+      snap.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.id;
+        opt.textContent = d.data().nome;
+        $('sel-evento').appendChild(opt);
+      });
+      // Pré-selecionar evento ativo
+      const { getDoc, doc } = await import("../js/firebase-config.js");
+      const ativo = await getDoc(doc(db, 'config', 'eventoAtivo'));
+      if (ativo.exists() && ativo.data().id) $('sel-evento').value = ativo.data().id;
+      carregar();
+    }
+
+    $('sel-evento').onchange = carregar;
+
+    async function carregar() {
+      const eventoId = $('sel-evento').value;
+      const vendasQuery = eventoId
+        ? query(collection(db, 'vendas'), where('eventoId', '==', eventoId))
+        : collection(db, 'vendas');
+      const movQuery = eventoId
+        ? query(collection(db, 'movimentacoes_saldo'), where('eventoId', '==', eventoId))
+        : collection(db, 'movimentacoes_saldo');
+
+      const [vendasSnap, comprasSnap, clientesSnap, movSnap] = await Promise.all([
+        getDocs(vendasQuery),
+        getDocs(collection(db, 'compras')),
+        getDocs(collection(db, 'clientes')),
+        getDocs(movQuery)
+      ]);
+
+      let receita = 0;
+      const porProduto = new Map();
+      vendasSnap.forEach(d => {
+        const v = d.data();
+        receita += v.total || 0;
+        (v.itens || []).forEach(i => {
+          const atual = porProduto.get(i.nome) || { qtd: 0, total: 0 };
+          atual.qtd += i.qtd;
+          atual.total += i.subtotal;
+          porProduto.set(i.nome, atual);
+        });
+      });
+
+      let custo = 0;
+      comprasSnap.forEach(d => custo += d.data().custoTotal || 0);
+
+      let saldoCirc = 0;
+      clientesSnap.forEach(d => saldoCirc += d.data().saldo || 0);
+
+      const porForma = new Map();
+      movSnap.forEach(d => {
+        const m = d.data();
+        if (m.tipo !== 'recarga') return;
+        const a = porForma.get(m.forma) || { qtd: 0, total: 0 };
+        a.qtd += 1;
+        a.total += m.valor;
+        porForma.set(m.forma, a);
+      });
+
+      $('receita').textContent = fmtBRL(receita);
+      $('custo').textContent   = fmtBRL(custo);
+      $('lucro').textContent   = fmtBRL(receita - custo);
+      $('saldo-circ').textContent = fmtBRL(saldoCirc);
+
+      const tblMais = $('tbl-mais');
+      tblMais.innerHTML = '';
+      const ordenados = Array.from(porProduto.entries()).sort((a, b) => b[1].qtd - a[1].qtd);
+      if (ordenados.length === 0) tblMais.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Sem vendas.</td></tr>';
+      ordenados.forEach(([nome, { qtd, total }]) => {
+        tblMais.innerHTML += `<tr><td>${nome}</td><td>${qtd}</td><td>${fmtBRL(total)}</td></tr>`;
+      });
+
+      const tblPagto = $('tbl-pagto');
+      tblPagto.innerHTML = '';
+      if (porForma.size === 0) tblPagto.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Sem recargas.</td></tr>';
+      porForma.forEach((v, forma) => {
+        tblPagto.innerHTML += `<tr><td>${forma}</td><td>${v.qtd}</td><td>${fmtBRL(v.total)}</td></tr>`;
+      });
+
+      $('btn-export').onclick = () => exportarCSV(vendasSnap);
+      const evNome = $('sel-evento').options[$('sel-evento').selectedIndex]?.text || 'Todos os eventos';
+      $('print-subtitulo').textContent = `Relatório Financeiro — ${evNome}`;
+      $('print-data').textContent = new Date().toLocaleString('pt-BR');
+      $('btn-print').onclick = () => window.print();
+    }
+
+    function exportarCSV(vendasSnap) {
+      const linhas = [['Data','Cliente ID','Cliente','Produto','Qtd','Preço Unit','Subtotal','Total da venda']];
+      vendasSnap.forEach(d => {
+        const v = d.data();
+        const data = v.criadoEm?.toDate?.()?.toLocaleString('pt-BR') || '';
+        (v.itens || []).forEach(i => {
+          linhas.push([data, v.clienteId, v.clienteNome || '', i.nome, i.qtd, i.preco, i.subtotal, v.total]);
+        });
+      });
+      const csv = linhas.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
+      const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `relatorio-vendas-${new Date().toISOString().slice(0,10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    carregarEventos();
+  </script>
+</body>
+</html>
