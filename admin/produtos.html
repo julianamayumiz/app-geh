@@ -19,7 +19,7 @@
         <label>Nome</label>
         <input type="text" id="prod-nome" placeholder="Ex: Brigadeiro">
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:1rem;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;">
         <div class="form-group">
           <label>Preço (R$)</label>
           <input type="number" id="prod-preco" step="0.50" min="0">
@@ -52,11 +52,11 @@
       <h3 class="card-title">Cadastrar em lote (CSV)</h3>
       <p class="text-muted" style="font-size:0.85rem;margin-bottom:0.75rem;">
         Cole uma linha por produto no formato: <code style="background:var(--cinza-claro);padding:2px 6px;border-radius:4px;">Nome, Preço, Estoque, Categoria</code><br>
-        Categoria é opcional. Exemplo:
+        Categoria é opcional. Se o nome tiver vírgula, coloque entre aspas: <code style="background:var(--cinza-claro);padding:2px 6px;border-radius:4px;">"Bolo, Chocolate", 4.00, 30</code>
       </p>
       <pre style="background:var(--cinza-claro);padding:0.75rem;border-radius:8px;font-size:0.8rem;margin-bottom:0.75rem;">Brigadeiro, 3.50, 100, Doces
 Suco de Laranja, 5.00, 50, Bebidas
-Bolo de Cenoura, 4.00, 30</pre>
+"Bolo de Cenoura, fatia", 4.00, 30</pre>
       <div class="form-group">
         <label>Lista de produtos</label>
         <textarea id="lote-produtos" rows="8" style="font-family:monospace;font-size:0.875rem;" placeholder="Nome, Preço, Estoque, Categoria"></textarea>
@@ -137,10 +137,25 @@ Bolo de Cenoura, 4.00, 30</pre>
       const erros = [];
       const produtos = [];
 
+      // Parse CSV respeitando aspas ("Bolo, chocolate", 4.00, 30)
+      function parseLinhaCSV(linha) {
+        const campos = [];
+        let atual = '';
+        let dentroAspas = false;
+        for (let i = 0; i < linha.length; i++) {
+          const c = linha[i];
+          if (c === '"') { dentroAspas = !dentroAspas; continue; }
+          if (c === ',' && !dentroAspas) { campos.push(atual.trim()); atual = ''; continue; }
+          atual += c;
+        }
+        campos.push(atual.trim());
+        return campos;
+      }
+
       linhas.forEach((linha, i) => {
-        const partes = linha.split(',').map(p => p.trim());
+        const partes = parseLinhaCSV(linha);
         const nome = partes[0];
-        const preco = parseFloat(partes[1]);
+        const preco = parseFloat((partes[1] || '').replace(',', '.'));
         const estoque = parseInt(partes[2]) || 0;
         const categoria = partes[3] || 'Geral';
         if (!nome || isNaN(preco) || preco <= 0) {

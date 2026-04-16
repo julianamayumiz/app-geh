@@ -327,12 +327,14 @@ a:focus-visible {
 .table-wrapper {
   background: var(--branco);
   border-radius: var(--radius);
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   box-shadow: var(--sombra);
 }
 
 table {
   width: 100%;
+  min-width: 600px;
   border-collapse: collapse;
 }
 
