@@ -446,17 +446,21 @@
       try {
         await runTransaction(db, async (tx) => {
           const clienteRef = doc(db, 'clientes', cliente.id);
+          const itensCarrinho = Array.from(carrinho.values());
+          const prodRefs = itensCarrinho.map(({ produto }) => doc(db, 'produtos', produto.id));
+
+          // Firestore exige TODOS os reads antes de qualquer write
           const clienteSnap = await tx.get(clienteRef);
+          const prodSnaps = await Promise.all(prodRefs.map(r => tx.get(r)));
+
           const saldoAtual = clienteSnap.data().saldo || 0;
           if (saldoAtual < total) throw new Error('Saldo insuficiente');
 
-          for (const { produto, qtd } of carrinho.values()) {
-            const prodRef = doc(db, 'produtos', produto.id);
-            const prodSnap = await tx.get(prodRef);
-            const estAtual = prodSnap.data().estoque || 0;
+          itensCarrinho.forEach(({ produto, qtd }, i) => {
+            const estAtual = prodSnaps[i].data().estoque || 0;
             if (estAtual < qtd) throw new Error(`Estoque insuficiente: ${produto.nome}`);
-            tx.update(prodRef, { estoque: estAtual - qtd });
-          }
+            tx.update(prodRefs[i], { estoque: estAtual - qtd });
+          });
 
           tx.update(clienteRef, { saldo: saldoAtual - total });
 
