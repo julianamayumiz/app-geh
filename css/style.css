@@ -336,6 +336,17 @@ a:focus-visible {
   box-shadow: var(--sombra-forte);
 }
 
+/* ===== Nav admin ===== */
+.admin-nav {
+  scrollbar-width: thin;
+}
+.admin-nav::-webkit-scrollbar { height: 6px; }
+.admin-nav::-webkit-scrollbar-thumb {
+  background: var(--cinza);
+  border-radius: 3px;
+}
+.admin-nav::-webkit-scrollbar-track { background: transparent; }
+
 /* ===== Tabelas (admin) ===== */
 .table-wrapper {
   background: var(--branco);

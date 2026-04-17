@@ -20,7 +20,7 @@ export function montarNav(paginaAtiva = '') {
       <h1>Admin GEH</h1>
       <button id="btn-logout" class="back" title="Sair" aria-label="Sair">${icon('power', { size: 22 })}</button>
     </header>
-    <nav style="background:white;padding:0.5rem 1rem;display:flex;gap:0.5rem;overflow-x:auto;box-shadow:var(--sombra);">
+    <nav class="admin-nav" style="background:white;padding:0.5rem 1rem 0.75rem;display:flex;gap:0.5rem;overflow-x:auto;box-shadow:var(--sombra);">
       ${links}
     </nav>
   `;
