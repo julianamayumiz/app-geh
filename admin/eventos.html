@@ -20,7 +20,10 @@
           <div style="font-size:1.25rem;font-weight:700;" id="nome-ativo">—</div>
           <div style="font-size:0.85rem;color:var(--cinza);" id="data-ativo">—</div>
         </div>
-        <button id="btn-encerrar" class="btn btn-danger" style="width:auto;padding:0.5rem 1rem;">Encerrar</button>
+        <div style="display:flex;gap:0.5rem;">
+          <button id="btn-editar-ativo" class="btn btn-secondary" style="width:auto;padding:0.5rem 1rem;">Editar</button>
+          <button id="btn-encerrar" class="btn btn-danger" style="width:auto;padding:0.5rem 1rem;">Encerrar</button>
+        </div>
       </div>
     </div>
 
@@ -52,7 +55,7 @@
   <script type="module">
     import { montarNav, fmtBRL } from "./_nav.js";
     import {
-      db, collection, doc, setDoc, getDoc, updateDoc, getDocs,
+      db, collection, doc, setDoc, getDoc, updateDoc, getDocs, deleteDoc,
       addDoc, onSnapshot, query, orderBy, where, serverTimestamp
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
@@ -107,6 +110,22 @@
       $('btn-criar').disabled = false;
     };
 
+    $('btn-editar-ativo').onclick = async () => {
+      const snap = await getDoc(doc(db, 'config', 'eventoAtivo'));
+      if (!snap.exists() || !snap.data().id) return;
+      const id = snap.data().id;
+      const evSnap = await getDoc(doc(db, 'eventos', id));
+      if (!evSnap.exists()) return;
+      const atual = evSnap.data();
+      const novoNome = prompt('Novo nome do evento:', atual.nome);
+      if (novoNome === null) return;
+      const nome = novoNome.trim();
+      if (!nome) return;
+      await updateDoc(doc(db, 'eventos', id), { nome });
+      await setDoc(doc(db, 'config', 'eventoAtivo'), { id, nome, data: atual.data || null });
+      carregarAtivo();
+    };
+
     $('btn-encerrar').onclick = async () => {
       if (!confirm('Encerrar o evento ativo? As vendas ficam salvas.')) return;
       const snap = await getDoc(doc(db, 'config', 'eventoAtivo'));
@@ -116,6 +135,36 @@
       await setDoc(doc(db, 'config', 'eventoAtivo'), { id: null, nome: null });
       $('evento-ativo-box').classList.add('hidden');
     };
+
+    // Editar nome de evento do histórico
+    async function editarEvento(id, nomeAtual) {
+      const novo = prompt('Novo nome do evento:', nomeAtual);
+      if (novo === null) return;
+      const nome = novo.trim();
+      if (!nome || nome === nomeAtual) return;
+      await updateDoc(doc(db, 'eventos', id), { nome });
+      // Se for o ativo, sincroniza config
+      const cfgSnap = await getDoc(doc(db, 'config', 'eventoAtivo'));
+      if (cfgSnap.exists() && cfgSnap.data().id === id) {
+        await setDoc(doc(db, 'config', 'eventoAtivo'), { ...cfgSnap.data(), nome });
+        carregarAtivo();
+      }
+    }
+
+    // Excluir evento
+    async function excluirEvento(id, nome, totalVendas) {
+      if (totalVendas > 0) {
+        alert(`Não é possível excluir "${nome}": existem ${totalVendas} venda(s) vinculadas. Apague as vendas primeiro ou mantenha o evento como histórico.`);
+        return;
+      }
+      if (!confirm(`Excluir definitivamente "${nome}"? Esta ação não pode ser desfeita.`)) return;
+      await deleteDoc(doc(db, 'eventos', id));
+      const cfgSnap = await getDoc(doc(db, 'config', 'eventoAtivo'));
+      if (cfgSnap.exists() && cfgSnap.data().id === id) {
+        await setDoc(doc(db, 'config', 'eventoAtivo'), { id: null, nome: null });
+        $('evento-ativo-box').classList.add('hidden');
+      }
+    }
 
     // Ativar evento antigo
     async function ativarEvento(id, nome, data) {
@@ -171,10 +220,18 @@
             <td>${badge}</td>
             <td>${vendasSnap.size}</td>
             <td>${fmtBRL(receita)}</td>
-            <td>${ev.status !== 'ativo' ? `<button class="btn btn-secondary" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" onclick="window._ativar('${ev.id}','${ev.nome}','${ev.data||''}')">Reativar</button>` : ''}</td>
+            <td>
+              <div style="display:flex;gap:0.35rem;justify-content:flex-end;flex-wrap:wrap;">
+                ${ev.status !== 'ativo' ? `<button class="btn btn-secondary" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" onclick="window._ativar('${ev.id}','${ev.nome.replace(/'/g,"\\'")}','${ev.data||''}')">Reativar</button>` : ''}
+                <button class="btn btn-secondary" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" onclick="window._editar('${ev.id}','${ev.nome.replace(/'/g,"\\'")}')">Editar</button>
+                <button class="btn btn-danger" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" onclick="window._excluir('${ev.id}','${ev.nome.replace(/'/g,"\\'")}',${vendasSnap.size})">Excluir</button>
+              </div>
+            </td>
           </tr>`;
       }
       window._ativar = ativarEvento;
+      window._editar = editarEvento;
+      window._excluir = excluirEvento;
     });
 
     carregarAtivo();
