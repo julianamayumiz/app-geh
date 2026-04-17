@@ -19,6 +19,7 @@ export function montarNav(paginaAtiva = '') {
       <button id="btn-menu" class="back" title="Menu" aria-label="Abrir menu">${icon('menu', { size: 22 })}</button>
       <img src="../assets/logo.png" alt="GEH" onerror="this.style.display='none'">
       <h1>Admin GEH</h1>
+      <button id="btn-tema" class="back" title="Alternar tema" aria-label="Alternar tema"></button>
       <button id="btn-logout" class="back" title="Sair" aria-label="Sair">${icon('power', { size: 22 })}</button>
     </header>
     <aside class="sidebar" id="sidebar">
@@ -36,6 +37,21 @@ export function montarNav(paginaAtiva = '') {
   document.getElementById('btn-menu').onclick = abrir;
   backdrop.onclick = fechar;
   sidebar.querySelectorAll('a').forEach(a => a.addEventListener('click', fechar));
+
+  const btnTema = document.getElementById('btn-tema');
+  const atualizarIconeTema = () => {
+    const atual = document.documentElement.dataset.theme || 'light';
+    btnTema.innerHTML = icon(atual === 'dark' ? 'sun' : 'moon', { size: 22 });
+  };
+  atualizarIconeTema();
+  btnTema.onclick = () => {
+    const atual = document.documentElement.dataset.theme || 'light';
+    const novo = atual === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = novo;
+    try { localStorage.setItem('theme', novo); } catch (e) {}
+    atualizarIconeTema();
+  };
+
   document.getElementById('btn-logout').onclick = async () => {
     await signOut(auth);
     window.location.href = 'login.html';

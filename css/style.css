@@ -520,72 +520,62 @@ tr:hover { background: var(--cinza-claro); }
   }
 }
 
-/* ===== Dark Mode ===== */
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* Brand — ligeiramente mais brilhante pra ter contraste no fundo escuro */
-    --azul:        #3B82F6;
-    --azul-escuro: #2563EB;
-    --azul-claro:  #60A5FA;
-    --verde:       #22C55E;
-    --vermelho:    #EF4444;
-    --amarelo:     #FCD34D;
+/* ===== Dark Mode =====
+   Ativado via atributo data-theme="dark" na tag <html>.
+   O init inline em cada HTML lê localStorage ou prefers-color-scheme
+   para decidir o tema antes do CSS aplicar (evita flash). */
+:root[data-theme="dark"] {
+  /* Brand — ligeiramente mais brilhante pra ter contraste no fundo escuro */
+  --azul:        #3B82F6;
+  --azul-escuro: #2563EB;
+  --azul-claro:  #60A5FA;
+  --verde:       #22C55E;
+  --vermelho:    #EF4444;
+  --amarelo:     #FCD34D;
 
-    /* Superfícies */
-    --branco:       #1E293B;   /* cards, modais, carrinho */
-    --cinza-claro:  #263548;   /* hover, nav inativa, bordas de linha */
-    --cinza:        #64748B;   /* texto mutado */
-    --cinza-escuro: #E2E8F0;   /* texto principal */
+  /* Superfícies */
+  --branco:       #1E293B;
+  --cinza-claro:  #263548;
+  --cinza:        #64748B;
+  --cinza-escuro: #E2E8F0;
 
-    /* Sombras mais pesadas pra se destacar no fundo escuro */
-    --sombra:       0 4px 12px rgba(0, 0, 0, 0.45);
-    --sombra-forte: 0 8px 24px rgba(0, 0, 0, 0.65);
-  }
+  --sombra:       0 4px 12px rgba(0, 0, 0, 0.45);
+  --sombra-forte: 0 8px 24px rgba(0, 0, 0, 0.65);
 
-  /* Informa ao browser que o esquema é escuro (scrollbar, controles nativos, etc.) */
-  html, body {
-    color-scheme: dark;
-    background: #0F172A;   /* fundo da página — mais escuro que os cards */
-  }
-
-  /* Nav montada via _nav.js com style="background:white" inline */
-  nav {
-    background: #1E293B !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
-  }
-
-  /* Inputs / selects / textareas (border era hardcoded #E5E7EB) */
-  .form-group input,
-  .form-group select,
-  .form-group textarea {
-    background: #0F172A;
-    border-color: #334155;
-    color: var(--cinza-escuro);
-    color-scheme: dark;
-  }
-
-  .form-group input::placeholder,
-  .form-group textarea::placeholder {
-    color: var(--cinza);
-  }
-
-  /* Botão accent (amarelo): texto escuro pra manter contraste */
-  .btn-accent {
-    color: #1E293B;
-  }
-
-  /* Linha de hover na tabela */
-  tr:hover { background: #2D3F55; }
-
-  /* Alertas — versão dark com fundo colorido escuro */
-  .alert-success { background: #064E3B; color: #6EE7B7; border: 1px solid #065F46; }
-  .alert-danger  { background: #7F1D1D; color: #FCA5A5; border: 1px solid #991B1B; }
-  .alert-warning { background: #78350F; color: #FDE68A; border: 1px solid #92400E; }
-  .alert-info    { background: #1E3A5F; color: #93C5FD; border: 1px solid #1E40AF; }
-
-  /* Scrollbar (webkit) */
-  ::-webkit-scrollbar          { width: 8px; height: 8px; }
-  ::-webkit-scrollbar-track    { background: #0F172A; }
-  ::-webkit-scrollbar-thumb    { background: #334155; border-radius: 4px; }
-  ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  color-scheme: dark;
+  background: #0F172A;
 }
+:root[data-theme="dark"] body { color-scheme: dark; }
+
+:root[data-theme="dark"] nav {
+  background: #1E293B !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
+}
+
+:root[data-theme="dark"] .form-group input,
+:root[data-theme="dark"] .form-group select,
+:root[data-theme="dark"] .form-group textarea {
+  background: #0F172A;
+  border-color: #334155;
+  color: var(--cinza-escuro);
+  color-scheme: dark;
+}
+
+:root[data-theme="dark"] .form-group input::placeholder,
+:root[data-theme="dark"] .form-group textarea::placeholder {
+  color: var(--cinza);
+}
+
+:root[data-theme="dark"] .btn-accent { color: #1E293B; }
+
+:root[data-theme="dark"] tr:hover { background: #2D3F55; }
+
+:root[data-theme="dark"] .alert-success { background: #064E3B; color: #6EE7B7; border: 1px solid #065F46; }
+:root[data-theme="dark"] .alert-danger  { background: #7F1D1D; color: #FCA5A5; border: 1px solid #991B1B; }
+:root[data-theme="dark"] .alert-warning { background: #78350F; color: #FDE68A; border: 1px solid #92400E; }
+:root[data-theme="dark"] .alert-info    { background: #1E3A5F; color: #93C5FD; border: 1px solid #1E40AF; }
+
+:root[data-theme="dark"] ::-webkit-scrollbar          { width: 8px; height: 8px; }
+:root[data-theme="dark"] ::-webkit-scrollbar-track    { background: #0F172A; }
+:root[data-theme="dark"] ::-webkit-scrollbar-thumb    { background: #334155; border-radius: 4px; }
+:root[data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: #475569; }
