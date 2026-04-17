@@ -19,12 +19,12 @@
 // ============================================================
 
 const firebaseConfig = {
-  apiKey: "AIzaSyA_vJEYqPYZOsdu4L1bXNX49I4vguxfDMk",
-  authDomain: "app-geh-cc577.firebaseapp.com",
-  projectId: "app-geh-cc577",
-  storageBucket: "app-geh-cc577.firebasestorage.app",
-  messagingSenderId: "712013991512",
-  appId: "1:712013991512:web:197f07d3ebb37b4f94042d"
+  apiKey: "AIzaSyAJtIikEp_tdyX33_2UGWcOSCuKtEbJaW8",
+  authDomain: "app-geh-dev.firebaseapp.com",
+  projectId: "app-geh-dev",
+  storageBucket: "app-geh-dev.firebasestorage.app",
+  messagingSenderId: "780193741149",
+  appId: "1:780193741149:web:23f34f5b489119bf9790b4"
 };
 
 // ============================================================

@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "app-geh-cc577"
+    "default": "app-geh-cc577",
+    "prod": "app-geh-cc577",
+    "dev": "app-geh-dev"
   }
 }
