@@ -41,14 +41,25 @@
       </div>
       <button id="btn-carregar" class="btn btn-success"><span data-icon="plus" data-size="18"></span> Adicionar saldo</button>
     </div>
+
+    <div id="historico" class="hidden">
+      <h3 style="color:var(--azul);margin:1rem 0 0.75rem;display:inline-flex;align-items:center;gap:0.5rem;"><span data-icon="clock" data-size="20"></span> Histórico</h3>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Quando</th><th>Tipo</th><th>Detalhe</th><th>Valor</th></tr></thead>
+          <tbody id="tbl-hist"></tbody>
+        </table>
+      </div>
+    </div>
   </main>
   <script type="module" src="../js/icons.js"></script>
 
   <script type="module">
     import {
-      db, doc, getDoc, collection, addDoc, serverTimestamp, runTransaction
+      db, doc, getDoc, getDocs, collection, query, where, orderBy,
+      addDoc, serverTimestamp, runTransaction
     } from "../js/firebase-config.js";
-    import { icon } from "../js/icons.js";
+    import { icon, renderIcons } from "../js/icons.js";
 
     const params = new URLSearchParams(window.location.search);
     const clienteId = params.get('cliente');
@@ -58,6 +69,57 @@
     if (somenteConsulta) {
       document.getElementById('titulo').innerHTML = `${icon('eye', { size: 22 })} Saldo do cliente`;
       document.getElementById('form-recarga').classList.add('hidden');
+    }
+
+    const fmtBRL = (v) => `R$ ${Number(v || 0).toFixed(2).replace('.', ',')}`;
+
+    async function carregarHistorico() {
+      const [movSnap, vendasSnap] = await Promise.all([
+        getDocs(query(collection(db, 'movimentacoes_saldo'), where('clienteId', '==', clienteId), orderBy('criadoEm', 'desc'))),
+        getDocs(query(collection(db, 'vendas'), where('clienteId', '==', clienteId), orderBy('criadoEm', 'desc')))
+      ]);
+
+      const movs = [];
+      movSnap.forEach(d => {
+        const m = d.data();
+        movs.push({
+          quando: m.criadoEm?.toDate?.() || new Date(0),
+          tipo: 'recarga',
+          detalhe: `Via ${m.forma || '—'}`,
+          valor: m.valor,
+          positivo: true
+        });
+      });
+      vendasSnap.forEach(d => {
+        const v = d.data();
+        const itens = (v.itens || []).map(i => `${i.qtd}× ${i.nome}`).join(', ');
+        movs.push({
+          quando: v.criadoEm?.toDate?.() || new Date(0),
+          tipo: 'venda',
+          detalhe: itens || '—',
+          valor: v.total,
+          positivo: false
+        });
+      });
+      movs.sort((a, b) => b.quando - a.quando);
+
+      const tbody = document.getElementById('tbl-hist');
+      if (movs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Sem movimentações.</td></tr>';
+      } else {
+        tbody.innerHTML = movs.map(m => {
+          const cor = m.positivo ? 'var(--verde)' : 'var(--vermelho)';
+          const sinal = m.positivo ? '+' : '-';
+          return `<tr>
+            <td>${m.quando.toLocaleString('pt-BR')}</td>
+            <td><span style="background:${cor};color:white;padding:2px 8px;border-radius:999px;font-size:0.8rem;">${m.tipo}</span></td>
+            <td style="font-size:0.875rem;">${m.detalhe}</td>
+            <td style="font-weight:700;color:${cor};">${sinal} ${fmtBRL(m.valor)}</td>
+          </tr>`;
+        }).join('');
+      }
+      document.getElementById('historico').classList.remove('hidden');
+      renderIcons();
     }
 
     // Evento ativo — precisa estar no doc da movimentação pra relatório filtrar por evento
@@ -84,7 +146,8 @@
       }
       const dados = { id: clienteId, ...snap.data() };
       $('cliente-nome').textContent = clienteId;
-      $('cliente-saldo').textContent = `R$ ${Number(dados.saldo || 0).toFixed(2).replace('.', ',')}`;
+      $('cliente-saldo').textContent = fmtBRL(dados.saldo);
+      if (somenteConsulta) carregarHistorico();
       return dados;
     }
 
