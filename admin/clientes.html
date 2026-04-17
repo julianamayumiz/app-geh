@@ -60,6 +60,7 @@
     import { montarNav, fmtBRL } from "./_nav.js";
     import { db, collection, doc, setDoc, getDoc, getDocs, deleteDoc, onSnapshot, writeBatch } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
+    import { confirmarAsync } from "../js/ui.js";
 
     montarNav('clientes.html');
     renderIcons();
@@ -113,7 +114,7 @@
           </td>
         `;
         tr.querySelector('[data-del]').onclick = async () => {
-          if (!confirm(`Excluir cliente "${c.id}"? Saldo: ${fmtBRL(c.saldo)}`)) return;
+          if (!(await confirmarAsync(`Excluir cliente "${c.id}"? Saldo: ${fmtBRL(c.saldo)}`, { destrutivo: true, textoOk: 'Excluir' }))) return;
           await deleteDoc(doc(db, 'clientes', c.id));
         };
         tbody.appendChild(tr);
@@ -129,7 +130,7 @@
       )];
 
       if (ids.length === 0) return;
-      if (!confirm(`Importar ${ids.length} clientes?`)) return;
+      if (!(await confirmarAsync(`Importar ${ids.length} clientes?`, { textoOk: 'Importar' }))) return;
 
       $('btn-lote').disabled = true;
       $('btn-lote').innerHTML = '<div class="loader"></div> Importando...';

@@ -80,6 +80,7 @@ Suco de Laranja, 5.00, 50, Bebidas
     import { montarNav, fmtBRL } from "./_nav.js";
     import { db, collection, doc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, writeBatch } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
+    import { confirmarAsync } from "../js/ui.js";
 
     montarNav('produtos.html');
     renderIcons();
@@ -174,7 +175,7 @@ Suco de Laranja, 5.00, 50, Bebidas
         return;
       }
 
-      if (!confirm(`Importar ${produtos.length} produtos?`)) return;
+      if (!(await confirmarAsync(`Importar ${produtos.length} produtos?`, { textoOk: 'Importar' }))) return;
 
       $('btn-lote').disabled = true;
       $('btn-lote').innerHTML = '<div class="loader"></div> Importando...';
@@ -195,7 +196,7 @@ Suco de Laranja, 5.00, 50, Bebidas
       const tbody = $('tbl');
       tbody.innerHTML = '';
       if (snap.empty) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Sem produtos ainda.</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state">${icon('package', { size: 32 })}<p>Sem produtos ainda.</p></div></td></tr>`;
         return;
       }
       snap.forEach(d => {
@@ -236,7 +237,7 @@ Suco de Laranja, 5.00, 50, Bebidas
           window.scrollTo({ top: 0, behavior: 'smooth' });
         };
         tr.querySelector('[data-del]').onclick = async () => {
-          if (!confirm(`Excluir "${p.nome}"?`)) return;
+          if (!(await confirmarAsync(`Excluir "${p.nome}"?`, { destrutivo: true, textoOk: 'Excluir' }))) return;
           await deleteDoc(doc(db, 'produtos', p.id));
         };
         tbody.appendChild(tr);

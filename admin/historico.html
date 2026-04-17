@@ -63,7 +63,7 @@
     import {
       db, collection, doc, getDoc, getDocs, query, where, orderBy
     } from "../js/firebase-config.js";
-    import { renderIcons } from "../js/icons.js";
+    import { icon, renderIcons } from "../js/icons.js";
 
     montarNav('historico.html');
     renderIcons();
@@ -169,7 +169,7 @@
       const tbody = $('tbl-mov');
       tbody.innerHTML = '';
       if (movimentos.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Sem movimentações.</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state">${icon('inbox', { size: 32 })}<p>Sem movimentações.</p></div></td></tr>`;
       } else {
         movimentos.forEach(m => {
           const cor = m.positivo ? 'var(--verde)' : 'var(--vermelho)';

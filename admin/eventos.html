@@ -59,6 +59,7 @@
       addDoc, onSnapshot, query, orderBy, where, serverTimestamp
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
+    import { confirmarAsync } from "../js/ui.js";
 
     montarNav('eventos.html');
     renderIcons();
@@ -127,7 +128,7 @@
     };
 
     $('btn-encerrar').onclick = async () => {
-      if (!confirm('Encerrar o evento ativo? As vendas ficam salvas.')) return;
+      if (!(await confirmarAsync('Encerrar o evento ativo? As vendas ficam salvas.', { textoOk: 'Encerrar' }))) return;
       const snap = await getDoc(doc(db, 'config', 'eventoAtivo'));
       if (snap.exists() && snap.data().id) {
         await updateDoc(doc(db, 'eventos', snap.data().id), { status: 'encerrado' });
@@ -157,7 +158,7 @@
         alert(`Não é possível excluir "${nome}": existem ${totalVendas} venda(s) vinculadas. Apague as vendas primeiro ou mantenha o evento como histórico.`);
         return;
       }
-      if (!confirm(`Excluir definitivamente "${nome}"? Esta ação não pode ser desfeita.`)) return;
+      if (!(await confirmarAsync(`Excluir definitivamente "${nome}"? Esta ação não pode ser desfeita.`, { destrutivo: true, textoOk: 'Excluir' }))) return;
       await deleteDoc(doc(db, 'eventos', id));
       const cfgSnap = await getDoc(doc(db, 'config', 'eventoAtivo'));
       if (cfgSnap.exists() && cfgSnap.data().id === id) {
@@ -168,7 +169,7 @@
 
     // Ativar evento antigo
     async function ativarEvento(id, nome, data) {
-      if (!confirm(`Reativar "${nome}"? O evento atualmente ativo (se houver) será encerrado.`)) return;
+      if (!(await confirmarAsync(`Reativar "${nome}"? O evento atualmente ativo (se houver) será encerrado.`, { textoOk: 'Reativar' }))) return;
       // Encerra os ativos atuais
       const ativosSnap = await getDocs(query(collection(db, 'eventos'), where('status', '==', 'ativo')));
       for (const d of ativosSnap.docs) {

@@ -257,7 +257,7 @@
       grid.innerHTML = '';
       const snap = await getDocs(collection(db, 'produtos'));
       if (snap.empty) {
-        grid.innerHTML = '<p class="text-muted text-center">Nenhum produto cadastrado.</p>';
+        grid.innerHTML = `<div class="empty-state">${icon('package', { size: 32 })}<p>Nenhum produto cadastrado.</p></div>`;
         return;
       }
       snap.forEach(d => {
@@ -425,6 +425,9 @@
     };
 
     $('modal-overlay').onclick = (e) => { if (e.target === $('modal-overlay')) fecharModal(); };
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && $('modal-overlay').classList.contains('aberto')) fecharModal();
+    });
 
     // ── Finalizar ─────────────────────────────────────
     $('btn-finalizar').onclick = async () => {

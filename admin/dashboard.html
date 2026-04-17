@@ -73,6 +73,7 @@
 
   <script type="module">
     import { montarNav, fmtBRL } from "./_nav.js";
+    import { icon } from "../js/icons.js";
     import {
       db, doc, getDoc, collection,
       onSnapshot, query, where, orderBy
@@ -268,7 +269,7 @@
           });
 
           if (snap.empty) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Sem vendas ainda neste evento.</td></tr>';
+            tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state">${icon('shopping-cart', { size: 32 })}<p>Sem vendas ainda neste evento.</p></div></td></tr>`;
           }
 
           $('total-vendido').textContent = fmtBRL(total);

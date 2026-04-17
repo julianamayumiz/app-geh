@@ -448,6 +448,12 @@ table {
   border-collapse: collapse;
 }
 
+@media (max-width: 640px) {
+  table { min-width: 0; font-size: 0.85rem; }
+  th, td { padding: 0.5rem 0.6rem; }
+  th { font-size: 0.72rem; letter-spacing: 0.3px; }
+}
+
 th, td {
   padding: 0.75rem 1rem;
   text-align: left;
@@ -522,6 +528,50 @@ tr:hover { background: var(--cinza-claro); }
 .alert-danger  { background: #FEE2E2; color: #991B1B; }
 .alert-warning { background: #FEF3C7; color: #92400E; }
 .alert-info    { background: #DBEAFE; color: #1E40AF; }
+
+/* ===== Estado vazio ===== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.5rem 1rem;
+  color: var(--cinza);
+  text-align: center;
+}
+.empty-state .icon { width: 32px; height: 32px; opacity: 0.6; }
+
+/* ===== Modal de confirmação ===== */
+.confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 1000;
+  animation: geh-fade-in 150ms ease both;
+}
+.confirm-modal {
+  background: var(--branco);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: var(--sombra-forte);
+}
+.confirm-msg {
+  font-size: 1rem;
+  color: var(--cinza-escuro);
+  margin-bottom: 1.25rem;
+  line-height: 1.5;
+}
+.confirm-acoes {
+  display: flex;
+  gap: 0.5rem;
+}
+.confirm-acoes .btn { width: auto; flex: 1; }
 
 /* ===== Loader ===== */
 .loader {

@@ -100,7 +100,7 @@
 
       const lista = document.getElementById('lista-hist');
       if (movs.length === 0) {
-        lista.innerHTML = '<div class="text-center text-muted" style="padding:1rem;">Sem movimentações.</div>';
+        lista.innerHTML = `<div class="empty-state">${icon('inbox', { size: 32 })}<p>Sem movimentações.</p></div>`;
       } else {
         lista.innerHTML = movs.map(m => {
           const cor = m.positivo ? 'var(--verde)' : 'var(--vermelho)';
