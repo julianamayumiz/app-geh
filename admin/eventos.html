@@ -196,24 +196,27 @@
     }
     limparOrfaos();
 
+    let renderGen = 0;
     onSnapshot(query(collection(db, 'eventos'), orderBy('criadoEm', 'desc')), async (snap) => {
+      const myGen = ++renderGen;
       const tbody = $('tbl');
-      tbody.innerHTML = '';
       if (snap.empty) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Nenhum evento ainda.</td></tr>';
         return;
       }
+      const linhas = [];
       for (const d of snap.docs) {
         const ev = { id: d.id, ...d.data() };
-        // Contar vendas do evento
         const vendasSnap = await getDocs(query(collection(db, 'vendas'), where('eventoId', '==', ev.id)));
+        if (myGen !== renderGen) return; // snapshot mais novo já está rodando
         let receita = 0;
         vendasSnap.forEach(v => receita += v.data().total || 0);
         const dataFmt = ev.data ? new Date(ev.data + 'T12:00').toLocaleDateString('pt-BR') : '—';
         const badge = ev.status === 'ativo'
           ? `<span style="background:var(--verde);color:white;padding:2px 8px;border-radius:999px;font-size:0.8rem;">Ativo</span>`
           : `<span style="background:var(--cinza);color:white;padding:2px 8px;border-radius:999px;font-size:0.8rem;">Encerrado</span>`;
-        tbody.innerHTML += `
+        const nomeEsc = ev.nome.replace(/'/g, "\\'");
+        linhas.push(`
           <tr>
             <td><strong>${ev.nome}</strong></td>
             <td>${dataFmt}</td>
@@ -222,13 +225,15 @@
             <td>${fmtBRL(receita)}</td>
             <td>
               <div style="display:flex;gap:0.35rem;justify-content:flex-end;flex-wrap:wrap;">
-                ${ev.status !== 'ativo' ? `<button class="btn btn-secondary" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" onclick="window._ativar('${ev.id}','${ev.nome.replace(/'/g,"\\'")}','${ev.data||''}')">Reativar</button>` : ''}
-                <button class="btn btn-secondary" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" onclick="window._editar('${ev.id}','${ev.nome.replace(/'/g,"\\'")}')">Editar</button>
-                <button class="btn btn-danger" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" onclick="window._excluir('${ev.id}','${ev.nome.replace(/'/g,"\\'")}',${vendasSnap.size})">Excluir</button>
+                ${ev.status !== 'ativo' ? `<button class="btn btn-secondary" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" onclick="window._ativar('${ev.id}','${nomeEsc}','${ev.data||''}')">Reativar</button>` : ''}
+                <button class="btn btn-secondary" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" onclick="window._editar('${ev.id}','${nomeEsc}')">Editar</button>
+                <button class="btn btn-danger" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" onclick="window._excluir('${ev.id}','${nomeEsc}',${vendasSnap.size})">Excluir</button>
               </div>
             </td>
-          </tr>`;
+          </tr>`);
       }
+      if (myGen !== renderGen) return;
+      tbody.innerHTML = linhas.join('');
       window._ativar = ativarEvento;
       window._editar = editarEvento;
       window._excluir = excluirEvento;
