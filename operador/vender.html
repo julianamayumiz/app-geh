@@ -4,13 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#1E3A8A">
+  <meta name="theme-color" content="#0F172A" media="(prefers-color-scheme: dark)">
   <title>Vender — App GEH</title>
   <link rel="stylesheet" href="../css/style.css">
   <link rel="manifest" href="../manifest.json">
   <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
   <style>
     .prod-card {
-      background: white;
+      background: var(--branco);
       border-radius: var(--radius-sm);
       padding: 0.875rem;
       box-shadow: var(--sombra);
@@ -117,7 +118,7 @@
     }
     .modal-overlay.aberto { display: flex; }
     .modal-box {
-      background: white;
+      background: var(--branco);
       border-radius: var(--radius) var(--radius) 0 0;
       width: 100%;
       max-height: 80vh;

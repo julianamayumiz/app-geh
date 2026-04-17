@@ -84,6 +84,12 @@
 
       $('btn-criar').disabled = true;
       try {
+        // Encerra todos os eventos atualmente com status=ativo antes de criar o novo
+        const ativosSnap = await getDocs(query(collection(db, 'eventos'), where('status', '==', 'ativo')));
+        for (const d of ativosSnap.docs) {
+          await updateDoc(doc(db, 'eventos', d.id), { status: 'encerrado' });
+        }
+
         const ref = await addDoc(collection(db, 'eventos'), {
           nome, data, status: 'ativo', criadoEm: serverTimestamp()
         });
@@ -91,6 +97,7 @@
         $('ev-nome').value = '';
         alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} Evento "${nome}" criado e ativado!</span>`;
         alerta.className = 'alert alert-success';
+        $('evento-ativo-box').classList.add('hidden');
         carregarAtivo();
       } catch (err) {
         alerta.textContent = `Erro: ${err.message}`;
@@ -111,11 +118,33 @@
 
     // Ativar evento antigo
     async function ativarEvento(id, nome, data) {
-      if (!confirm(`Reativar "${nome}"?`)) return;
+      if (!confirm(`Reativar "${nome}"? O evento atualmente ativo (se houver) será encerrado.`)) return;
+      // Encerra os ativos atuais
+      const ativosSnap = await getDocs(query(collection(db, 'eventos'), where('status', '==', 'ativo')));
+      for (const d of ativosSnap.docs) {
+        if (d.id !== id) await updateDoc(doc(db, 'eventos', d.id), { status: 'encerrado' });
+      }
       await updateDoc(doc(db, 'eventos', id), { status: 'ativo' });
       await setDoc(doc(db, 'config', 'eventoAtivo'), { id, nome, data });
       carregarAtivo();
     }
+
+    // Limpeza automática: marcar como encerrado qualquer evento com status=ativo
+    // que não seja o eventoAtivo atual (resolve estado bugado de cliques duplicados)
+    async function limparOrfaos() {
+      const cfgSnap = await getDoc(doc(db, 'config', 'eventoAtivo'));
+      const atualId = cfgSnap.exists() ? cfgSnap.data().id : null;
+      const ativosSnap = await getDocs(query(collection(db, 'eventos'), where('status', '==', 'ativo')));
+      let corrigidos = 0;
+      for (const d of ativosSnap.docs) {
+        if (d.id !== atualId) {
+          await updateDoc(doc(db, 'eventos', d.id), { status: 'encerrado' });
+          corrigidos++;
+        }
+      }
+      if (corrigidos > 0) console.log(`[limpeza] ${corrigidos} eventos órfãos marcados como encerrados`);
+    }
+    limparOrfaos();
 
     onSnapshot(query(collection(db, 'eventos'), orderBy('criadoEm', 'desc')), async (snap) => {
       const tbody = $('tbl');
