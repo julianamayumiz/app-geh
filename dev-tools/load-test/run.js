@@ -19,7 +19,7 @@ import {
 } from "firebase/firestore";
 
 // ---------- Config ----------
-const VUS = 30;                    // usuários virtuais simultâneos
+const VUS = 50;                    // usuários virtuais simultâneos
 const OPS_POR_VU = 20;             // operações por VU
 const MIX = { vender: 0.70, carregar: 0.20, consultar: 0.10 };
 const PROD_PROJECT_ID = "app-geh-cc577";
@@ -159,7 +159,7 @@ async function runVU(vuId, ctx, stats) {
       const code = err.message === "SALDO_INSUF" ? "saldo_insuf"
                  : err.message === "ESTOQUE_INSUF" ? "estoque_insuf"
                  : "erro";
-      stats.err.push({ op, dt, code, msg: err.message });
+      stats.err.push({ op, dt, code, msg: err.message, fbCode: err.code, name: err.name });
     }
     await sleep(rnd(50, 250)); // jitter humano
   }
@@ -209,6 +209,17 @@ function pct(arr, p) {
   if (Object.keys(errPorCodigo).length) {
     console.log(`\nErros por tipo:`);
     for (const [code, n] of Object.entries(errPorCodigo)) console.log(`  ${code}: ${n}`);
+  }
+
+  const genericos = stats.err.filter(e => e.code === "erro");
+  if (genericos.length) {
+    console.log(`\nDetalhe dos ${genericos.length} erros genéricos:`);
+    const agrupados = {};
+    genericos.forEach(e => {
+      const chave = `[${e.fbCode || e.name || "?"}] ${e.msg}`;
+      agrupados[chave] = (agrupados[chave] || 0) + 1;
+    });
+    for (const [k, n] of Object.entries(agrupados)) console.log(`  ${n}× ${k}`);
   }
 
   // ---------- Integridade ----------
