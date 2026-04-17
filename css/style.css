@@ -613,30 +613,53 @@ tr:hover { background: var(--cinza-claro); }
 :root[data-theme="dark"] ::-webkit-scrollbar-thumb    { background: #334155; border-radius: 4px; }
 :root[data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: #475569; }
 
-.hist-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.hist-list { display: flex; flex-direction: column; gap: 0.6rem; }
 .hist-item {
-  background: var(--branco, #fff);
-  border: 1px solid var(--borda, #E2E8F0);
-  border-radius: 10px;
-  padding: 0.6rem 0.75rem;
+  background: var(--branco);
+  border: 1px solid var(--cinza-claro);
+  border-radius: var(--radius, 10px);
+  padding: 0.7rem 0.85rem;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
 .hist-row {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 .hist-badge {
   color: #fff;
-  padding: 2px 8px;
+  padding: 2px 10px;
   border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.72rem;
+  font-weight: 700;
   text-transform: lowercase;
+  letter-spacing: 0.3px;
+  line-height: 1.5;
+  flex-shrink: 0;
 }
-.hist-quando { font-size: 0.8rem; color: var(--cinza, #64748B); }
-.hist-valor { margin-left: auto; font-weight: 700; font-size: 0.95rem; white-space: nowrap; }
-.hist-detalhe { margin-top: 0.25rem; font-size: 0.875rem; color: var(--texto, #0F172A); word-break: break-word; }
+.hist-quando {
+  font-size: 0.8rem;
+  color: var(--cinza);
+  flex-shrink: 0;
+}
+.hist-valor {
+  margin-left: auto;
+  font-weight: 700;
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+.hist-detalhe {
+  margin-top: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--cinza-escuro);
+  word-break: break-word;
+}
 
-:root[data-theme="dark"] .hist-item { background: #1E293B; border-color: #334155; }
-:root[data-theme="dark"] .hist-detalhe { color: #E2E8F0; }
+:root[data-theme="dark"] .hist-item {
+  background: #1E293B;
+  border-color: #334155;
+  box-shadow: none;
+}
+:root[data-theme="dark"] .hist-detalhe { color: #CBD5E1; }
+:root[data-theme="dark"] .hist-quando { color: #94A3B8; }
