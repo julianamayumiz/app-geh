@@ -485,11 +485,14 @@
 
         vibrar([40, 60, 40, 60, 80]); // padrão de sucesso
         fecharModal();
+        const saldoFinal = (cliente.saldo || 0) - total;
+        cliente.saldo = saldoFinal;
+        atualizarSaldoExibido();
         const alertaEl = $('alerta');
-        alertaEl.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 18 })} Venda concluída! Total: ${fmtBRL(total)}</span>`;
+        alertaEl.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 18 })} Venda concluída! Total: ${fmtBRL(total)} · Saldo final: <strong>${fmtBRL(saldoFinal)}</strong></span>`;
         alertaEl.className = 'alert alert-success';
         alertaEl.classList.remove('hidden');
-        setTimeout(() => window.location.href = 'index.html', 1800);
+        setTimeout(() => window.location.href = 'index.html', 2500);
       } catch (err) {
         vibrar([100, 50, 100]); // padrão de erro
         $('alerta-modal').textContent = `Erro: ${err.message}`;
