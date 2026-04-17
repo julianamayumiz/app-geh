@@ -338,14 +338,24 @@ a:focus-visible {
 
 /* ===== Nav admin ===== */
 .admin-nav {
+  background: white;
+  box-shadow: var(--sombra);
+}
+.admin-nav-scroll {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+  overflow-y: hidden;
   scrollbar-width: thin;
 }
-.admin-nav::-webkit-scrollbar { height: 6px; }
-.admin-nav::-webkit-scrollbar-thumb {
+.admin-nav-scroll::-webkit-scrollbar { height: 6px; }
+.admin-nav-scroll::-webkit-scrollbar-thumb {
   background: var(--cinza);
   border-radius: 3px;
 }
-.admin-nav::-webkit-scrollbar-track { background: transparent; }
+.admin-nav-scroll::-webkit-scrollbar-track { background: transparent; }
+.admin-nav-scroll > .btn { flex-shrink: 0; }
 
 /* ===== Tabelas (admin) ===== */
 .table-wrapper {
