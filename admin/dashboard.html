@@ -5,10 +5,126 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard — Admin GEH</title>
   <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="../css/style.css">
   <link rel="manifest" href="../manifest.json">
   <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <style>
+    .kpis {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    @media (min-width: 860px) {
+      .kpis {
+        grid-template-columns: 1.4fr 1fr 1fr 1fr;
+      }
+    }
+
+    .kpi-hero {
+      position: relative;
+      overflow: hidden;
+      padding: 1.5rem 1.4rem 1.25rem;
+      border-radius: var(--radius);
+      color: #fff;
+      background:
+        radial-gradient(ellipse at 90% 120%, rgba(251,191,36,0.22) 0%, transparent 55%),
+        linear-gradient(135deg, var(--azul) 0%, var(--azul-escuro) 100%);
+      box-shadow: var(--sombra-forte);
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      isolation: isolate;
+    }
+    .kpi-hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      opacity: 0.08;
+      background-image: radial-gradient(circle at 1px 1px, #fff 1px, transparent 0);
+      background-size: 22px 22px;
+    }
+    .kpi-hero .etiqueta {
+      font-size: 0.72rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      font-weight: 600;
+      color: rgba(255,255,255,0.65);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .kpi-hero .valor {
+      font-family: var(--font-display);
+      font-weight: 500;
+      font-size: clamp(2.5rem, 6.5vw, 3.4rem);
+      line-height: 1.02;
+      letter-spacing: -0.025em;
+      font-variant-numeric: tabular-nums;
+      margin-top: 0.35rem;
+    }
+    .kpi-hero .valor small {
+      font-family: var(--font-body);
+      font-size: 0.48em;
+      font-weight: 500;
+      opacity: 0.65;
+      margin-right: 0.2em;
+    }
+    .kpi-hero .meta {
+      display: flex;
+      gap: 1rem;
+      font-size: 0.82rem;
+      color: rgba(255,255,255,0.75);
+      margin-top: 0.3rem;
+    }
+    .kpi-hero .meta strong { color: var(--amarelo); font-variant-numeric: tabular-nums; }
+    .kpi-hero .spark {
+      position: relative;
+      height: 56px;
+      margin-top: 0.9rem;
+    }
+
+    .kpi-small {
+      background: var(--branco);
+      border-radius: var(--radius);
+      padding: 1rem 1.1rem;
+      box-shadow: var(--sombra);
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      border-left: 3px solid transparent;
+    }
+    .kpi-small .etiqueta {
+      font-size: 0.7rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      font-weight: 600;
+      color: var(--cinza);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .kpi-small .valor {
+      font-family: var(--font-display);
+      font-weight: 500;
+      font-size: 2rem;
+      line-height: 1;
+      letter-spacing: -0.02em;
+      font-variant-numeric: tabular-nums;
+    }
+    .kpi-small.accent-verde    { border-left-color: var(--verde); }
+    .kpi-small.accent-verde    .valor { color: var(--verde); }
+    .kpi-small.accent-amarelo  { border-left-color: var(--amarelo); }
+    .kpi-small.accent-amarelo  .valor { color: #B45309; }
+    :root[data-theme="dark"] .kpi-small.accent-amarelo .valor { color: var(--amarelo); }
+    .kpi-small.accent-azul     { border-left-color: var(--azul); }
+    .kpi-small.accent-azul     .valor { color: var(--azul); }
+  </style>
 </head>
 <body>
   <main class="admin">
@@ -21,22 +137,35 @@
     </div>
 
     <!-- KPIs -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;">
-      <div class="card">
-        <div class="text-muted">Total vendido</div>
-        <div style="font-size:2rem;font-weight:700;color:var(--verde);font-variant-numeric:tabular-nums;" id="total-vendido">R$ 0,00</div>
+    <div class="kpis">
+      <div class="kpi-hero">
+        <span class="etiqueta">
+          <span data-icon="trending-up" data-size="14"></span>
+          Total vendido
+        </span>
+        <div class="valor"><small>R$</small><span id="total-vendido-num">0,00</span></div>
+        <div class="meta">
+          <span><strong id="kpi-ticket">R$ 0,00</strong> ticket médio</span>
+          <span><strong id="kpi-pico">—</strong> hora de pico</span>
+        </div>
+        <div class="spark">
+          <canvas id="chart-spark"></canvas>
+        </div>
+        <!-- mantém id antigo pra compatibilidade com o script, oculto -->
+        <span id="total-vendido" class="hidden"></span>
       </div>
-      <div class="card">
-        <div class="text-muted">Nº de vendas</div>
-        <div style="font-size:2rem;font-weight:700;color:var(--azul);" id="num-vendas">0</div>
+
+      <div class="kpi-small accent-azul">
+        <span class="etiqueta"><span data-icon="shopping-cart" data-size="13"></span> Nº de vendas</span>
+        <div class="valor" id="num-vendas">0</div>
       </div>
-      <div class="card">
-        <div class="text-muted">Saldo em circulação</div>
-        <div style="font-size:2rem;font-weight:700;color:var(--amarelo);font-variant-numeric:tabular-nums;" id="saldo-circulacao">R$ 0,00</div>
+      <div class="kpi-small accent-amarelo">
+        <span class="etiqueta"><span data-icon="wallet" data-size="13"></span> Saldo em circulação</span>
+        <div class="valor" id="saldo-circulacao">R$ 0,00</div>
       </div>
-      <div class="card">
-        <div class="text-muted">Clientes ativos</div>
-        <div style="font-size:2rem;font-weight:700;color:var(--azul);" id="num-clientes">0</div>
+      <div class="kpi-small accent-verde">
+        <span class="etiqueta"><span data-icon="users" data-size="13"></span> Clientes ativos</span>
+        <div class="valor" id="num-clientes">0</div>
       </div>
     </div>
 
@@ -94,13 +223,59 @@
       grid:      dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)',
     };
 
-    Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    Chart.defaults.font.family = "'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
     Chart.defaults.font.size   = 12;
     Chart.defaults.color       = COR.texto;
 
     // ── Instâncias dos gráficos ───────────────────────────────────────
     let chartHoras   = null;
     let chartProdutos = null;
+    let chartSpark   = null;
+
+    function criarSparkline() {
+      chartSpark = new Chart($('chart-spark'), {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [{
+            data: [],
+            borderColor: '#FCD34D',
+            backgroundColor: (ctx) => {
+              const { chart } = ctx;
+              const { ctx: c, chartArea } = chart;
+              if (!chartArea) return 'rgba(252,211,77,0.15)';
+              const g = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+              g.addColorStop(0, 'rgba(252,211,77,0.45)');
+              g.addColorStop(1, 'rgba(252,211,77,0)');
+              return g;
+            },
+            borderWidth: 2,
+            fill: true,
+            tension: 0.35,
+            pointRadius: 0,
+            pointHoverRadius: 4,
+            pointHoverBackgroundColor: '#FCD34D',
+            pointHoverBorderColor: '#fff',
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              displayColors: false,
+              callbacks: {
+                title: ctx => ctx[0].label,
+                label: ctx => ` R$ ${ctx.parsed.y.toFixed(2).replace('.', ',')}`,
+              },
+            },
+          },
+          scales: { x: { display: false }, y: { display: false } },
+          elements: { line: { capBezierPoints: true } },
+        },
+      });
+    }
 
     function criarGraficos() {
       const escalaBase = {
@@ -198,6 +373,21 @@
       chartHoras.data.datasets[0].data = dataH;
       chartHoras.update('none'); // sem animação nos live-updates
 
+      // Sparkline reaproveita os mesmos dados por hora
+      if (chartSpark) {
+        chartSpark.data.labels = labelsH;
+        chartSpark.data.datasets[0].data = dataH;
+        chartSpark.update('none');
+      }
+
+      // Hora de pico
+      const pico = dataH.reduce(
+        (acc, v, i) => (v > acc.v ? { v, i } : acc),
+        { v: -1, i: -1 }
+      );
+      const picoEl = document.getElementById('kpi-pico');
+      if (picoEl) picoEl.textContent = pico.i >= 0 && pico.v > 0 ? labelsH[pico.i] : '—';
+
       // Top produtos (por quantidade)
       const prodMap = {};
       docs.forEach(d => {
@@ -244,6 +434,7 @@
       // Mostrar seção de gráficos e inicializar
       $('graficos').classList.remove('hidden');
       criarGraficos();
+      criarSparkline();
 
       // Vendas em tempo real
       onSnapshot(
@@ -273,7 +464,14 @@
           }
 
           $('total-vendido').textContent = fmtBRL(total);
+          // Hero: só o número (o "R$" já está estilizado em <small>)
+          const numHero = document.getElementById('total-vendido-num');
+          if (numHero) numHero.textContent = total.toFixed(2).replace('.', ',');
           $('num-vendas').textContent = snap.size;
+
+          // Ticket médio
+          const ticketEl = document.getElementById('kpi-ticket');
+          if (ticketEl) ticketEl.textContent = snap.size ? fmtBRL(total / snap.size) : fmtBRL(0);
 
           atualizarGraficos(snap.docs);
         }
