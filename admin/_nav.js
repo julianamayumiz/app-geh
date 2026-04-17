@@ -36,7 +36,19 @@ export function montarNav(paginaAtiva = '') {
   const fechar = () => { sidebar.classList.remove('open'); backdrop.classList.remove('show'); };
   document.getElementById('btn-menu').onclick = abrir;
   backdrop.onclick = fechar;
-  sidebar.querySelectorAll('a').forEach(a => a.addEventListener('click', fechar));
+  sidebar.querySelectorAll('a').forEach(a => {
+    a.addEventListener('click', fechar);
+    const prefetch = () => {
+      if (a.dataset.prefetched) return;
+      a.dataset.prefetched = '1';
+      const l = document.createElement('link');
+      l.rel = 'prefetch';
+      l.href = a.href;
+      document.head.appendChild(l);
+    };
+    a.addEventListener('mouseenter', prefetch, { once: true });
+    a.addEventListener('touchstart', prefetch, { once: true, passive: true });
+  });
 
   const btnTema = document.getElementById('btn-tema');
   const atualizarIconeTema = () => {

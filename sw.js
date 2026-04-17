@@ -1,4 +1,4 @@
-const CACHE = 'app-geh-v2';
+const CACHE = 'app-geh-v3';
 const ARQUIVOS = [
   '/',
   '/index.html',

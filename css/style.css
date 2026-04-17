@@ -96,6 +96,39 @@ main.admin {
   max-width: 1200px;
 }
 
+/* ===== Transição entre páginas ===== */
+@view-transition { navigation: auto; }
+
+::view-transition-old(root) {
+  animation: geh-fade-out 120ms ease both;
+}
+::view-transition-new(root) {
+  animation: geh-fade-in 180ms ease both;
+}
+
+@keyframes geh-fade-out {
+  to { opacity: 0; }
+}
+@keyframes geh-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Fallback pra navegadores sem View Transitions */
+@supports not (view-transition-name: none) {
+  .has-sidebar main {
+    animation: geh-fade-in 180ms ease both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root),
+  .has-sidebar main {
+    animation: none !important;
+  }
+}
+
 /* ===== Botões ===== */
 .btn {
   display: inline-flex;
