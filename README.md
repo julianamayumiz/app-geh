@@ -1,46 +1,58 @@
 # App GEH — Grupo Escoteiro Hokkaido
-Sistema de gerenciamento de vendas em eventos do Grupo Escoteiro Hokkaido.
-Substitui o AppSheet anterior com uma solução própria, mais funcional e bonita.
+
+Sistema de gerenciamento de vendas em eventos do **Grupo Escoteiro Hokkaido**.
+Substitui o AppSheet anterior com uma solução própria — mais rápida, mais bonita e feita sob medida pro fluxo do grupo.
+
+🔗 **Produção:** https://app-geh-cc577.web.app
 
 ---
 
-## Stack
+## ✨ Stack
 
 | Camada | Tecnologia |
 |---|---|
-| Frontend | HTML + CSS + JavaScript puro |
-| Banco de dados | Firebase Firestore |
+| Frontend | HTML + CSS + JavaScript puro (ES Modules) |
+| Tipografia | Inter (Google Fonts) |
+| Ícones | Lucide (SVG sprite inline, zero dependências) |
+| Banco de dados | Firebase Firestore (tempo real) |
 | Autenticação | Firebase Auth (Google + email/senha) |
 | Hospedagem | Firebase Hosting |
 | Scanner QR | html5-qrcode |
 | PWA | Service Worker + manifest.json |
 
+Sem bundler, sem framework. Tudo ES Modules nativos, servidos direto pelo Firebase Hosting.
+
 ---
 
-## Funcionalidades
+## 🎯 Funcionalidades
 
 ### 📱 Operador (mobile, sem login)
+
 - Tela inicial mostra o **evento ativo** em tempo real
 - **Scanner de QR code** pela câmera do celular (+ entrada manual de ID)
-- **Carrinho de compras** estilo delivery — botões +/− direto nos cards de produto
+- **Carrinho estilo delivery** — botões +/− direto nos cards de produto, com barra POS fixa mostrando total e qtd
 - Badge de **promoção** com preço riscado e preço novo em vermelho
-- Aviso de **estoque baixo** (⚠️ Restam X) nos produtos
+- Aviso de **estoque baixo** (⚠️ Restam X) e **sem estoque** (botão desabilita)
 - **Carregar saldo** no QR do cliente (dinheiro, Pix ou cartão)
 - **Consultar saldo** sem fazer venda
+- **Toasts com vibração háptica** — feedback claro no barulho do evento, mão única
 
-### 🖥️ Admin/Diretoria (desktop, com login)
+### 🖥️ Admin / Diretoria (desktop, com login)
+
 - Login via **Google** (conta corporativa) ou email/senha
-- **📅 Eventos** — criar, ativar e encerrar eventos; histórico com receita por evento
+- **Sidebar agrupada** por área (Operação · Cadastros · Financeiro) e **tema claro/escuro**
+- **Busca e ordenação automática** em todas as tabelas (basta marcar `data-search` / `data-sort`)
+- **📅 Eventos** — criar, ativar e encerrar; histórico com receita por evento
 - **📊 Dashboard** — visão em tempo real: total vendido, nº de vendas, saldo em circulação, clientes ativos, últimas vendas
 - **📦 Produtos** — CRUD completo; cadastro em lote (CSV); promoções com preço especial; badge de estoque baixo/sem estoque
 - **👥 Clientes** — cadastro por ID do QR; cadastro em lote (um ID por linha); busca; exclusão
 - **🔍 Histórico** — busca por ID do cliente, mostra todas as recargas e vendas com data e itens
-- **🛒 Compras** — registro de entrada de estoque (produto, quantidade, custo, fornecedor); atualiza estoque automaticamente
+- **🛒 Compras** — registro de entrada de estoque (produto, qtd, custo, fornecedor); atualiza estoque automaticamente
 - **📈 Relatório** — filtrado por evento; receita, custo, lucro bruto, saldo em circulação; ranking de mais vendidos; recargas por forma de pagamento; exportação CSV; **impressão/PDF** formatada com logo
 
 ---
 
-## Estrutura de arquivos
+## 📁 Estrutura de arquivos
 
 ```
 App GEH/
@@ -48,23 +60,27 @@ App GEH/
 ├── manifest.json               # Configuração do PWA
 ├── sw.js                       # Service Worker (cache offline)
 ├── firebase.json               # Config do Firebase Hosting
+├── firestore.rules             # Regras de segurança do Firestore
+├── firestore.indexes.json      # Índices compostos
 ├── .firebaserc                 # Projeto Firebase vinculado
 │
 ├── css/
-│   └── style.css               # Estilos globais + paleta GEH
+│   └── style.css               # Estilos globais, paleta GEH, tema claro/escuro
 │
 ├── js/
-│   └── firebase-config.js      # Inicialização do Firebase + exports
+│   ├── firebase-config.js      # Inicialização do Firebase + exports
+│   ├── ui.js                   # Toasts, busca/ordenação de tabelas, helpers
+│   └── icons.js                # Sprite SVG Lucide (ícones inlinados)
 │
 ├── operador/
 │   ├── index.html              # Home do operador (evento ativo + ações)
 │   ├── scanner.html            # Scanner de QR code
-│   ├── vender.html             # Carrinho de venda
+│   ├── vender.html             # Carrinho de venda (barra POS fixa)
 │   └── carregar.html           # Recarga / consulta de saldo
 │
 ├── admin/
 │   ├── login.html              # Login Google / email
-│   ├── _nav.js                 # Navegação e autenticação compartilhados
+│   ├── _nav.js                 # Sidebar agrupada + auth compartilhada
 │   ├── eventos.html            # Gerenciar eventos
 │   ├── dashboard.html          # Visão geral em tempo real
 │   ├── produtos.html           # Gerenciar produtos
@@ -73,13 +89,16 @@ App GEH/
 │   ├── compras.html            # Entrada de estoque
 │   └── relatorio.html          # Relatório financeiro + impressão
 │
-└── assets/
-    └── logo.png                # Logo do Grupo Escoteiro Hokkaido
+├── assets/
+│   └── logo.png                # Logo do Grupo Escoteiro Hokkaido
+│
+└── dev-tools/
+    └── load-test/              # Scripts de teste de carga (interno)
 ```
 
 ---
 
-## Modelo de dados (Firestore)
+## 🗄️ Modelo de dados (Firestore)
 
 | Coleção | Campos principais |
 |---|---|
@@ -93,7 +112,7 @@ App GEH/
 
 ---
 
-## Como rodar localmente
+## 🚀 Como rodar localmente
 
 ```bash
 # Instalar Firebase CLI (só na primeira vez)
@@ -108,17 +127,27 @@ firebase serve
 # Acesse em http://localhost:5000
 ```
 
-## Como fazer deploy
+## 📤 Como fazer deploy
 
 ```bash
+# Deploy completo (hosting + regras + índices)
 firebase deploy
+
+# Só o hosting
+firebase deploy --only hosting
+
+# Só as regras do Firestore
+firebase deploy --only firestore:rules
+
+# Só os índices (demora ~1min na primeira vez)
+firebase deploy --only firestore:indexes
 ```
 
 URL de produção: **https://app-geh-cc577.web.app**
 
 ---
 
-## Regras do Firestore
+## 🔒 Segurança (Firestore rules)
 
 As regras estão versionadas em [`firestore.rules`](firestore.rules) e os índices compostos em [`firestore.indexes.json`](firestore.indexes.json).
 
@@ -128,45 +157,47 @@ As regras estão versionadas em [`firestore.rules`](firestore.rules) e os índic
 
 Isso bloqueia ataques drive-by (delete em massa, hijack do evento ativo) sem quebrar o fluxo do operador. Fluxos sensíveis que ainda ficam abertos (ex.: criar venda falsa, zerar saldo via DevTools) exigiriam Cloud Functions.
 
-**Deploy das regras e índices:**
-
-```bash
-# Deploy só das regras
-firebase deploy --only firestore:rules
-
-# Deploy dos índices (demora ~1min na primeira vez)
-firebase deploy --only firestore:indexes
-
-# Ou ambos junto
-firebase deploy --only firestore
-```
-
 ---
 
-## Fluxo de uso no evento
+## 🎪 Fluxo de uso no evento
 
 ```
 PRÉ-EVENTO (Admin no PC)
-1. Criar evento em "Eventos" → ativar
-2. Cadastrar produtos (ou importar em lote)
-3. Cadastrar QR codes dos clientes (ou importar em lote)
+  1. Criar evento em "Eventos" → ativar
+  2. Cadastrar produtos (ou importar em lote)
+  3. Cadastrar QR codes dos clientes (ou importar em lote)
 
 DURANTE O EVENTO (Operador no celular)
-4. Acessar https://app-geh-cc577.web.app → "Sou Operador"
-5. Carregar saldo: escanear QR → digitar valor → confirmar
-6. Vender: escanear QR → adicionar produtos → finalizar
+  4. Acessar https://app-geh-cc577.web.app → "Sou Operador"
+  5. Carregar saldo: escanear QR → digitar valor → confirmar
+  6. Vender: escanear QR → adicionar produtos → finalizar
 
 PÓS-EVENTO (Admin no PC)
-7. Encerrar evento em "Eventos"
-8. Ver relatório → filtrar pelo evento → exportar CSV ou imprimir PDF
+  7. Encerrar evento em "Eventos"
+  8. Ver relatório → filtrar pelo evento → exportar CSV ou imprimir PDF
 ```
 
 ---
 
-## PWA — Instalar no celular
+## 📲 PWA — Instalar no celular
 
-**Android (Chrome):** abre o site → menu ⋮ → "Adicionar à tela inicial"
+**Android (Chrome):** abre o site → menu ⋮ → *Adicionar à tela inicial*
 
-**iOS (Safari):** abre o site → botão compartilhar → "Adicionar à Tela de Início"
+**iOS (Safari):** abre o site → botão compartilhar → *Adicionar à Tela de Início*
 
-O app funciona instalado como se fosse um app nativo, sem barra do navegador.
+O app funciona instalado como se fosse um app nativo, sem barra do navegador. O Service Worker guarda os arquivos estáticos em cache, então a tela abre rápido mesmo com conexão ruim (dados do Firestore continuam em tempo real quando há rede).
+
+---
+
+## 🎨 Design system (resumo)
+
+- **Paleta GEH:** azul `#1E3A8A`, azul-escuro `#152C6B`, vermelho `#DC2626`, amarelo `#FBBF24`
+- **Tipografia:** Inter (400/500/600/700) em todo o app
+- **Ícones:** sprite SVG inline (Lucide) — uso: `<span data-icon="package" data-size="24"></span>`
+- **Toasts:** `toast('Venda concluída', { tipo: 'sucesso' })` com vibração háptica
+- **Tabelas:** adicione `data-search="#input"` e `data-sort` nos `<th>` pra ativar filtro/ordenação sem JS adicional
+- **Tema:** claro/escuro com toggle na sidebar; persiste em `localStorage`
+
+---
+
+Feito com 💙 pro **Grupo Escoteiro Hokkaido**.
