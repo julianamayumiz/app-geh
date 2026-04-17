@@ -498,7 +498,25 @@
         setTimeout(() => window.location.href = 'index.html', 2500);
       } catch (err) {
         vibrar([100, 50, 100]); // padrão de erro
-        $('alerta-modal').textContent = `Erro: ${err.message}`;
+
+        // Diferencia os tipos de erro pra dar mensagem útil pro operador.
+        // Contenção de transação (raro, mas possível com vários operadores
+        // vendendo o mesmo produto ao mesmo tempo) gera FAILED_PRECONDITION
+        // ou ABORTED — nesse caso a venda NÃO foi cobrada, só clicar de novo.
+        let mensagem;
+        const eContencao = err.code === 'failed-precondition'
+                        || err.code === 'aborted'
+                        || /stored version/i.test(err.message || '');
+        if (err.message === 'Saldo insuficiente') {
+          mensagem = 'Saldo insuficiente pra essa venda.';
+        } else if ((err.message || '').startsWith('Estoque insuficiente')) {
+          mensagem = err.message + '. Atualize a tela e tente de novo.';
+        } else if (eContencao) {
+          mensagem = 'Conflito com outra venda simultânea. A venda NÃO foi cobrada — clique Finalizar de novo.';
+        } else {
+          mensagem = `Erro: ${err.message}. Tente de novo.`;
+        }
+        $('alerta-modal').textContent = mensagem;
         $('alerta-modal').className = 'alert alert-danger';
         $('btn-finalizar').disabled = false;
         $('btn-finalizar').innerHTML = `${icon('check', { size: 20 })} Finalizar Venda`;
