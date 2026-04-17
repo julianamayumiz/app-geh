@@ -37,6 +37,7 @@ const PATHS = {
   'printer':       '<polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/>',
   'plus':          '<path d="M5 12h14"/><path d="M12 5v14"/>',
   'minus':         '<path d="M5 12h14"/>',
+  'menu':          '<line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/>',
 };
 
 export function icon(name, { size = 24, strokeWidth = 2, cls = '' } = {}) {

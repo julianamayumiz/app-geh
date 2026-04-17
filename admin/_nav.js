@@ -16,15 +16,26 @@ export function montarNav(paginaAtiva = '') {
   const links = ITENS.map(i => linkNav(i, paginaAtiva)).join('');
   const nav = `
     <header class="header">
+      <button id="btn-menu" class="back" title="Menu" aria-label="Abrir menu">${icon('menu', { size: 22 })}</button>
       <img src="../assets/logo.png" alt="GEH" onerror="this.style.display='none'">
       <h1>Admin GEH</h1>
       <button id="btn-logout" class="back" title="Sair" aria-label="Sair">${icon('power', { size: 22 })}</button>
     </header>
-    <nav class="admin-nav">
-      <div class="admin-nav-scroll">${links}</div>
-    </nav>
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-links">${links}</div>
+    </aside>
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
   `;
   document.body.insertAdjacentHTML('afterbegin', nav);
+  document.body.classList.add('has-sidebar');
+
+  const sidebar  = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  const abrir  = () => { sidebar.classList.add('open'); backdrop.classList.add('show'); };
+  const fechar = () => { sidebar.classList.remove('open'); backdrop.classList.remove('show'); };
+  document.getElementById('btn-menu').onclick = abrir;
+  backdrop.onclick = fechar;
+  sidebar.querySelectorAll('a').forEach(a => a.addEventListener('click', fechar));
   document.getElementById('btn-logout').onclick = async () => {
     await signOut(auth);
     window.location.href = 'login.html';
@@ -37,10 +48,8 @@ export function montarNav(paginaAtiva = '') {
 }
 
 function linkNav({ href, icone, texto }, ativa) {
-  const estilo = href === ativa
-    ? 'background:var(--azul);color:white;'
-    : 'background:var(--cinza-claro);color:var(--azul);';
-  return `<a href="${href}" class="btn" style="${estilo}width:auto;white-space:nowrap;padding:0.5rem 0.875rem;font-size:0.9rem;gap:0.4rem;">${icon(icone, { size: 16 })} ${texto}</a>`;
+  const classe = href === ativa ? 'sidebar-link ativo' : 'sidebar-link';
+  return `<a href="${href}" class="${classe}">${icon(icone, { size: 18 })} <span>${texto}</span></a>`;
 }
 
 export function fmtBRL(v) {
