@@ -3,8 +3,8 @@ import { auth, signOut, onAuthStateChanged } from "../js/firebase-config.js";
 import { icon } from "../js/icons.js";
 
 const ITENS = [
-  { href: 'eventos.html',   icone: 'calendar',     texto: 'Eventos'   },
   { href: 'dashboard.html', icone: 'bar-chart',    texto: 'Dashboard' },
+  { href: 'eventos.html',   icone: 'calendar',     texto: 'Eventos'   },
   { href: 'produtos.html',  icone: 'package',      texto: 'Produtos'  },
   { href: 'clientes.html',  icone: 'users',        texto: 'Clientes'  },
   { href: 'historico.html', icone: 'search',       texto: 'Histórico' },
