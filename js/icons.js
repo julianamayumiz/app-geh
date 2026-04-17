@@ -1,7 +1,13 @@
-// Ícones do Lucide (lucide.dev, MIT License), inlinados para evitar dependência externa.
+// Ícones do Lucide (lucide.dev, MIT License), inlinados como sprite SVG.
+//
+// Estratégia: cada ícone é um <symbol id="icon-foo"> dentro de um único <svg>
+// injetado no topo do <body>. Cada uso vira <svg><use href="#icon-foo"/></svg>,
+// o que reduz o tamanho do DOM (uma definição por ícone, em vez de N cópias)
+// e permite estilizar via CSS sem reprocessar.
+//
 // Uso em HTML estático:  <span data-icon="shopping-cart" data-size="24"></span>
 // Uso em JS dinâmico:    element.innerHTML = icon('tag', { size: 14 });
-// Chamar renderIcons() após mudanças no DOM para substituir atributos data-icon.
+// Chamar renderIcons() após inserir novos data-icon no DOM.
 
 const PATHS = {
   // Navegação / ações principais
@@ -44,13 +50,31 @@ const PATHS = {
   'moon':          '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
 };
 
+// Injeta o sprite uma única vez no topo do <body>. Idempotente.
+function injetarSprite() {
+  if (typeof document === 'undefined') return;
+  if (document.getElementById('geh-icon-sprite')) return;
+  const symbols = Object.entries(PATHS).map(([nome, path]) =>
+    `<symbol id="icon-${nome}" viewBox="0 0 24 24">${path}</symbol>`
+  ).join('');
+  const sprite = document.createElement('div');
+  sprite.id = 'geh-icon-sprite';
+  // display:none mantém o sprite oculto sem afetar o layout
+  sprite.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;';
+  sprite.setAttribute('aria-hidden', 'true');
+  sprite.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg">${symbols}</svg>`;
+  // Insere o mais cedo possível pra <use> resolver imediatamente
+  if (document.body) document.body.insertBefore(sprite, document.body.firstChild);
+  else document.documentElement.appendChild(sprite);
+}
+
 export function icon(name, { size = 24, strokeWidth = 2, cls = '' } = {}) {
-  const path = PATHS[name];
-  if (!path) return '';
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" class="icon icon-${name} ${cls}">${path}</svg>`;
+  if (!PATHS[name]) return '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" class="icon icon-${name} ${cls}"><use href="#icon-${name}"/></svg>`;
 }
 
 export function renderIcons(root = document) {
+  injetarSprite();
   root.querySelectorAll('[data-icon]').forEach(el => {
     if (el.dataset.iconDone === '1') return;
     const name = el.getAttribute('data-icon');

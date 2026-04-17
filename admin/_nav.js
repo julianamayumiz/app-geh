@@ -1,6 +1,7 @@
 // Navegação comum do admin
 import { auth, signOut, onAuthStateChanged } from "../js/firebase-config.js";
 import { icon } from "../js/icons.js";
+import { enhanceAllTables } from "../js/ui.js";
 
 // Itens agrupados por área de responsabilidade — ajuda a orientar
 // o olhar na sidebar quando ela cresce.
@@ -95,6 +96,10 @@ export function montarNav(paginaAtiva = '') {
     console.log('[auth]', user ? `logada como ${user.email || user.uid}` : 'NÃO autenticada');
     if (!user) window.location.href = 'login.html';
   });
+
+  // Adiciona busca + ordenação em todas as tabelas da página
+  // (opt-out por tabela com data-no-enhance no .table-wrapper)
+  enhanceAllTables();
 }
 
 function linkNav({ href, icone, texto }, ativa) {
