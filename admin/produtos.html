@@ -205,7 +205,7 @@ Suco de Laranja, 5.00, 50, Bebidas
           ? `<span style="background:var(--vermelho);color:white;font-size:0.7rem;padding:2px 6px;border-radius:999px;margin-left:4px;display:inline-flex;align-items:center;gap:3px;">${icon('tag', { size: 11 })} PROMO</span>`
           : '';
         const badgeEstoque = p.estoque <= 0
-          ? `<span style="background:#6B7280;color:white;font-size:0.7rem;padding:2px 6px;border-radius:999px;margin-left:4px;">SEM ESTOQUE</span>`
+          ? `<span style="background:var(--cinza);color:white;font-size:0.7rem;padding:2px 6px;border-radius:999px;margin-left:4px;">SEM ESTOQUE</span>`
           : p.estoque <= ESTOQUE_BAIXO
           ? `<span style="background:var(--amarelo);color:#333;font-size:0.7rem;padding:2px 6px;border-radius:999px;margin-left:4px;display:inline-flex;align-items:center;gap:3px;">${icon('alert-triangle', { size: 11 })} BAIXO</span>`
           : '';

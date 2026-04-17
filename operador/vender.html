@@ -462,6 +462,7 @@
           const vendaRef = doc(collection(db, 'vendas'));
           tx.set(vendaRef, {
             clienteId: cliente.id,
+            clienteNome: cliente.id,   // mesmo valor por ora; campo já existe pra quando tiver nome
             eventoId: eventoAtivo?.id || null,
             eventoNome: eventoAtivo?.nome || null,
             itens: Array.from(carrinho.values()).map(({ produto, qtd }) => ({
@@ -480,11 +481,8 @@
         vibrar([40, 60, 40, 60, 80]); // padrão de sucesso
         fecharModal();
         const alertaEl = $('alerta');
-        alertaEl.innerHTML = `${icon('check-circle', { size: 18 })} Venda concluída! Total: ${fmtBRL(total)}`;
+        alertaEl.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 18 })} Venda concluída! Total: ${fmtBRL(total)}</span>`;
         alertaEl.className = 'alert alert-success';
-        alertaEl.style.display = 'inline-flex';
-        alertaEl.style.alignItems = 'center';
-        alertaEl.style.gap = '0.4rem';
         alertaEl.classList.remove('hidden');
         setTimeout(() => window.location.href = 'index.html', 1800);
       } catch (err) {

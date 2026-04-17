@@ -260,7 +260,7 @@
             tbody.innerHTML += `
               <tr>
                 <td>${quando}</td>
-                <td>${v.clienteId}</td>
+                <td>${v.clienteNome || v.clienteId}</td>
                 <td>${qtd}</td>
                 <td>${fmtBRL(v.total)}</td>
               </tr>`;

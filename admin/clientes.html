@@ -136,16 +136,17 @@
       const alertaLote = $('alerta-lote');
       let criados = 0, ignorados = 0;
 
+      // Usa o cache local do onSnapshot pra evitar N leituras no Firestore
+      const existentes = new Set(todos.map(c => c.id));
+
       // Firestore batch aceita até 500 por vez
       const LIMITE = 500;
       for (let i = 0; i < ids.length; i += LIMITE) {
         const chunk = ids.slice(i, i + LIMITE);
         const batch = writeBatch(db);
         for (const id of chunk) {
-          const ref = doc(db, 'clientes', id);
-          const existe = await getDoc(ref);
-          if (existe.exists()) { ignorados++; continue; }
-          batch.set(ref, { saldo: 0 });
+          if (existentes.has(id)) { ignorados++; continue; }
+          batch.set(doc(db, 'clientes', id), { saldo: 0 });
           criados++;
         }
         await batch.commit();
