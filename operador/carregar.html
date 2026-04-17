@@ -44,12 +44,7 @@
 
     <div id="historico" class="hidden">
       <h3 style="color:var(--azul);margin:1rem 0 0.75rem;display:inline-flex;align-items:center;gap:0.5rem;"><span data-icon="clock" data-size="20"></span> Histórico</h3>
-      <div class="table-wrapper">
-        <table>
-          <thead><tr><th>Quando</th><th>Tipo</th><th>Detalhe</th><th>Valor</th></tr></thead>
-          <tbody id="tbl-hist"></tbody>
-        </table>
-      </div>
+      <div id="lista-hist" class="hist-list"></div>
     </div>
   </main>
   <script type="module" src="../js/icons.js"></script>
@@ -103,19 +98,23 @@
       });
       movs.sort((a, b) => b.quando - a.quando);
 
-      const tbody = document.getElementById('tbl-hist');
+      const lista = document.getElementById('lista-hist');
       if (movs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Sem movimentações.</td></tr>';
+        lista.innerHTML = '<div class="text-center text-muted" style="padding:1rem;">Sem movimentações.</div>';
       } else {
-        tbody.innerHTML = movs.map(m => {
+        lista.innerHTML = movs.map(m => {
           const cor = m.positivo ? 'var(--verde)' : 'var(--vermelho)';
           const sinal = m.positivo ? '+' : '-';
-          return `<tr>
-            <td>${m.quando.toLocaleString('pt-BR')}</td>
-            <td><span style="background:${cor};color:white;padding:2px 8px;border-radius:999px;font-size:0.8rem;">${m.tipo}</span></td>
-            <td style="font-size:0.875rem;">${m.detalhe}</td>
-            <td style="font-weight:700;color:${cor};">${sinal} ${fmtBRL(m.valor)}</td>
-          </tr>`;
+          const dt = m.quando.toLocaleDateString('pt-BR');
+          const hr = m.quando.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          return `<div class="hist-item">
+            <div class="hist-row">
+              <span class="hist-badge" style="background:${cor};">${m.tipo}</span>
+              <span class="hist-quando">${dt} · ${hr}</span>
+              <span class="hist-valor" style="color:${cor};">${sinal} ${fmtBRL(m.valor)}</span>
+            </div>
+            <div class="hist-detalhe">${m.detalhe}</div>
+          </div>`;
         }).join('');
       }
       document.getElementById('historico').classList.remove('hidden');

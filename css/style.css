@@ -612,3 +612,31 @@ tr:hover { background: var(--cinza-claro); }
 :root[data-theme="dark"] ::-webkit-scrollbar-track    { background: #0F172A; }
 :root[data-theme="dark"] ::-webkit-scrollbar-thumb    { background: #334155; border-radius: 4px; }
 :root[data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+.hist-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.hist-item {
+  background: var(--branco, #fff);
+  border: 1px solid var(--borda, #E2E8F0);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+}
+.hist-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.hist-badge {
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: lowercase;
+}
+.hist-quando { font-size: 0.8rem; color: var(--cinza, #64748B); }
+.hist-valor { margin-left: auto; font-weight: 700; font-size: 0.95rem; white-space: nowrap; }
+.hist-detalhe { margin-top: 0.25rem; font-size: 0.875rem; color: var(--texto, #0F172A); word-break: break-word; }
+
+:root[data-theme="dark"] .hist-item { background: #1E293B; border-color: #334155; }
+:root[data-theme="dark"] .hist-detalhe { color: #E2E8F0; }
