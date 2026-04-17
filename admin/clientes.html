@@ -132,7 +132,7 @@
       if (!confirm(`Importar ${ids.length} clientes?`)) return;
 
       $('btn-lote').disabled = true;
-      $('btn-lote').innerHTML = '<div class="loader" style="border-top-color:white"></div> Importando...';
+      $('btn-lote').innerHTML = '<div class="loader"></div> Importando...';
 
       const alertaLote = $('alerta-lote');
       let criados = 0, ignorados = 0;
