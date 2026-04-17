@@ -1,3 +1,41 @@
+// Toast efêmero — feedback rápido pra ações em ambiente de evento (barulho, mão única).
+// Uso: toast('Venda concluída', { tipo: 'sucesso', vibrar: [40,60,40] });
+//      toast('Erro de rede', { tipo: 'erro' });
+// Tipos: 'sucesso' | 'erro' | 'info' (default).
+const VIBRACOES_PADRAO = {
+  sucesso: [40, 60, 40, 60, 80],
+  erro:    [100, 50, 100],
+  info:    15,
+};
+export function toast(mensagem, { tipo = 'info', duracao = 3000, vibrar } = {}) {
+  let host = document.getElementById('toast-host');
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'toast-host';
+    host.className = 'toast-host';
+    document.body.appendChild(host);
+  }
+  const el = document.createElement('div');
+  el.className = `toast toast-${tipo}`;
+  el.setAttribute('role', tipo === 'erro' ? 'alert' : 'status');
+  el.setAttribute('aria-live', tipo === 'erro' ? 'assertive' : 'polite');
+  el.textContent = mensagem;
+  host.appendChild(el);
+
+  // Vibração háptica — explícita, ou padrão do tipo, ou nada se for false
+  const padrao = vibrar === false ? null : (vibrar ?? VIBRACOES_PADRAO[tipo]);
+  if (padrao) { try { navigator.vibrate?.(padrao); } catch (_) {} }
+
+  // Permite clicar pra dispensar
+  el.addEventListener('click', () => fechar());
+  const t = setTimeout(fechar, duracao);
+  function fechar() {
+    clearTimeout(t);
+    el.classList.add('saindo');
+    el.addEventListener('transitionend', () => el.remove(), { once: true });
+  }
+}
+
 // Modal de confirmação acessível — substitui window.confirm().
 // Uso: const ok = await confirmarAsync('Excluir?', { destrutivo: true });
 export function confirmarAsync(mensagem, { destrutivo = false, textoOk = 'Confirmar', textoCancelar = 'Cancelar' } = {}) {

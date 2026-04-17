@@ -2,18 +2,40 @@
 import { auth, signOut, onAuthStateChanged } from "../js/firebase-config.js";
 import { icon } from "../js/icons.js";
 
-const ITENS = [
-  { href: 'dashboard.html', icone: 'bar-chart',    texto: 'Dashboard' },
-  { href: 'eventos.html',   icone: 'calendar',     texto: 'Eventos'   },
-  { href: 'produtos.html',  icone: 'package',      texto: 'Produtos'  },
-  { href: 'clientes.html',  icone: 'users',        texto: 'Clientes'  },
-  { href: 'historico.html', icone: 'search',       texto: 'Histórico' },
-  { href: 'compras.html',   icone: 'shopping-bag', texto: 'Compras'   },
-  { href: 'relatorio.html', icone: 'trending-up',  texto: 'Relatório' },
+// Itens agrupados por área de responsabilidade — ajuda a orientar
+// o olhar na sidebar quando ela cresce.
+const GRUPOS = [
+  {
+    titulo: 'Operação',
+    itens: [
+      { href: 'dashboard.html', icone: 'bar-chart', texto: 'Dashboard' },
+      { href: 'eventos.html',   icone: 'calendar',  texto: 'Eventos'   },
+      { href: 'historico.html', icone: 'search',    texto: 'Histórico' },
+    ],
+  },
+  {
+    titulo: 'Cadastros',
+    itens: [
+      { href: 'produtos.html', icone: 'package', texto: 'Produtos' },
+      { href: 'clientes.html', icone: 'users',   texto: 'Clientes' },
+    ],
+  },
+  {
+    titulo: 'Financeiro',
+    itens: [
+      { href: 'compras.html',   icone: 'shopping-bag', texto: 'Compras'   },
+      { href: 'relatorio.html', icone: 'trending-up',  texto: 'Relatório' },
+    ],
+  },
 ];
 
 export function montarNav(paginaAtiva = '') {
-  const links = ITENS.map(i => linkNav(i, paginaAtiva)).join('');
+  const grupos = GRUPOS.map(g => `
+    <div class="sidebar-grupo">
+      <div class="sidebar-grupo-titulo">${g.titulo}</div>
+      ${g.itens.map(i => linkNav(i, paginaAtiva)).join('')}
+    </div>
+  `).join('');
   const nav = `
     <header class="header">
       <button id="btn-menu" class="back" title="Menu" aria-label="Abrir menu">${icon('menu', { size: 22 })}</button>
@@ -23,7 +45,7 @@ export function montarNav(paginaAtiva = '') {
       <button id="btn-logout" class="back" title="Sair" aria-label="Sair">${icon('power', { size: 22 })}</button>
     </header>
     <aside class="sidebar" id="sidebar">
-      <div class="sidebar-links">${links}</div>
+      <div class="sidebar-links">${grupos}</div>
     </aside>
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
   `;
