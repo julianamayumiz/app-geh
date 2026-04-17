@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Seed — App GEH DEV</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 20px; }
+    h1 { color: #1e40af; }
+    .warn { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px 16px; margin: 16px 0; border-radius: 4px; }
+    .danger { background: #fee2e2; border-left: 4px solid #dc2626; padding: 12px 16px; margin: 16px 0; border-radius: 4px; }
+    .ok { background: #d1fae5; border-left: 4px solid #059669; padding: 12px 16px; margin: 16px 0; border-radius: 4px; }
+    button { background: #1e40af; color: white; border: 0; padding: 12px 20px; font-size: 16px; border-radius: 6px; cursor: pointer; margin-right: 8px; }
+    button:hover { background: #1e3a8a; }
+    button:disabled { background: #9ca3af; cursor: not-allowed; }
+    button.danger-btn { background: #dc2626; }
+    pre { background: #1f2937; color: #e5e7eb; padding: 16px; border-radius: 6px; overflow-x: auto; max-height: 400px; font-size: 13px; }
+    code { background: #f3f4f6; padding: 2px 6px; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <h1>Seed do ambiente de DEV</h1>
+
+  <div class="warn">
+    ⚠️ Esse utilitário popula o Firestore com dados fake. Ele <b>bloqueia automaticamente</b> se detectar o projectId de produção. Mesmo assim, confirme o projeto antes de rodar.
+  </div>
+
+  <p>Projeto detectado: <code id="projectId">carregando...</code></p>
+
+  <button id="btnSeed">Popular (1 evento + 15 produtos + 50 clientes)</button>
+  <button id="btnWipe" class="danger-btn">Limpar tudo (dev)</button>
+
+  <h3>Log</h3>
+  <pre id="log">Aguardando...</pre>
+
+  <script type="module">
+    import {
+      db,
+      collection, doc, getDocs, setDoc, addDoc, deleteDoc, writeBatch, serverTimestamp
+    } from "../js/firebase-config.js";
+
+    const PROD_PROJECT_ID = "app-geh-cc577";
+    const logEl = document.getElementById("log");
+    const projEl = document.getElementById("projectId");
+    const btnSeed = document.getElementById("btnSeed");
+    const btnWipe = document.getElementById("btnWipe");
+
+    // Descobre o projectId olhando na instância do Firestore
+    const projectId = db.app.options.projectId;
+    projEl.textContent = projectId;
+
+    const isProd = projectId === PROD_PROJECT_ID;
+    if (isProd) {
+      projEl.style.color = "#dc2626";
+      projEl.style.fontWeight = "bold";
+      btnSeed.disabled = true;
+      btnWipe.disabled = true;
+      const div = document.createElement("div");
+      div.className = "danger";
+      div.innerHTML = `🛑 <b>ABORTADO</b>: esse é o projeto de PRODUÇÃO (${PROD_PROJECT_ID}). Troque o <code>firebase-config.js</code> pro projeto de dev antes de rodar o seed.`;
+      document.body.insertBefore(div, logEl.previousElementSibling);
+    }
+
+    function log(msg) {
+      logEl.textContent += `\n${msg}`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    // ---------- SEED ----------
+    const PRODUTOS = [
+      { nome: "Cachorro-quente",     preco: 10, promocao: false, estoque: 100, categoria: "Comida" },
+      { nome: "Hambúrguer",          preco: 15, promocao: false, estoque: 80,  categoria: "Comida" },
+      { nome: "Pipoca",              preco: 5,  promocao: false, estoque: 150, categoria: "Comida" },
+      { nome: "Algodão-doce",        preco: 7,  promocao: false, estoque: 60,  categoria: "Comida" },
+      { nome: "Batata frita",        preco: 12, promocao: true,  precoPromo: 10, estoque: 70,  categoria: "Comida" },
+      { nome: "Pastel",              preco: 8,  promocao: false, estoque: 90,  categoria: "Comida" },
+      { nome: "Refrigerante lata",   preco: 6,  promocao: false, estoque: 200, categoria: "Bebida" },
+      { nome: "Água 500ml",          preco: 3,  promocao: false, estoque: 250, categoria: "Bebida" },
+      { nome: "Suco natural",        preco: 8,  promocao: false, estoque: 50,  categoria: "Bebida" },
+      { nome: "Café",                preco: 4,  promocao: false, estoque: 120, categoria: "Bebida" },
+      { nome: "Chocolate quente",    preco: 6,  promocao: true,  precoPromo: 5,  estoque: 40,  categoria: "Bebida" },
+      { nome: "Bolo fatia",          preco: 7,  promocao: false, estoque: 30,  categoria: "Sobremesa" },
+      { nome: "Brigadeiro",          preco: 3,  promocao: false, estoque: 150, categoria: "Sobremesa" },
+      { nome: "Sorvete",             preco: 10, promocao: false, estoque: 0,   categoria: "Sobremesa" },
+      { nome: "Pulseira GEH",        preco: 20, promocao: false, estoque: 50,  categoria: "Souvenir" },
+    ];
+
+    function normalizeProduto(p) {
+      return {
+        nome: p.nome,
+        preco: p.preco,
+        precoPromo: p.precoPromo ?? null,
+        promocao: p.promocao,
+        estoque: p.estoque,
+        categoria: p.categoria,
+      };
+    }
+
+    async function seed() {
+      if (isProd) return;
+      btnSeed.disabled = true;
+      logEl.textContent = "Iniciando seed...";
+
+      try {
+        // 1. Evento ativo
+        log("→ Criando evento ativo...");
+        const eventoRef = await addDoc(collection(db, "eventos"), {
+          nome: "Evento de Teste DEV",
+          data: new Date().toISOString().slice(0, 10),
+          status: "ativo",
+          criadoEm: serverTimestamp(),
+        });
+        log(`  ✓ evento criado: ${eventoRef.id}`);
+
+        // 2. config/eventoAtivo
+        log("→ Setando config/eventoAtivo...");
+        await setDoc(doc(db, "config", "eventoAtivo"), {
+          id: eventoRef.id,
+          nome: "Evento de Teste DEV",
+          data: new Date().toISOString().slice(0, 10),
+        });
+        log("  ✓ config gravada");
+
+        // 3. Produtos
+        log(`→ Criando ${PRODUTOS.length} produtos...`);
+        for (const p of PRODUTOS) {
+          await addDoc(collection(db, "produtos"), normalizeProduto(p));
+        }
+        log(`  ✓ ${PRODUTOS.length} produtos criados`);
+
+        // 4. Clientes GEH001..GEH050 com saldos variados
+        log("→ Criando 50 clientes (GEH001..GEH050)...");
+        const batch = writeBatch(db);
+        for (let i = 1; i <= 50; i++) {
+          const matricula = `GEH${String(i).padStart(3, "0")}`;
+          // distribuição: 10% zerados, 30% baixo (10-50), 40% médio (50-200), 20% alto (200-500)
+          let saldo;
+          const r = Math.random();
+          if (r < 0.10) saldo = 0;
+          else if (r < 0.40) saldo = Math.floor(10 + Math.random() * 40);
+          else if (r < 0.80) saldo = Math.floor(50 + Math.random() * 150);
+          else saldo = Math.floor(200 + Math.random() * 300);
+          batch.set(doc(db, "clientes", matricula), { saldo });
+        }
+        await batch.commit();
+        log("  ✓ 50 clientes criados");
+
+        log("\n✅ Seed concluído com sucesso!");
+      } catch (err) {
+        log(`\n❌ Erro: ${err.message}`);
+        console.error(err);
+      } finally {
+        btnSeed.disabled = false;
+      }
+    }
+
+    // ---------- WIPE ----------
+    async function wipeCollection(name) {
+      const snap = await getDocs(collection(db, name));
+      let n = 0;
+      for (const d of snap.docs) {
+        await deleteDoc(d.ref);
+        n++;
+      }
+      return n;
+    }
+
+    async function wipe() {
+      if (isProd) return;
+      if (!confirm(`Apagar TUDO do projeto ${projectId}? (eventos, produtos, clientes, vendas, movimentacoes_saldo, compras, config/eventoAtivo)`)) return;
+      btnWipe.disabled = true;
+      logEl.textContent = "Iniciando limpeza...";
+      try {
+        for (const name of ["eventos", "produtos", "clientes", "vendas", "movimentacoes_saldo", "compras"]) {
+          log(`→ Limpando ${name}...`);
+          const n = await wipeCollection(name);
+          log(`  ✓ ${n} docs apagados`);
+        }
+        log("→ Limpando config/eventoAtivo...");
+        try { await deleteDoc(doc(db, "config", "eventoAtivo")); log("  ✓ ok"); }
+        catch(e) { log("  (já não existia)"); }
+        log("\n✅ Limpeza concluída");
+      } catch (err) {
+        log(`\n❌ Erro: ${err.message}`);
+        console.error(err);
+      } finally {
+        btnWipe.disabled = false;
+      }
+    }
+
+    btnSeed.addEventListener("click", seed);
+    btnWipe.addEventListener("click", wipe);
+  </script>
+</body>
+</html>
