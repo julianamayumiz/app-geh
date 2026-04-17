@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="../css/style.css">
   <link rel="manifest" href="../manifest.json">
   <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <main class="admin">
@@ -18,10 +19,11 @@
       <span>Nenhum evento ativo. Crie e ative um evento em <a href="eventos.html" style="color:var(--azul);font-weight:600;">Eventos</a> para começar a vender.</span>
     </div>
 
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;">
+    <!-- KPIs -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;">
       <div class="card">
         <div class="text-muted">Total vendido</div>
-        <div style="font-size:2rem;font-weight:700;color:var(--verde);" id="total-vendido">R$ 0,00</div>
+        <div style="font-size:2rem;font-weight:700;color:var(--verde);font-variant-numeric:tabular-nums;" id="total-vendido">R$ 0,00</div>
       </div>
       <div class="card">
         <div class="text-muted">Nº de vendas</div>
@@ -29,11 +31,31 @@
       </div>
       <div class="card">
         <div class="text-muted">Saldo em circulação</div>
-        <div style="font-size:2rem;font-weight:700;color:var(--amarelo);" id="saldo-circulacao">R$ 0,00</div>
+        <div style="font-size:2rem;font-weight:700;color:var(--amarelo);font-variant-numeric:tabular-nums;" id="saldo-circulacao">R$ 0,00</div>
       </div>
       <div class="card">
         <div class="text-muted">Clientes ativos</div>
         <div style="font-size:2rem;font-weight:700;color:var(--azul);" id="num-clientes">0</div>
+      </div>
+    </div>
+
+    <!-- Gráficos — só aparecem quando há evento ativo -->
+    <div id="graficos" class="hidden" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem;margin-top:1.5rem;">
+      <div class="card">
+        <h3 class="card-title" style="display:inline-flex;align-items:center;gap:0.5rem;">
+          <span data-icon="trending-up" data-size="18"></span> Receita por hora
+        </h3>
+        <div style="position:relative;height:220px;">
+          <canvas id="chart-horas"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <h3 class="card-title" style="display:inline-flex;align-items:center;gap:0.5rem;">
+          <span data-icon="package" data-size="18"></span> Top produtos
+        </h3>
+        <div style="position:relative;height:220px;">
+          <canvas id="chart-produtos"></canvas>
+        </div>
       </div>
     </div>
 
@@ -50,12 +72,147 @@
 
   <script type="module">
     import { montarNav, fmtBRL } from "./_nav.js";
-    import { db, doc, getDoc, collection, onSnapshot, query, where, orderBy } from "../js/firebase-config.js";
+    import {
+      db, doc, getDoc, collection,
+      onSnapshot, query, where, orderBy
+    } from "../js/firebase-config.js";
 
     montarNav('dashboard.html');
 
-    const $ = (id) => document.getElementById(id);
+    const $ = id => document.getElementById(id);
 
+    // ── Cores adaptadas ao dark mode ──────────────────────────────────
+    const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const COR = {
+      azul:      dark ? '#3B82F6' : '#1E3A8A',
+      azulFill:  dark ? '#3B82F6BB' : '#1E3A8ABB',
+      verde:     dark ? '#22C55E' : '#16A34A',
+      verdeFill: dark ? '#22C55EBB' : '#16A34ABB',
+      texto:     dark ? '#94A3B8' : '#6B7280',
+      grid:      dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)',
+    };
+
+    Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    Chart.defaults.font.size   = 12;
+    Chart.defaults.color       = COR.texto;
+
+    // ── Instâncias dos gráficos ───────────────────────────────────────
+    let chartHoras   = null;
+    let chartProdutos = null;
+
+    function criarGraficos() {
+      const escalaBase = {
+        grid:  { color: COR.grid },
+        ticks: { color: COR.texto },
+      };
+
+      chartHoras = new Chart($('chart-horas'), {
+        type: 'bar',
+        data: {
+          labels: [],
+          datasets: [{
+            label: 'Receita (R$)',
+            data: [],
+            backgroundColor: COR.azulFill,
+            borderColor: COR.azul,
+            borderWidth: 2,
+            borderRadius: 6,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => ` R$ ${ctx.parsed.y.toFixed(2).replace('.', ',')}`,
+              },
+            },
+          },
+          scales: {
+            x: { ...escalaBase },
+            y: {
+              ...escalaBase,
+              beginAtZero: true,
+              ticks: {
+                ...escalaBase.ticks,
+                callback: v => `R$ ${Number(v).toFixed(0)}`,
+              },
+            },
+          },
+        },
+      });
+
+      chartProdutos = new Chart($('chart-produtos'), {
+        type: 'bar',
+        data: {
+          labels: [],
+          datasets: [{
+            label: 'Qtd vendida',
+            data: [],
+            backgroundColor: COR.verdeFill,
+            borderColor: COR.verde,
+            borderWidth: 2,
+            borderRadius: 6,
+          }],
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: {
+              ...escalaBase,
+              beginAtZero: true,
+              ticks: { ...escalaBase.ticks, precision: 0 },
+            },
+            y: { ...escalaBase },
+          },
+        },
+      });
+    }
+
+    // ── Atualiza gráficos com os docs do onSnapshot ──────────────────
+    function atualizarGraficos(docs) {
+      // Receita por hora
+      const horaMap = {};
+      docs.forEach(d => {
+        const h = d.data().criadoEm?.toDate?.()?.getHours?.();
+        if (h !== undefined) {
+          horaMap[h] = (horaMap[h] || 0) + (d.data().total || 0);
+        }
+      });
+      const horas = Object.keys(horaMap).map(Number).sort((a, b) => a - b);
+      const labelsH = [], dataH = [];
+      if (horas.length) {
+        for (let h = horas[0]; h <= horas[horas.length - 1]; h++) {
+          labelsH.push(`${h}h`);
+          dataH.push(horaMap[h] || 0);
+        }
+      }
+      chartHoras.data.labels = labelsH;
+      chartHoras.data.datasets[0].data = dataH;
+      chartHoras.update('none'); // sem animação nos live-updates
+
+      // Top produtos (por quantidade)
+      const prodMap = {};
+      docs.forEach(d => {
+        (d.data().itens || []).forEach(item => {
+          const n = item.nome || '?';
+          prodMap[n] = (prodMap[n] || 0) + (item.qtd || 1);
+        });
+      });
+      const top = Object.entries(prodMap)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8);
+      chartProdutos.data.labels = top.map(([n]) => n);
+      chartProdutos.data.datasets[0].data = top.map(([, v]) => v);
+      chartProdutos.update('none');
+    }
+
+    // ── Init ──────────────────────────────────────────────────────────
     (async function init() {
       const snap = await getDoc(doc(db, 'config', 'eventoAtivo'));
       const eventoAtivo = snap.exists() && snap.data().id ? snap.data() : null;
@@ -66,54 +223,65 @@
         $('total-vendido').textContent = 'R$ 0,00';
         $('num-vendas').textContent = '0';
         $('tbl-vendas').innerHTML = '<tr><td colspan="4" class="text-center text-muted">Nenhum evento ativo.</td></tr>';
-        // Saldo em circulação e clientes ativos continuam sendo totais globais (independem de evento)
-        onSnapshot(collection(db, 'clientes'), (s) => {
-          let saldoTotal = 0;
-          s.forEach(d => saldoTotal += d.data().saldo || 0);
-          $('saldo-circulacao').textContent = fmtBRL(saldoTotal);
+        onSnapshot(collection(db, 'clientes'), s => {
+          let saldo = 0;
+          s.forEach(d => saldo += d.data().saldo || 0);
+          $('saldo-circulacao').textContent = fmtBRL(saldo);
           $('num-clientes').textContent = s.size;
         });
         return;
       }
 
-      $('evento-label').innerHTML = `<strong style="color:var(--verde);display:inline-flex;align-items:center;gap:0.4rem;"><span style="width:8px;height:8px;background:var(--verde);border-radius:50%;display:inline-block;"></span>${eventoAtivo.nome}</strong> <span style="color:var(--cinza);">— números deste evento</span>`;
+      $('evento-label').innerHTML = `
+        <strong style="color:var(--verde);display:inline-flex;align-items:center;gap:0.4rem;">
+          <span style="width:8px;height:8px;background:var(--verde);border-radius:50%;display:inline-block;"></span>
+          ${eventoAtivo.nome}
+        </strong>
+        <span style="color:var(--cinza);"> — números deste evento</span>`;
 
-      // Vendas DO EVENTO ATIVO em tempo real (limite 50 pra não baixar tudo em eventos grandes)
-      const vendasQuery = query(
-        collection(db, 'vendas'),
-        where('eventoId', '==', eventoAtivo.id),
-        orderBy('criadoEm', 'desc')
+      // Mostrar seção de gráficos e inicializar
+      $('graficos').classList.remove('hidden');
+      criarGraficos();
+
+      // Vendas em tempo real
+      onSnapshot(
+        query(collection(db, 'vendas'), where('eventoId', '==', eventoAtivo.id), orderBy('criadoEm', 'desc')),
+        snap => {
+          let total = 0;
+          const tbody = $('tbl-vendas');
+          tbody.innerHTML = '';
+
+          snap.docs.forEach(d => total += d.data().total || 0);
+
+          snap.docs.slice(0, 50).forEach(d => {
+            const v = d.data();
+            const qtd    = (v.itens || []).reduce((s, i) => s + (i.qtd || 0), 0);
+            const quando = v.criadoEm?.toDate?.()?.toLocaleTimeString('pt-BR') || '—';
+            tbody.innerHTML += `
+              <tr>
+                <td>${quando}</td>
+                <td>${v.clienteId}</td>
+                <td>${qtd}</td>
+                <td>${fmtBRL(v.total)}</td>
+              </tr>`;
+          });
+
+          if (snap.empty) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Sem vendas ainda neste evento.</td></tr>';
+          }
+
+          $('total-vendido').textContent = fmtBRL(total);
+          $('num-vendas').textContent = snap.size;
+
+          atualizarGraficos(snap.docs);
+        }
       );
-      onSnapshot(vendasQuery, (snap) => {
-        let total = 0;
-        const tbody = $('tbl-vendas');
-        tbody.innerHTML = '';
-        const docs = snap.docs;
-        docs.forEach(d => total += (d.data().total || 0));
-        // Mostrar só as 50 mais recentes na tabela
-        docs.slice(0, 50).forEach(d => {
-          const v = d.data();
-          const qtdItens = (v.itens || []).reduce((s, i) => s + (i.qtd || 0), 0);
-          const quando = v.criadoEm?.toDate?.()?.toLocaleTimeString('pt-BR') || '—';
-          tbody.innerHTML += `
-            <tr>
-              <td>${quando}</td>
-              <td>${v.clienteId}</td>
-              <td>${qtdItens}</td>
-              <td>${fmtBRL(v.total)}</td>
-            </tr>
-          `;
-        });
-        if (snap.empty) tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Sem vendas ainda neste evento.</td></tr>';
-        $('total-vendido').textContent = fmtBRL(total);
-        $('num-vendas').textContent = snap.size;
-      });
 
-      // Saldo em circulação e clientes ativos — globais (o QR é da pessoa, carrega entre eventos)
-      onSnapshot(collection(db, 'clientes'), (s) => {
-        let saldoTotal = 0;
-        s.forEach(d => saldoTotal += d.data().saldo || 0);
-        $('saldo-circulacao').textContent = fmtBRL(saldoTotal);
+      // Saldo + clientes (globais)
+      onSnapshot(collection(db, 'clientes'), s => {
+        let saldo = 0;
+        s.forEach(d => saldo += d.data().saldo || 0);
+        $('saldo-circulacao').textContent = fmtBRL(saldo);
         $('num-clientes').textContent = s.size;
       });
     })();
