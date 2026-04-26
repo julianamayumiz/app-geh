@@ -87,7 +87,13 @@ service cloud.firestore {
 
     match /eventos/{doc} {
       allow read: if isEquipe();
-      allow write: if isAdmin();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin()
+        || (
+          isRecepcao()
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['categoriasIngresso'])
+        );
     }
 
     match /config/{doc} {
