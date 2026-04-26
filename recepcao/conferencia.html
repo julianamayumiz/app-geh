@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1E3A8A">
+  <title>Conferência — Recepção GEH</title>
+  <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="manifest" href="../manifest.json">
+  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+  <style>
+    .resumo-box {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .resumo-card {
+      background: var(--cinza-fundo);
+      border-radius: 10px;
+      padding: 0.6rem 0.75rem;
+      text-align: center;
+      border: 1px solid var(--cinza-claro);
+    }
+    .resumo-card .num { font-size: 1.4rem; font-weight: 700; line-height: 1; }
+    .resumo-card .lbl { font-size: 0.7rem; color: var(--cinza); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 0.25rem; }
+    .resumo-card.ok    .num { color: var(--verde); }
+    .resumo-card.pend  .num { color: #B45309; }
+    .resumo-card.tot   .num { color: var(--azul); }
+
+    .busca-box {
+      position: sticky; top: 0; z-index: 10;
+      background: var(--cinza-fundo);
+      padding: 0.5rem 0;
+      margin-bottom: 0.5rem;
+    }
+    .busca-input {
+      font-size: 1.1rem;
+      padding: 0.85rem 1rem;
+      width: 100%;
+      border-radius: 12px;
+      border: 2px solid var(--azul);
+      background: var(--branco);
+      color: var(--cinza-escuro);
+    }
+
+    .convite-card {
+      background: var(--branco);
+      border: 1px solid var(--cinza-claro);
+      border-radius: 12px;
+      padding: 0.85rem 1rem;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      cursor: pointer;
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
+    }
+    .convite-card:hover { box-shadow: 0 4px 12px -4px rgba(0,0,0,0.15); }
+    .convite-card:active { transform: scale(0.98); }
+    .convite-card.presente { opacity: 0.55; }
+    .convite-card .numero {
+      font-weight: 800; font-size: 1.5rem;
+      min-width: 60px; text-align: center;
+      color: var(--azul);
+    }
+    .convite-card.presente .numero { color: var(--verde); }
+    .convite-card .info { flex: 1; min-width: 0; }
+    .convite-card .nome { font-weight: 600; font-size: 1rem; }
+    .convite-card .meta { font-size: 0.78rem; color: var(--cinza); margin-top: 0.15rem; }
+    .convite-card .badge-cat {
+      display: inline-block;
+      padding: 0.1rem 0.5rem;
+      border-radius: 999px;
+      background: var(--cinza-claro);
+      font-size: 0.7rem;
+      font-weight: 600;
+      margin-left: 0.35rem;
+    }
+    .convite-card .status {
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+    }
+    .status.pend { background: rgba(217,119,6,0.14); color: #B45309; }
+    .status.ok   { background: rgba(22,163,74,0.14); color: var(--verde); }
+
+    .filtros {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .chip {
+      padding: 0.4rem 0.85rem;
+      border-radius: 999px;
+      border: 1px solid var(--cinza-claro);
+      background: var(--branco);
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--cinza-escuro);
+    }
+    .chip.ativo { background: var(--azul); color: white; border-color: var(--azul); }
+
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(15,29,77,0.55);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 100; padding: 1rem;
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal-card {
+      background: var(--branco);
+      border-radius: 16px;
+      padding: 1.25rem;
+      max-width: 420px;
+      width: 100%;
+      box-shadow: 0 24px 60px -20px rgba(0,0,0,0.5);
+    }
+    .modal-card h3 { margin: 0 0 0.5rem; color: var(--azul); }
+    .modal-card .linha { display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px dashed var(--cinza-claro); }
+    .modal-card .linha .lbl { color: var(--cinza); font-size: 0.85rem; }
+    .modal-card .linha .val { font-weight: 600; }
+    .modal-card .acoes { display: flex; gap: 0.5rem; margin-top: 1rem; }
+    .alerta-presenca {
+      background: rgba(217,119,6,0.14);
+      color: #B45309;
+      padding: 0.6rem 0.85rem;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      margin-bottom: 0.75rem;
+      display: flex; gap: 0.5rem; align-items: center;
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <a href="index.html" class="back" aria-label="Voltar"><span data-icon="arrow-left" data-size="24"></span></a>
+    <img src="../assets/logo.png" alt="GEH" onerror="this.style.display='none'">
+    <h1>Conferência</h1>
+    <button id="btn-logout" class="back" title="Sair" aria-label="Sair"><span data-icon="power" data-size="22"></span></button>
+  </header>
+
+  <main>
+    <div class="resumo-box">
+      <div class="resumo-card tot"><div class="num" id="r-total">—</div><div class="lbl">Total</div></div>
+      <div class="resumo-card ok"><div class="num" id="r-presentes">—</div><div class="lbl">Presentes</div></div>
+      <div class="resumo-card pend"><div class="num" id="r-pendentes">—</div><div class="lbl">Pendentes</div></div>
+    </div>
+
+    <div class="busca-box">
+      <input type="text" id="busca" class="busca-input" placeholder="Buscar por nº, nome ou família…" autocomplete="off">
+    </div>
+
+    <div class="filtros">
+      <button class="chip ativo" data-filtro="todos">Todos</button>
+      <button class="chip" data-filtro="pendentes">Pendentes</button>
+      <button class="chip" data-filtro="presentes">Presentes</button>
+    </div>
+
+    <div id="lista"></div>
+  </main>
+
+  <div id="modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <h3 id="m-nome">—</h3>
+      <div id="m-aviso-ja" class="alerta-presenca hidden"></div>
+      <div class="linha"><span class="lbl">Família</span><span class="val" id="m-familia">—</span></div>
+      <div class="linha"><span class="lbl">Nº convite</span><span class="val" id="m-numero">—</span></div>
+      <div class="linha"><span class="lbl">Categoria</span><span class="val" id="m-categoria">—</span></div>
+      <div class="acoes">
+        <button id="btn-marcar" class="btn btn-primary">✓ Liberar entrada</button>
+        <button id="btn-cancelar-modal" class="btn btn-secondary" style="max-width:120px;">Cancelar</button>
+      </div>
+      <button id="btn-desfazer" class="btn btn-danger hidden" style="margin-top:0.5rem;">Desfazer check-in</button>
+    </div>
+  </div>
+
+  <script type="module" src="../js/icons.js"></script>
+  <script type="module">
+    import {
+      db, collection, doc, getDoc, updateDoc, onSnapshot, query, where, serverTimestamp, auth, signOut
+    } from "../js/firebase-config.js";
+    import { renderIcons } from "../js/icons.js";
+    import { requireAuth } from "../js/auth-guard.js";
+
+    const { perfil } = await requireAuth({ papel: 'recepcao' });
+    renderIcons();
+
+    document.getElementById('btn-logout').onclick = async () => {
+      await signOut(auth);
+      window.location.href = '../admin/login.html';
+    };
+
+    const $ = id => document.getElementById(id);
+
+    const cfg = await getDoc(doc(db, 'config', 'eventoAtivo'));
+    const eventoAtivoId = cfg.exists() ? cfg.data().id : null;
+    if (!eventoAtivoId) {
+      $('lista').innerHTML = '<div class="alert alert-warning">Sem evento ativo. Avise a diretoria.</div>';
+      throw new Error('sem evento');
+    }
+
+    let convites = [];
+    let filtro = 'todos';
+    let termoBusca = '';
+    let conviteAberto = null;
+
+    function normaliza(s) {
+      return String(s || '').toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '');
+    }
+
+    function atualizarResumo() {
+      $('r-total').textContent = convites.length;
+      const pres = convites.filter(c => c.presente).length;
+      $('r-presentes').textContent = pres;
+      $('r-pendentes').textContent = convites.length - pres;
+    }
+
+    function render() {
+      const termo = normaliza(termoBusca.trim());
+      let lista = convites;
+      if (filtro === 'pendentes') lista = lista.filter(c => !c.presente);
+      else if (filtro === 'presentes') lista = lista.filter(c => c.presente);
+      if (termo) {
+        lista = lista.filter(c =>
+          String(c.numero).toLowerCase().includes(termo) ||
+          normaliza(c.nome).includes(termo) ||
+          normaliza(c.familia).includes(termo)
+        );
+      }
+      lista.sort((a, b) => {
+        const fa = (a.familia || '').localeCompare(b.familia || '');
+        if (fa !== 0) return fa;
+        const na = parseInt(a.numero) || 0;
+        const nb = parseInt(b.numero) || 0;
+        return na - nb;
+      });
+
+      const cont = $('lista');
+      if (lista.length === 0) {
+        cont.innerHTML = `<div style="text-align:center;color:var(--cinza);padding:2rem 1rem;">Nada encontrado.</div>`;
+        return;
+      }
+      cont.innerHTML = lista.map(c => `
+        <div class="convite-card ${c.presente ? 'presente' : ''}" data-id="${c.id}">
+          <div class="numero">${c.numero}</div>
+          <div class="info">
+            <div class="nome">${c.nome}${c.categoria ? `<span class="badge-cat">${c.categoria}</span>` : ''}</div>
+            <div class="meta">${c.familia || 'Sem família'}</div>
+          </div>
+          <div class="status ${c.presente ? 'ok' : 'pend'}">${c.presente ? 'Presente' : 'Pendente'}</div>
+        </div>
+      `).join('');
+      cont.querySelectorAll('[data-id]').forEach(el => {
+        el.onclick = () => abrirModal(el.dataset.id);
+      });
+    }
+
+    function abrirModal(id) {
+      const c = convites.find(x => x.id === id);
+      if (!c) return;
+      conviteAberto = c;
+      $('m-nome').textContent = c.nome;
+      $('m-familia').textContent = c.familia || '—';
+      $('m-numero').textContent = c.numero;
+      $('m-categoria').textContent = c.categoria || '—';
+
+      if (c.presente) {
+        const quando = c.checkInEm?.toDate ? c.checkInEm.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—';
+        $('m-aviso-ja').textContent = `⚠️ Já entrou às ${quando}${c.checkInPor ? ` por ${c.checkInPor}` : ''}.`;
+        $('m-aviso-ja').classList.remove('hidden');
+        $('btn-marcar').classList.add('hidden');
+        $('btn-desfazer').classList.remove('hidden');
+      } else {
+        $('m-aviso-ja').classList.add('hidden');
+        $('btn-marcar').classList.remove('hidden');
+        $('btn-desfazer').classList.add('hidden');
+      }
+      $('modal').classList.remove('hidden');
+    }
+
+    function fecharModal() {
+      $('modal').classList.add('hidden');
+      conviteAberto = null;
+    }
+
+    $('btn-cancelar-modal').onclick = fecharModal;
+    $('modal').onclick = (e) => { if (e.target.id === 'modal') fecharModal(); };
+
+    $('btn-marcar').onclick = async () => {
+      if (!conviteAberto) return;
+      $('btn-marcar').disabled = true;
+      try {
+        await updateDoc(doc(db, 'convites_antecipados', conviteAberto.id), {
+          presente: true,
+          checkInEm: serverTimestamp(),
+          checkInPor: perfil.nome || perfil.email || 'recepção',
+        });
+        fecharModal();
+      } finally {
+        $('btn-marcar').disabled = false;
+      }
+    };
+
+    $('btn-desfazer').onclick = async () => {
+      if (!conviteAberto) return;
+      if (!confirm(`Desfazer entrada de ${conviteAberto.nome}?`)) return;
+      $('btn-desfazer').disabled = true;
+      try {
+        await updateDoc(doc(db, 'convites_antecipados', conviteAberto.id), {
+          presente: false,
+          checkInEm: null,
+          checkInPor: null,
+        });
+        fecharModal();
+      } finally {
+        $('btn-desfazer').disabled = false;
+      }
+    };
+
+    $('busca').oninput = (e) => {
+      termoBusca = e.target.value;
+      render();
+    };
+
+    document.querySelectorAll('.chip[data-filtro]').forEach(c => {
+      c.onclick = () => {
+        document.querySelectorAll('.chip').forEach(x => x.classList.remove('ativo'));
+        c.classList.add('ativo');
+        filtro = c.dataset.filtro;
+        render();
+      };
+    });
+
+    onSnapshot(
+      query(collection(db, 'convites_antecipados'), where('eventoId', '==', eventoAtivoId)),
+      (snap) => {
+        convites = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        atualizarResumo();
+        render();
+      }
+    );
+  </script>
+</body>
+</html>

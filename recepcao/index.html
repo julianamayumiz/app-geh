@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1E3A8A">
+  <meta name="theme-color" content="#0F172A" media="(prefers-color-scheme: dark)">
+  <title>Recepção — App GEH</title>
+  <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="manifest" href="../manifest.json">
+  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+  <style>
+    .evento-hero {
+      background:
+        radial-gradient(ellipse at 90% 120%, rgba(251,191,36,0.18) 0%, transparent 55%),
+        linear-gradient(135deg, var(--azul) 0%, var(--azul-escuro) 100%);
+      color: #fff;
+      border-radius: 16px;
+      padding: 1.1rem 1.25rem;
+      box-shadow: 0 20px 40px -20px rgba(15,29,77,0.5);
+      margin-bottom: 1.25rem;
+    }
+    .evento-hero .evento-nome { font-weight: 700; font-size: 1.15rem; margin-top: 0.25rem; }
+    .evento-hero .evento-sub  { color: rgba(255,255,255,0.7); font-size: 0.85rem; margin-top: 0.15rem; }
+    .evento-hero.sem-evento {
+      background: linear-gradient(135deg, #2a1a1a 0%, #1a0f0f 100%);
+    }
+
+    .grid-acoes .btn-lg {
+      flex-direction: row;
+      justify-content: flex-start;
+      text-align: left;
+      gap: 1rem;
+      padding: 1.2rem 1.25rem;
+      min-height: unset;
+    }
+    .grid-acoes .btn-lg .icon-wrap {
+      width: 44px; height: 44px; border-radius: 12px;
+      display: inline-flex; align-items: center; justify-content: center;
+      flex-shrink: 0; background: rgba(255,255,255,0.15);
+    }
+    .grid-acoes .btn-secondary .icon-wrap { background: rgba(30,58,138,0.08); }
+    :root[data-theme="dark"] .grid-acoes .btn-secondary .icon-wrap { background: rgba(59,130,246,0.15); }
+    .grid-acoes .label-wrap { display: flex; flex-direction: column; gap: 0.15rem; }
+    .grid-acoes .label-principal { font-weight: 700; font-size: 1.05rem; }
+    .grid-acoes .label-sec { font-size: 0.78rem; font-weight: 500; opacity: 0.7; }
+    .grid-acoes .seta { margin-left: auto; opacity: 0.55; }
+    @media (min-width: 768px) { .grid-acoes { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <a href="../index.html" class="back" aria-label="Voltar"><span data-icon="arrow-left" data-size="24"></span></a>
+    <img src="../assets/logo.png" alt="GEH" onerror="this.style.display='none'">
+    <h1>Recepção</h1>
+    <button id="btn-logout" class="back" title="Sair" aria-label="Sair"><span data-icon="power" data-size="22"></span></button>
+  </header>
+
+  <main>
+    <div class="evento-hero" id="evento-box">
+      <span class="tag" id="evento-tag"><span class="dot"></span> Verificando evento…</span>
+      <div class="evento-nome" id="evento-nome"></div>
+      <div class="evento-sub" id="evento-sub"></div>
+    </div>
+
+    <div class="grid-acoes">
+      <a href="conferencia.html" class="btn btn-primary btn-lg">
+        <span class="icon-wrap"><span data-icon="list-checks" data-size="22"></span></span>
+        <span class="label-wrap">
+          <span class="label-principal">Conferência antecipada</span>
+          <span class="label-sec">Bater nº do convite com a lista e marcar presença</span>
+        </span>
+        <span class="seta" data-icon="arrow-right" data-size="18"></span>
+      </a>
+      <a href="venda-porta.html" class="btn btn-secondary btn-lg">
+        <span class="icon-wrap"><span data-icon="door-open" data-size="22"></span></span>
+        <span class="label-wrap">
+          <span class="label-principal">Venda na porta</span>
+          <span class="label-sec">Vender convite na hora (Pix ou dinheiro)</span>
+        </span>
+        <span class="seta" data-icon="arrow-right" data-size="18"></span>
+      </a>
+    </div>
+  </main>
+  <script type="module" src="../js/icons.js"></script>
+  <script type="module">
+    import { db, doc, getDoc, auth, signOut } from "../js/firebase-config.js";
+    import { renderIcons } from "../js/icons.js";
+    import { requireAuth } from "../js/auth-guard.js";
+
+    await requireAuth({ papel: 'recepcao' });
+
+    document.getElementById('btn-logout').onclick = async () => {
+      await signOut(auth);
+      window.location.href = '../admin/login.html';
+    };
+
+    const snap = await getDoc(doc(db, 'config', 'eventoAtivo'));
+    const box  = document.getElementById('evento-box');
+    const tag  = document.getElementById('evento-tag');
+    const nome = document.getElementById('evento-nome');
+    const sub  = document.getElementById('evento-sub');
+
+    if (snap.exists() && snap.data().id) {
+      tag.innerHTML = '<span class="dot"></span> Evento ativo';
+      nome.textContent = snap.data().nome;
+      sub.textContent = 'Pronto pra receber o público.';
+    } else {
+      box.classList.add('sem-evento');
+      tag.className = 'tag danger';
+      tag.innerHTML = '<span class="dot"></span> Sem evento ativo';
+      nome.textContent = 'Nenhum evento rodando agora';
+      sub.textContent = 'Avise a diretoria para ativar um evento.';
+    }
+    renderIcons(box);
+  </script>
+</body>
+</html>

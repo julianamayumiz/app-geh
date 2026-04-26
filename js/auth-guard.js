@@ -25,12 +25,14 @@ function loginUrl() {
   if (location.pathname.includes('/admin/')) return 'login.html';
   if (location.pathname.includes('/operador/')) return '../admin/login.html';
   if (location.pathname.includes('/caixa/')) return '../admin/login.html';
+  if (location.pathname.includes('/recepcao/')) return '../admin/login.html';
   return 'admin/login.html';
 }
 
 function homeFor(perfil) {
   if (perfil?.papel === 'operador') return '/operador/index.html';
   if (perfil?.papel === 'caixa') return '/caixa/index.html';
+  if (perfil?.papel === 'recepcao') return '/recepcao/index.html';
   return '/admin/dashboard.html';
 }
 

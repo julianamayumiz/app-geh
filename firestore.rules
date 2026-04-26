@@ -86,7 +86,7 @@ service cloud.firestore {
     }
 
     match /eventos/{doc} {
-      allow read: if isOperador();
+      allow read: if isEquipe();
       allow write: if isAdmin();
     }
 
