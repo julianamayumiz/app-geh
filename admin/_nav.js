@@ -28,6 +28,7 @@ const GRUPOS = [
     titulo: 'Financeiro',
     itens: [
       { href: 'compras.html',     icone: 'shopping-bag', texto: 'Compras'         },
+      { href: 'despesas.html',    icone: 'dollar-sign',  texto: 'Despesas'        },
       { href: 'ajuste-saldo.html', icone: 'edit',         texto: 'Ajuste de saldo' },
       { href: 'relatorio.html',   icone: 'trending-up',  texto: 'Relatório'       },
       { href: 'fechamento.html',  icone: 'file-text',    texto: 'Fechamento'      },

@@ -95,6 +95,16 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /despesas/{doc} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /insumos/{doc} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
     // Ajustes manuais de saldo feitos pela Diretoria — auditoria
     // separada das recargas do Caixa. Imutavel: nao permite update
     // nem delete (nem para admin) pra preservar a trilha.
