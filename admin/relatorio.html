@@ -83,6 +83,29 @@
       </table>
     </div>
 
+    <h3 style="color:var(--azul);margin-bottom:0.75rem;">Ajustes manuais (Diretoria)</h3>
+    <p style="color:var(--cinza);font-size:0.85rem;margin-bottom:0.5rem;">
+      Correções aplicadas fora do fluxo do caixa — separadas para auditoria.
+    </p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.75rem;margin-bottom:0.75rem;">
+      <div class="card" style="margin:0;">
+        <div class="text-muted" style="font-size:0.78rem;">Total adicionado</div>
+        <div style="font-size:1.25rem;font-weight:700;color:var(--verde);" id="aj-pos">R$ 0,00</div>
+      </div>
+      <div class="card" style="margin:0;">
+        <div class="text-muted" style="font-size:0.78rem;">Total retirado</div>
+        <div style="font-size:1.25rem;font-weight:700;color:var(--vermelho);" id="aj-neg">R$ 0,00</div>
+      </div>
+      <div class="card" style="margin:0;">
+        <div class="text-muted" style="font-size:0.78rem;">Saldo líquido dos ajustes</div>
+        <div style="font-size:1.25rem;font-weight:700;color:var(--azul);" id="aj-net">R$ 0,00</div>
+      </div>
+      <div class="card" style="margin:0;">
+        <div class="text-muted" style="font-size:0.78rem;">Qtd. de ajustes</div>
+        <div style="font-size:1.25rem;font-weight:700;" id="aj-qtd">0</div>
+      </div>
+    </div>
+
     <div style="display:flex;gap:1rem;flex-wrap:wrap;">
       <button class="btn btn-primary" id="btn-export" style="max-width:280px;"><span data-icon="download" data-size="18"></span> Exportar CSV</button>
       <button class="btn btn-secondary" id="btn-print" style="max-width:280px;"><span data-icon="printer" data-size="18"></span> Imprimir / Salvar PDF</button>
@@ -125,12 +148,16 @@
       const movQuery = eventoId
         ? query(collection(db, 'movimentacoes_saldo'), where('eventoId', '==', eventoId))
         : collection(db, 'movimentacoes_saldo');
+      const ajustesQuery = eventoId
+        ? query(collection(db, 'ajustes_saldo'), where('eventoId', '==', eventoId))
+        : collection(db, 'ajustes_saldo');
 
-      const [vendasSnap, comprasSnap, clientesSnap, movSnap] = await Promise.all([
+      const [vendasSnap, comprasSnap, clientesSnap, movSnap, ajustesSnap] = await Promise.all([
         getDocs(vendasQuery),
         getDocs(collection(db, 'compras')),
         getDocs(collection(db, 'clientes')),
-        getDocs(movQuery)
+        getDocs(movQuery),
+        getDocs(ajustesQuery)
       ]);
 
       let receita = 0;
@@ -181,6 +208,18 @@
       porForma.forEach((v, forma) => {
         tblPagto.innerHTML += `<tr><td>${forma}</td><td>${v.qtd}</td><td>${fmtBRL(v.total)}</td></tr>`;
       });
+
+      // Ajustes manuais
+      let ajPos = 0, ajNeg = 0, ajQtd = 0;
+      ajustesSnap.forEach(d => {
+        const v = d.data().valor || 0;
+        ajQtd += 1;
+        if (v >= 0) ajPos += v; else ajNeg += Math.abs(v);
+      });
+      $('aj-pos').textContent = fmtBRL(ajPos);
+      $('aj-neg').textContent = fmtBRL(ajNeg);
+      $('aj-net').textContent = fmtBRL(ajPos - ajNeg);
+      $('aj-qtd').textContent = ajQtd;
 
       $('btn-export').onclick = () => exportarCSV(vendasSnap);
       const evNome = $('sel-evento').options[$('sel-evento').selectedIndex]?.text || 'Todos os eventos';

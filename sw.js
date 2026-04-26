@@ -1,4 +1,4 @@
-const CACHE = 'app-geh-v8';
+const CACHE = 'app-geh-v9';
 const ARQUIVOS = [
   '/',
   '/index.html',
@@ -19,6 +19,7 @@ const ARQUIVOS = [
   '/admin/compras.html',
   '/admin/relatorio.html',
   '/admin/usuarios.html',
+  '/admin/ajuste-saldo.html',
 ];
 
 self.addEventListener('install', e => {

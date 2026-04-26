@@ -118,19 +118,12 @@
       $('res-id').textContent = id;
       $('res-saldo').textContent = fmtBRL(saldo);
 
-      // Buscar movimentações de saldo (recargas)
-      const movSnap = await getDocs(query(
-        collection(db, 'movimentacoes_saldo'),
-        where('clienteId', '==', id),
-        orderBy('criadoEm', 'desc')
-      ));
-
-      // Buscar vendas
-      const vendasSnap = await getDocs(query(
-        collection(db, 'vendas'),
-        where('clienteId', '==', id),
-        orderBy('criadoEm', 'desc')
-      ));
+      // Buscar movimentações de saldo (recargas), vendas e ajustes manuais
+      const [movSnap, vendasSnap, ajustesSnap] = await Promise.all([
+        getDocs(query(collection(db, 'movimentacoes_saldo'), where('clienteId', '==', id), orderBy('criadoEm', 'desc'))),
+        getDocs(query(collection(db, 'vendas'),               where('clienteId', '==', id), orderBy('criadoEm', 'desc'))),
+        getDocs(query(collection(db, 'ajustes_saldo'),        where('clienteId', '==', id), orderBy('criadoEm', 'desc'))),
+      ]);
 
       // Montar lista unificada
       const movimentos = [];
@@ -142,9 +135,10 @@
         movimentos.push({
           quando: m.criadoEm?.toDate?.() || new Date(0),
           tipo: 'recarga',
-          detalhe: `Via ${m.forma || '—'}`,
+          detalhe: `Via ${m.forma || '—'}${m.caixaNome ? ` · caixa ${m.caixaNome}` : ''}`,
           valor: m.valor,
-          positivo: true
+          positivo: true,
+          cor: 'var(--verde)'
         });
       });
 
@@ -157,7 +151,21 @@
           tipo: 'venda',
           detalhe: itens,
           valor: v.total,
-          positivo: false
+          positivo: false,
+          cor: 'var(--vermelho)'
+        });
+      });
+
+      ajustesSnap.forEach(d => {
+        const a = d.data();
+        const v = a.valor || 0;
+        movimentos.push({
+          quando: a.criadoEm?.toDate?.() || new Date(0),
+          tipo: 'ajuste',
+          detalhe: `${a.motivo || '—'}${a.adminNome ? ` · por ${a.adminNome}` : ''}`,
+          valor: Math.abs(v),
+          positivo: v >= 0,
+          cor: '#B45309'
         });
       });
 
@@ -172,14 +180,14 @@
         tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state">${icon('inbox', { size: 32 })}<p>Sem movimentações.</p></div></td></tr>`;
       } else {
         movimentos.forEach(m => {
-          const cor = m.positivo ? 'var(--verde)' : 'var(--vermelho)';
+          const corValor = m.positivo ? 'var(--verde)' : 'var(--vermelho)';
           const sinal = m.positivo ? '+' : '-';
           tbody.innerHTML += `
             <tr>
               <td>${m.quando.toLocaleString('pt-BR')}</td>
-              <td><span style="background:${cor};color:white;padding:2px 8px;border-radius:999px;font-size:0.8rem;">${m.tipo}</span></td>
+              <td><span style="background:${m.cor};color:white;padding:2px 8px;border-radius:999px;font-size:0.8rem;">${m.tipo}</span></td>
               <td style="font-size:0.875rem;">${m.detalhe}</td>
-              <td style="font-weight:700;color:${cor};">${sinal} ${fmtBRL(m.valor)}</td>
+              <td style="font-weight:700;color:${corValor};">${sinal} ${fmtBRL(m.valor)}</td>
             </tr>
           `;
         });
