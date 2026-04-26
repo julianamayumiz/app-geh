@@ -4,7 +4,8 @@
       "Bash(python \"C:\\\\Users\\\\julia\\\\.claude\\\\plugins\\\\cache\\\\ui-ux-pro-max-skill\\\\ui-ux-pro-max\\\\2.5.0\\\\.claude\\\\skills\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"point-of-sale event sales admin dashboard friendly trustworthy\" --design-system -p \"App GEH\" -f markdown)",
       "mcp__Claude_Preview__preview_start",
       "Bash(curl -s http://localhost:5000/css/style.css)",
-      "PowerShell(git add -A)"
+      "PowerShell(git add -A)",
+      "PowerShell(git mv \"admin/compras.html\" \"admin/estoque.html\")"
     ]
   }
 }

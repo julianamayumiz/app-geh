@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Compras — Admin GEH</title>
+  <title>Estoque — Admin GEH</title>
   <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
   <link rel="stylesheet" href="../css/style.css">
   <link rel="manifest" href="../manifest.json">
@@ -11,8 +11,8 @@
 </head>
 <body>
   <main class="admin">
-    <h2 style="color:var(--azul);margin-bottom:1rem;display:inline-flex;align-items:center;gap:0.5rem;"><span data-icon="shopping-bag" data-size="24"></span> Compras / Entrada de estoque</h2>
-    <p class="text-muted mb-2">Registre aqui a compra de produtos para o evento. O estoque é atualizado automaticamente.</p>
+    <h2 style="color:var(--azul);margin-bottom:1rem;display:inline-flex;align-items:center;gap:0.5rem;"><span data-icon="package" data-size="24"></span> Estoque</h2>
+    <p class="text-muted mb-2">Controle de estoque dos produtos. Cada entrada soma na quantidade disponível para venda.</p>
 
     <div class="card">
       <h3 class="card-title">Nova entrada</h3>
@@ -26,25 +26,35 @@
           <input type="number" id="compra-qtd" min="1" step="1">
         </div>
         <div class="form-group">
-          <label>Custo total (R$)</label>
-          <input type="number" id="compra-custo" step="0.01" min="0">
-        </div>
-        <div class="form-group">
-          <label>Fornecedor</label>
-          <input type="text" id="compra-fornecedor" placeholder="Opcional">
+          <label>Valor unitário (R$)</label>
+          <input type="number" id="compra-valor-unit" step="0.01" min="0" placeholder="Opcional">
         </div>
       </div>
       <div id="alerta" class="alert hidden"></div>
-      <button id="btn-registrar" class="btn btn-primary">Registrar compra</button>
+      <button id="btn-registrar" class="btn btn-primary">Registrar entrada</button>
     </div>
 
-    <h3 style="color:var(--azul);margin:1.5rem 0 0.75rem;">Histórico</h3>
+    <h3 style="color:var(--azul);margin:1.5rem 0 0.75rem;">Estoque atual</h3>
     <div class="table-wrapper">
       <table>
         <thead>
-          <tr><th>Data</th><th>Produto</th><th>Qtd</th><th>Custo</th><th>Fornecedor</th></tr>
+          <tr><th>Produto</th><th>Categoria</th><th>Estoque</th></tr>
         </thead>
-        <tbody id="tbl"><tr><td colspan="5" class="text-center text-muted">Carregando...</td></tr></tbody>
+        <tbody id="tbl-estoque"><tr><td colspan="3" class="text-center text-muted">Carregando...</td></tr></tbody>
+      </table>
+    </div>
+
+    <h3 style="color:var(--azul);margin:1.5rem 0 0.75rem;">Histórico de entradas</h3>
+    <div class="form-group" style="max-width:240px;">
+      <label>Filtrar por categoria</label>
+      <select id="filtro-categoria"><option value="">Todas</option></select>
+    </div>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr><th>Data</th><th>Produto</th><th>Categoria</th><th>Qtd</th><th>Valor unit.</th><th>Total</th></tr>
+        </thead>
+        <tbody id="tbl"><tr><td colspan="6" class="text-center text-muted">Carregando...</td></tr></tbody>
       </table>
     </div>
   </main>
@@ -52,36 +62,85 @@
   <script type="module">
     import { montarNav, fmtBRL } from "./_nav.js";
     import {
-      db, collection, doc, getDoc, addDoc, updateDoc, onSnapshot,
+      db, collection, doc, addDoc, onSnapshot,
       query, orderBy, limit, serverTimestamp, runTransaction
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
 
-    montarNav('compras.html');
+    montarNav('estoque.html');
     renderIcons();
 
     const $ = (id) => document.getElementById(id);
     const alerta = $('alerta');
 
+    const produtosMap = new Map();
+
     onSnapshot(collection(db, 'produtos'), (snap) => {
       const sel = $('compra-produto');
       const valorAtual = sel.value;
       sel.innerHTML = '<option value="">Selecione...</option>';
+
+      const categorias = new Set();
+      const produtos = [];
+      produtosMap.clear();
+
       snap.forEach(d => {
-        const p = d.data();
+        const p = { id: d.id, ...d.data() };
+        produtosMap.set(p.id, p);
+        produtos.push(p);
+        if (p.categoria) categorias.add(p.categoria);
+      });
+
+      produtos.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+      produtos.forEach(p => {
         const opt = document.createElement('option');
-        opt.value = d.id;
-        opt.textContent = `${p.nome} (estoque: ${p.estoque})`;
+        opt.value = p.id;
+        opt.textContent = `${p.nome} (estoque: ${p.estoque ?? 0})`;
         sel.appendChild(opt);
       });
       sel.value = valorAtual;
+
+      const filtro = $('filtro-categoria');
+      const filtroAtual = filtro.value;
+      filtro.innerHTML = '<option value="">Todas</option>';
+      [...categorias].sort().forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        filtro.appendChild(opt);
+      });
+      filtro.value = filtroAtual;
+
+      const tEst = $('tbl-estoque');
+      if (produtos.length === 0) {
+        tEst.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Sem produtos cadastrados.</td></tr>';
+      } else {
+        const ESTOQUE_BAIXO = 10;
+        tEst.innerHTML = '';
+        produtos.forEach(p => {
+          const est = p.estoque ?? 0;
+          const badge = est <= 0
+            ? `<span style="background:var(--cinza);color:white;font-size:0.7rem;padding:2px 6px;border-radius:999px;margin-left:6px;">SEM ESTOQUE</span>`
+            : est <= ESTOQUE_BAIXO
+            ? `<span style="background:var(--amarelo);color:#1F2937;font-size:0.7rem;padding:2px 6px;border-radius:999px;margin-left:6px;display:inline-flex;align-items:center;gap:3px;">${icon('alert-triangle', { size: 11 })} BAIXO</span>`
+            : '';
+          tEst.innerHTML += `
+            <tr>
+              <td>${p.nome}</td>
+              <td>${p.categoria || '—'}</td>
+              <td>${est}${badge}</td>
+            </tr>
+          `;
+        });
+      }
+
+      renderHistorico();
     });
 
     $('btn-registrar').onclick = async () => {
       const produtoId = $('compra-produto').value;
       const qtd = parseInt($('compra-qtd').value);
-      const custo = parseFloat($('compra-custo').value) || 0;
-      const fornecedor = $('compra-fornecedor').value.trim();
+      const valorUnit = parseFloat($('compra-valor-unit').value) || 0;
 
       if (!produtoId || !qtd || qtd <= 0) {
         alerta.textContent = 'Selecione produto e quantidade válida.';
@@ -102,16 +161,15 @@
             produtoId,
             produtoNome: p.nome,
             qtd,
-            custoTotal: custo,
-            fornecedor,
+            valorUnitario: valorUnit,
+            custoTotal: valorUnit * qtd,
             criadoEm: serverTimestamp()
           });
         });
 
         $('compra-qtd').value = '';
-        $('compra-custo').value = '';
-        $('compra-fornecedor').value = '';
-        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} Compra registrada e estoque atualizado.</span>`;
+        $('compra-valor-unit').value = '';
+        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} Entrada registrada e estoque atualizado.</span>`;
         alerta.className = 'alert alert-success';
         setTimeout(() => alerta.classList.add('hidden'), 2000);
       } catch (err) {
@@ -120,27 +178,50 @@
       }
     };
 
-    onSnapshot(query(collection(db, 'compras'), orderBy('criadoEm', 'desc'), limit(100)), (snap) => {
+    let historicoCache = [];
+    onSnapshot(query(collection(db, 'compras'), orderBy('criadoEm', 'desc'), limit(200)), (snap) => {
+      historicoCache = [];
+      snap.forEach(d => historicoCache.push(d.data()));
+      renderHistorico();
+    });
+
+    $('filtro-categoria').onchange = renderHistorico;
+
+    function renderHistorico() {
       const tbody = $('tbl');
-      tbody.innerHTML = '';
-      if (snap.empty) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Sem compras registradas.</td></tr>';
+      const filtro = $('filtro-categoria').value;
+      const linhas = historicoCache.filter(c => {
+        if (!filtro) return true;
+        const prod = produtosMap.get(c.produtoId);
+        return prod && prod.categoria === filtro;
+      });
+
+      if (linhas.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Sem entradas para o filtro.</td></tr>';
         return;
       }
-      snap.forEach(d => {
-        const c = d.data();
+
+      tbody.innerHTML = '';
+      linhas.forEach(c => {
         const quando = c.criadoEm?.toDate?.()?.toLocaleString('pt-BR') || '—';
+        const prod = produtosMap.get(c.produtoId);
+        const categoria = prod?.categoria || '—';
+        const valorUnit = c.valorUnitario != null
+          ? c.valorUnitario
+          : (c.qtd ? (c.custoTotal || 0) / c.qtd : 0);
+        const total = c.custoTotal || (valorUnit * (c.qtd || 0));
         tbody.innerHTML += `
           <tr>
             <td>${quando}</td>
-            <td>${c.produtoNome}</td>
-            <td>${c.qtd}</td>
-            <td>${fmtBRL(c.custoTotal)}</td>
-            <td>${c.fornecedor || '—'}</td>
+            <td>${c.produtoNome || '—'}</td>
+            <td>${categoria}</td>
+            <td>${c.qtd || 0}</td>
+            <td>${fmtBRL(valorUnit)}</td>
+            <td>${fmtBRL(total)}</td>
           </tr>
         `;
       });
-    });
+    }
   </script>
 </body>
 </html>

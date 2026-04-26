@@ -12,9 +12,10 @@ const GRUPOS = [
   {
     titulo: 'Operação',
     itens: [
-      { href: 'dashboard.html', icone: 'bar-chart', texto: 'Dashboard' },
-      { href: 'eventos.html',   icone: 'calendar',  texto: 'Eventos'   },
-      { href: 'historico.html', icone: 'search',    texto: 'Histórico' },
+      { href: 'dashboard.html',   icone: 'bar-chart', texto: 'Dashboard'   },
+      { href: 'comparativo.html', icone: 'git-compare', texto: 'Comparativo' },
+      { href: 'eventos.html',     icone: 'calendar',  texto: 'Eventos'     },
+      { href: 'historico.html',   icone: 'search',    texto: 'Histórico'   },
     ],
   },
   {
@@ -27,7 +28,7 @@ const GRUPOS = [
   {
     titulo: 'Financeiro',
     itens: [
-      { href: 'compras.html',     icone: 'shopping-bag', texto: 'Compras'         },
+      { href: 'estoque.html',     icone: 'package',      texto: 'Estoque'         },
       { href: 'despesas.html',    icone: 'dollar-sign',  texto: 'Despesas'        },
       { href: 'ajuste-saldo.html', icone: 'edit',         texto: 'Ajuste de saldo' },
       { href: 'relatorio.html',   icone: 'trending-up',  texto: 'Relatório'       },

@@ -143,7 +143,7 @@
             <div class="val" style="color:var(--verde);" id="receita">R$ 0,00</div>
           </div>
           <div class="fc-kpi">
-            <div class="lbl">Custo (compras)</div>
+            <div class="lbl">Custo (estoque)</div>
             <div class="val" style="color:var(--vermelho);" id="custo">R$ 0,00</div>
           </div>
           <div class="fc-kpi">
@@ -157,7 +157,7 @@
         </div>
         <p style="font-size:0.78rem;color:var(--cinza);margin-top:0.5rem;">
           <strong>Receita</strong>: total consumido pelos clientes nas barracas durante o evento selecionado.
-          <strong>Custo</strong>: total das compras cadastradas (todos os eventos — não há vínculo por evento).
+          <strong>Custo</strong>: total das entradas de estoque cadastradas (todos os eventos — não há vínculo por evento).
           <strong>Saldo em circulação</strong>: soma do saldo atual de todos os clientes (passivo — pode ser solicitado em devolução).
         </p>
       </div>
@@ -398,7 +398,7 @@
       linhas.push([]);
       linhas.push(['Resumo financeiro']);
       linhas.push(['Receita', receita.toFixed(2)]);
-      linhas.push(['Custo (compras)', custo.toFixed(2)]);
+      linhas.push(['Custo (estoque)', custo.toFixed(2)]);
       linhas.push(['Lucro', (receita - custo).toFixed(2)]);
       linhas.push(['Saldo em circulação', saldoCirc.toFixed(2)]);
       linhas.push([]);
