@@ -392,7 +392,7 @@
     import { icon, renderIcons } from "../js/icons.js";
     import { requireAuth } from "../js/auth-guard.js";
 
-    await requireAuth({ papel: 'operador' });
+    const { perfil } = await requireAuth({ papel: 'operador' });
     import { toast } from "../js/ui.js";
 
     // Evento ativo
@@ -789,6 +789,8 @@
               subtotal: (produto.precoFinal ?? produto.preco) * qtd
             })),
             total,
+            operadorId: perfil?.uid || null,
+            operadorNome: perfil?.nome || perfil?.email || 'Operador',
             criadoEm: serverTimestamp()
           });
         });

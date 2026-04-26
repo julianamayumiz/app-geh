@@ -124,6 +124,93 @@
     :root[data-theme="dark"] .kpi-small.accent-amarelo .valor { color: var(--amarelo); }
     .kpi-small.accent-azul     { border-left-color: var(--azul); }
     .kpi-small.accent-azul     .valor { color: var(--azul); }
+
+    /* Ranking de vendedores */
+    .podium {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+      align-items: end;
+      margin-bottom: 1rem;
+    }
+    .podium-card {
+      position: relative;
+      border-radius: var(--radius);
+      padding: 1rem 0.75rem 1.1rem;
+      text-align: center;
+      color: #fff;
+      box-shadow: var(--sombra);
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      align-items: center;
+      isolation: isolate;
+      overflow: hidden;
+    }
+    .podium-card .medalha {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.25);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+    .podium-card .nome {
+      font-weight: 700;
+      font-size: 0.95rem;
+      line-height: 1.15;
+      word-break: break-word;
+    }
+    .podium-card .total {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.15rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .podium-card .meta {
+      font-size: 0.72rem;
+      opacity: 0.85;
+      letter-spacing: 0.04em;
+    }
+    .podium-1 { background: linear-gradient(135deg, #F59E0B 0%, #B45309 100%); padding-top: 1.4rem; padding-bottom: 1.5rem; }
+    .podium-2 { background: linear-gradient(135deg, #94A3B8 0%, #475569 100%); }
+    .podium-3 { background: linear-gradient(135deg, #B87333 0%, #7C3F1D 100%); }
+    .podium-1 .medalha { background: rgba(255,255,255,0.35); }
+    .ranking-resto {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .ranking-row {
+      display: grid;
+      grid-template-columns: 28px 1fr auto;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.45rem 0.6rem;
+      border-radius: 8px;
+      background: var(--cinza-claro, #F3F4F6);
+      font-size: 0.9rem;
+    }
+    :root[data-theme="dark"] .ranking-row { background: rgba(255,255,255,0.04); }
+    .ranking-row .pos {
+      font-family: var(--font-display);
+      font-weight: 700;
+      color: var(--cinza);
+      text-align: center;
+    }
+    .ranking-row .nome { font-weight: 600; }
+    .ranking-row .total { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--azul); }
+    :root[data-theme="dark"] .ranking-row .total { color: #93C5FD; }
+
+    @media (max-width: 520px) {
+      .podium { grid-template-columns: 1fr; }
+      .podium-1 { order: 1; }
+      .podium-2 { order: 2; }
+      .podium-3 { order: 3; }
+    }
   </style>
 </head>
 <body>
@@ -195,6 +282,16 @@
           <canvas id="chart-produtos"></canvas>
         </div>
       </div>
+    </div>
+
+    <!-- Ranking de vendedores — só aparece quando há evento ativo e vendas com operador -->
+    <div id="card-ranking" class="card hidden" style="margin-top:1.5rem;">
+      <h3 class="card-title" style="display:inline-flex;align-items:center;gap:0.5rem;">
+        <span data-icon="trophy" data-size="18"></span> Top vendedores do evento
+      </h3>
+      <div id="podium" class="podium"></div>
+      <div id="ranking-resto" class="ranking-resto"></div>
+      <p id="ranking-vazio" class="text-muted text-center hidden" style="margin:0.5rem 0;">Ainda ninguém pontuou neste evento.</p>
     </div>
 
     <h3 style="color:var(--azul);margin:1.5rem 0 0.75rem;">Últimas vendas</h3>
@@ -410,6 +507,64 @@
       chartProdutos.data.labels = top.map(([n]) => n);
       chartProdutos.data.datasets[0].data = top.map(([, v]) => v);
       chartProdutos.update('none');
+
+      atualizarRanking(docs);
+    }
+
+    // ── Ranking de vendedores ────────────────────────────────────────
+    function atualizarRanking(docs) {
+      const card = document.getElementById('card-ranking');
+      const podium = document.getElementById('podium');
+      const resto = document.getElementById('ranking-resto');
+      const vazio = document.getElementById('ranking-vazio');
+      if (!card || !podium || !resto) return;
+
+      const map = {};
+      docs.forEach(d => {
+        const v = d.data();
+        if (!v.operadorId) return;
+        const key = v.operadorId;
+        if (!map[key]) map[key] = { nome: v.operadorNome || 'Operador', total: 0, vendas: 0 };
+        map[key].total += v.total || 0;
+        map[key].vendas += 1;
+      });
+
+      const ranking = Object.values(map).sort((a, b) => b.total - a.total);
+
+      if (ranking.length === 0) {
+        card.classList.add('hidden');
+        return;
+      }
+      vazio.classList.add('hidden');
+      card.classList.remove('hidden');
+
+      // Pódio: 2º, 1º, 3º (ordem visual clássica)
+      const top3 = ranking.slice(0, 3);
+      const ordem = [top3[1], top3[0], top3[2]];
+      const meta = [
+        { cls: 'podium-2', medalha: '2', titulo: 'Prata' },
+        { cls: 'podium-1', medalha: '1', titulo: 'Ouro' },
+        { cls: 'podium-3', medalha: '3', titulo: 'Bronze' },
+      ];
+      podium.innerHTML = ordem.map((r, i) => {
+        if (!r) return '<div></div>';
+        const m = meta[i];
+        return `
+          <div class="podium-card ${m.cls}">
+            <div class="medalha">${m.medalha}</div>
+            <div class="nome">${r.nome}</div>
+            <div class="total">${fmtBRL(r.total)}</div>
+            <div class="meta">${r.vendas} venda${r.vendas === 1 ? '' : 's'}</div>
+          </div>`;
+      }).join('');
+
+      const resto_arr = ranking.slice(3);
+      resto.innerHTML = resto_arr.map((r, i) => `
+        <div class="ranking-row">
+          <span class="pos">${i + 4}</span>
+          <span class="nome">${r.nome} <span style="color:var(--cinza);font-weight:500;font-size:0.8rem;">· ${r.vendas} venda${r.vendas === 1 ? '' : 's'}</span></span>
+          <span class="total">${fmtBRL(r.total)}</span>
+        </div>`).join('');
     }
 
     // ── Init ──────────────────────────────────────────────────────────
