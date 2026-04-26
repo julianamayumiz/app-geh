@@ -42,6 +42,10 @@
         <input type="checkbox" id="prod-promocao" style="width:20px;height:20px;cursor:pointer;">
         <label for="prod-promocao" style="cursor:pointer;margin-bottom:0;display:inline-flex;align-items:center;gap:0.35rem;"><span data-icon="tag" data-size="16"></span> Marcar como promoção agora</label>
       </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:0.5rem;">
+        <input type="checkbox" id="prod-favorito" style="width:20px;height:20px;cursor:pointer;">
+        <label for="prod-favorito" style="cursor:pointer;margin-bottom:0;display:inline-flex;align-items:center;gap:0.35rem;"><span data-icon="star" data-size="16"></span> Fixar no topo da tela de venda (favorito)</label>
+      </div>
       <div id="alerta" class="alert hidden"></div>
       <div style="display:flex;gap:0.5rem;">
         <button id="btn-salvar" class="btn btn-primary">Salvar</button>
@@ -96,6 +100,7 @@ Suco de Laranja, 5.00, 50, Bebidas
       $('prod-estoque').value = '';
       $('prod-categoria').value = '';
       $('prod-promocao').checked = false;
+      $('prod-favorito').checked = false;
       $('form-titulo').textContent = 'Adicionar produto';
       $('btn-cancelar').classList.add('hidden');
       alerta.classList.add('hidden');
@@ -111,6 +116,7 @@ Suco de Laranja, 5.00, 50, Bebidas
         preco: parseFloat($('prod-preco').value) || 0,
         precoPromo: precoPromo > 0 ? precoPromo : null,
         promocao: promocao,
+        favorito: $('prod-favorito').checked,
         estoque: parseInt($('prod-estoque').value) || 0,
         categoria: $('prod-categoria').value.trim() || 'Geral'
       };
@@ -206,6 +212,9 @@ Suco de Laranja, 5.00, 50, Bebidas
         const badgePromo = p.promocao
           ? `<span style="background:var(--vermelho);color:white;font-size:0.7rem;padding:2px 6px;border-radius:999px;margin-left:4px;display:inline-flex;align-items:center;gap:3px;">${icon('tag', { size: 11 })} PROMO</span>`
           : '';
+        const badgeFav = p.favorito
+          ? `<span style="background:var(--amarelo);color:#1F2937;font-size:0.7rem;padding:2px 6px;border-radius:999px;margin-left:4px;display:inline-flex;align-items:center;gap:3px;">${icon('star', { size: 11 })} FAV</span>`
+          : '';
         const badgeEstoque = p.estoque <= 0
           ? `<span style="background:var(--cinza);color:white;font-size:0.7rem;padding:2px 6px;border-radius:999px;margin-left:4px;">SEM ESTOQUE</span>`
           : p.estoque <= ESTOQUE_BAIXO
@@ -215,7 +224,7 @@ Suco de Laranja, 5.00, 50, Bebidas
           ? `<span style="text-decoration:line-through;color:var(--cinza);font-size:0.85rem;">${fmtBRL(p.preco)}</span> <strong style="color:var(--vermelho);">${fmtBRL(p.precoPromo)}</strong>`
           : fmtBRL(p.preco);
         tr.innerHTML = `
-          <td>${p.nome}${badgePromo}${badgeEstoque}</td>
+          <td>${p.nome}${badgeFav}${badgePromo}${badgeEstoque}</td>
           <td>${p.categoria || '—'}</td>
           <td>${precoHtml}</td>
           <td>${p.estoque}</td>
@@ -230,6 +239,7 @@ Suco de Laranja, 5.00, 50, Bebidas
           $('prod-preco').value = p.preco;
           $('prod-preco-promo').value = p.precoPromo || '';
           $('prod-promocao').checked = p.promocao || false;
+          $('prod-favorito').checked = p.favorito || false;
           $('prod-estoque').value = p.estoque;
           $('prod-categoria').value = p.categoria || '';
           $('form-titulo').textContent = `Editando "${p.nome}"`;

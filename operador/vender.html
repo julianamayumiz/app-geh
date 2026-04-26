@@ -29,6 +29,66 @@
     }
     .prod-card.sem-estoque { opacity: 0.45; pointer-events: none; }
 
+    /* Indicador de favorito no card */
+    .prod-card .fav-star {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      color: var(--amarelo);
+      filter: drop-shadow(0 1px 1px rgba(0,0,0,0.15));
+    }
+
+    /* Caixa de busca */
+    .busca-wrapper {
+      position: relative;
+      margin-bottom: 0.75rem;
+    }
+    .busca-wrapper input {
+      width: 100%;
+      padding: 0.7rem 0.75rem 0.7rem 2.4rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--cinza-claro);
+      background: var(--branco);
+      color: inherit;
+      font-size: 0.95rem;
+      box-sizing: border-box;
+    }
+    .busca-wrapper .busca-icon {
+      position: absolute;
+      left: 0.75rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--cinza);
+      pointer-events: none;
+      display: inline-flex;
+    }
+    .busca-wrapper .busca-clear {
+      position: absolute;
+      right: 0.5rem;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--cinza);
+      cursor: pointer;
+      padding: 0.25rem;
+      display: none;
+    }
+    .busca-wrapper input:not(:placeholder-shown) ~ .busca-clear { display: inline-flex; }
+
+    .secao-titulo {
+      font-size: 0.78rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--cinza);
+      margin: 0.5rem 0.25rem 0.5rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .secao-titulo .icon { color: var(--amarelo); }
+
     /* Badge de qtd no canto — visível só quando o item está no carrinho */
     .qtd-badge {
       position: absolute;
@@ -252,8 +312,13 @@
     <div id="alerta" class="alert hidden"></div>
 
     <h3 class="card-title" style="padding-left:0.25rem;margin-bottom:0.5rem;">Produtos</h3>
-    <div id="produtos-grid" class="produtos-grid">
-      <p class="text-muted text-center">Carregando produtos...</p>
+    <div class="busca-wrapper">
+      <span class="busca-icon" data-icon="search" data-size="18"></span>
+      <input type="search" id="busca-prod" placeholder="Buscar produto..." autocomplete="off">
+      <button type="button" class="busca-clear" id="busca-clear" aria-label="Limpar busca"><span data-icon="x" data-size="16"></span></button>
+    </div>
+    <div id="produtos-container">
+      <p class="text-muted text-center" id="produtos-loading">Carregando produtos...</p>
     </div>
   </main>
 
@@ -340,20 +405,91 @@
     }
 
     // ── Produtos ─────────────────────────────────────
+    let produtosCache = [];
+
     async function carregarProdutos() {
-      const grid = $('produtos-grid');
-      grid.innerHTML = '';
+      const cont = $('produtos-container');
       const snap = await getDocs(collection(db, 'produtos'));
       if (snap.empty) {
-        grid.innerHTML = `<div class="empty-state">${icon('package', { size: 32 })}<p>Nenhum produto cadastrado.</p></div>`;
+        cont.innerHTML = `<div class="empty-state">${icon('package', { size: 32 })}<p>Nenhum produto cadastrado.</p></div>`;
         return;
       }
+      produtosCache = [];
       snap.forEach(d => {
         const p = { id: d.id, ...d.data() };
         p.precoFinal = p.promocao && p.precoPromo ? p.precoPromo : p.preco;
-        grid.appendChild(criarCardProduto(p));
+        produtosCache.push(p);
       });
+      // Ordem alfabética dentro de cada grupo
+      produtosCache.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+      renderizarProdutos();
     }
+
+    // Normaliza pra busca (case + acento insensitive)
+    const norm = (s) => (s || '').toString().toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+    function renderizarProdutos() {
+      const cont = $('produtos-container');
+      const termo = norm($('busca-prod').value.trim());
+      const filtrados = termo
+        ? produtosCache.filter(p => norm(p.nome).includes(termo) || norm(p.categoria).includes(termo))
+        : produtosCache;
+
+      if (filtrados.length === 0) {
+        cont.innerHTML = `<div class="empty-state">${icon('search', { size: 32 })}<p>Nenhum produto encontrado para "${$('busca-prod').value}".</p></div>`;
+        return;
+      }
+
+      const favoritos = filtrados.filter(p => p.favorito);
+      const demais    = filtrados.filter(p => !p.favorito);
+
+      cont.innerHTML = '';
+
+      // Quando há busca ativa, não separa em seções — só lista o resultado
+      if (termo) {
+        const grid = document.createElement('div');
+        grid.className = 'produtos-grid';
+        filtrados.forEach(p => grid.appendChild(criarCardProduto(p)));
+        cont.appendChild(grid);
+        return;
+      }
+
+      if (favoritos.length > 0) {
+        const titFav = document.createElement('div');
+        titFav.className = 'secao-titulo';
+        titFav.innerHTML = `${icon('star', { size: 14 })} Favoritos`;
+        cont.appendChild(titFav);
+        const gridFav = document.createElement('div');
+        gridFav.className = 'produtos-grid';
+        favoritos.forEach(p => gridFav.appendChild(criarCardProduto(p)));
+        cont.appendChild(gridFav);
+      }
+
+      if (demais.length > 0) {
+        if (favoritos.length > 0) {
+          const titAll = document.createElement('div');
+          titAll.className = 'secao-titulo';
+          titAll.style.color = 'var(--cinza)';
+          titAll.innerHTML = 'Demais produtos';
+          cont.appendChild(titAll);
+        }
+        const gridAll = document.createElement('div');
+        gridAll.className = 'produtos-grid';
+        demais.forEach(p => gridAll.appendChild(criarCardProduto(p)));
+        cont.appendChild(gridAll);
+      }
+
+      // Re-aplica estado do carrinho aos cards recém-renderizados
+      carrinho.forEach(({ qtd }, id) => atualizarCardProduto(id, qtd));
+    }
+
+    $('busca-prod').addEventListener('input', renderizarProdutos);
+    $('busca-clear').addEventListener('click', () => {
+      $('busca-prod').value = '';
+      renderizarProdutos();
+      $('busca-prod').focus();
+    });
 
     function criarCardProduto(p) {
       const ESTOQUE_BAIXO = 10;
@@ -376,8 +512,12 @@
         : estoqueBaixo
           ? `${icon('alert-triangle', { size: 12 })} Restam ${p.estoque}`
           : `Est: ${p.estoque}`;
+      const starHtml = p.favorito
+        ? `<span class="fav-star" aria-label="Favorito">${icon('star', { size: 14 })}</span>`
+        : '';
       card.innerHTML = `
         <span class="qtd-badge" id="badge-${p.id}" aria-hidden="true">0</span>
+        ${starHtml}
         ${badgePromo}
         <div class="prod-nome">${p.nome}</div>
         ${precoHtml}
