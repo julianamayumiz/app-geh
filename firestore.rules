@@ -2,64 +2,88 @@ rules_version = '2';
 
 // Regras Firestore — App GEH
 //
-// Modelo de acesso:
-// - OPERADOR (sem login, usa no celular): precisa ler tudo, e só escrever nas
-//   operações do evento — criar venda, criar recarga, alterar estoque e saldo.
-// - ADMIN (com login, diretoria): pode fazer qualquer coisa.
-//
-// O controle físico dos operadores (só quem está no evento tem o link) deixa
-// de ser a única barreira — agora ataques drive-by de delete/create em massa
-// em produtos, clientes, eventos, config e compras exigem autenticação.
+// Modelo de acesso baseado em papel (role):
+// - SUPER ADMIN: e-mail hardcoded da Juliana — sempre passa, mesmo
+//   sem doc em /usuarios. Resolve o bootstrap (primeiro acesso).
+// - ADMIN: tem doc em /usuarios/{uid} com papel='admin' e ativo=true.
+//   Faz qualquer coisa.
+// - OPERADOR: tem doc em /usuarios/{uid} com papel='operador' e
+//   ativo=true. Pode ler dados do evento e registrar vendas/recargas.
+// - QUALQUER OUTRO: bloqueado.
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Produtos — operador precisa UPDATE para decrementar estoque na venda.
-    // Admin cria, deleta e edita preços/promoções.
+    // ── Helpers ──────────────────────────────────────────────────────
+    function logado() {
+      return request.auth != null;
+    }
+    function isSuperAdmin() {
+      return logado() && request.auth.token.email == 'juliana.mayumi14@gmail.com';
+    }
+    function perfil() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+    }
+    function temPerfilAtivo() {
+      return logado()
+        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+        && perfil().ativo == true;
+    }
+    function isAdmin() {
+      return isSuperAdmin() || (temPerfilAtivo() && perfil().papel == 'admin');
+    }
+    function isOperador() {
+      return isAdmin() || (temPerfilAtivo() && perfil().papel == 'operador');
+    }
+
+    // ── /usuarios — gerenciamento de acesso ──────────────────────────
+    // Só admin lê e escreve. Cada um pode ler o próprio doc (pro
+    // auth-guard funcionar sem precisar ser admin).
+    match /usuarios/{uid} {
+      allow get: if isAdmin() || (logado() && request.auth.uid == uid);
+      allow list: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ── Dados do evento ──────────────────────────────────────────────
+    // Operador lê tudo e escreve nas operações da venda.
+    // Admin tem acesso total.
+
     match /produtos/{doc} {
-      allow read: if true;
-      allow update: if true;
-      allow create, delete: if request.auth != null;
+      allow read: if isOperador();
+      allow update: if isOperador();
+      allow create, delete: if isAdmin();
     }
 
-    // Clientes — operador precisa UPDATE para alterar saldo (vender/carregar).
-    // Admin cria (cadastro via admin/clientes.html) e deleta.
     match /clientes/{doc} {
-      allow read: if true;
-      allow update: if true;
-      allow create, delete: if request.auth != null;
+      allow read: if isOperador();
+      allow update: if isOperador();
+      allow create, delete: if isAdmin();
     }
 
-    // Vendas — operador cria durante a venda. Nenhum caminho no app altera
-    // ou deleta uma venda, então bloqueamos isso para quem não está logado.
     match /vendas/{doc} {
-      allow read, create: if true;
-      allow update, delete: if request.auth != null;
+      allow read, create: if isOperador();
+      allow update, delete: if isAdmin();
     }
 
-    // Movimentações de saldo (recargas) — operador cria. Idem vendas.
     match /movimentacoes_saldo/{doc} {
-      allow read, create: if true;
-      allow update, delete: if request.auth != null;
+      allow read, create: if isOperador();
+      allow update, delete: if isAdmin();
     }
 
-    // Eventos — só admin manipula (criar, ativar, encerrar).
     match /eventos/{doc} {
-      allow read: if true;
-      allow write: if request.auth != null;
+      allow read: if isOperador();
+      allow write: if isAdmin();
     }
 
-    // Config (inclui /config/eventoAtivo) — só admin escreve. Protege contra
-    // alguém "roubar" o evento ativo e redirecionar vendas.
     match /config/{doc} {
-      allow read: if true;
-      allow write: if request.auth != null;
+      allow read: if isOperador();
+      allow write: if isAdmin();
     }
 
-    // Compras (entrada de estoque) — só admin registra.
     match /compras/{doc} {
-      allow read: if true;
-      allow write: if request.auth != null;
+      allow read: if isAdmin();
+      allow write: if isAdmin();
     }
   }
 }

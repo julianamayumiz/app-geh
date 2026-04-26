@@ -1,5 +1,6 @@
 // Navegação comum do admin
-import { auth, signOut, onAuthStateChanged } from "../js/firebase-config.js";
+import { auth, signOut } from "../js/firebase-config.js";
+import { requireAuth } from "../js/auth-guard.js";
 import { icon } from "../js/icons.js";
 
 const ITENS = [
@@ -10,9 +11,15 @@ const ITENS = [
   { href: 'historico.html', icone: 'search',       texto: 'Histórico' },
   { href: 'compras.html',   icone: 'shopping-bag', texto: 'Compras'   },
   { href: 'relatorio.html', icone: 'trending-up',  texto: 'Relatório' },
+  { href: 'usuarios.html',  icone: 'user-check',   texto: 'Usuários'  },
 ];
 
 export function montarNav(paginaAtiva = '') {
+  // Dispara checagem de admin em paralelo. Se não passar,
+  // requireAuth redireciona pra login. As regras do Firestore
+  // são a barreira real — esse redirect só evita ver a tela.
+  const guardPromise = requireAuth({ papel: 'admin' });
+
   const links = ITENS.map(i => linkNav(i, paginaAtiva)).join('');
   const nav = `
     <header class="header">
@@ -24,6 +31,7 @@ export function montarNav(paginaAtiva = '') {
     </header>
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-links">${links}</div>
+      <div id="sidebar-user" style="margin-top:auto;padding:1rem;border-top:1px solid var(--cinza-claro);font-size:0.8rem;color:var(--cinza);"></div>
     </aside>
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
   `;
@@ -69,10 +77,18 @@ export function montarNav(paginaAtiva = '') {
     window.location.href = 'login.html';
   };
 
-  onAuthStateChanged(auth, (user) => {
-    console.log('[auth]', user ? `logada como ${user.email || user.uid}` : 'NÃO autenticada');
-    if (!user) window.location.href = 'login.html';
+  // Quando o guard resolver, preenche o footer da sidebar
+  guardPromise.then(({ perfil }) => {
+    const box = document.getElementById('sidebar-user');
+    if (!box || !perfil) return;
+    const nome = perfil.nome || perfil.email || 'Conta';
+    box.innerHTML = `
+      <div style="font-weight:600;color:var(--cinza-escuro);">${nome}</div>
+      <div>${perfil.papel || ''}</div>
+    `;
   });
+
+  return guardPromise;
 }
 
 function linkNav({ href, icone, texto }, ativa) {

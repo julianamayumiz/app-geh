@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Usuários — Admin GEH</title>
+  <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="manifest" href="../manifest.json">
+  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+  <style>
+    .user-row .badge {
+      display: inline-block;
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    .badge-admin    { background: rgba(30,58,138,0.12); color: var(--azul); }
+    .badge-operador { background: rgba(22,163,74,0.12); color: var(--verde); }
+    .badge-inativo  { background: rgba(220,38,38,0.12); color: #B91C1C; }
+    :root[data-theme="dark"] .badge-admin    { background: rgba(59,130,246,0.18); color: #93C5FD; }
+    :root[data-theme="dark"] .badge-operador { background: rgba(34,197,94,0.18); color: #86EFAC; }
+    :root[data-theme="dark"] .badge-inativo  { background: rgba(239,68,68,0.18); color: #FCA5A5; }
+
+    .acoes-linha {
+      display: inline-flex;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+    }
+    .acoes-linha button {
+      padding: 0.35rem 0.7rem;
+      font-size: 0.78rem;
+      border-radius: 8px;
+      border: 1px solid var(--cinza-claro);
+      background: var(--branco);
+      color: var(--cinza-escuro);
+      cursor: pointer;
+    }
+    .acoes-linha button:hover { background: var(--cinza-fundo); }
+    .acoes-linha .danger { color: #B91C1C; }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+    @media (max-width: 700px) { .form-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main class="admin">
+    <h2 style="color:var(--azul);margin-bottom:0.25rem;display:inline-flex;align-items:center;gap:0.5rem;">
+      <span data-icon="user-check" data-size="24"></span> Usuários
+    </h2>
+    <p style="color:var(--cinza);margin-bottom:1rem;">Quem pode entrar no app — e em qual área.</p>
+
+    <div class="card">
+      <h3 class="card-title" style="display:inline-flex;align-items:center;gap:0.5rem;">
+        <span data-icon="user-plus" data-size="18"></span> Cadastrar novo usuário
+      </h3>
+      <p style="font-size:0.85rem;color:var(--cinza);margin-bottom:0.75rem;">
+        A pessoa entra com este e-mail e a senha provisória que você definir aqui.
+        Ela pode trocar depois pelo "Esqueci minha senha" no login.
+      </p>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Nome</label>
+          <input type="text" id="novo-nome" placeholder="Maria da Silva">
+        </div>
+        <div class="form-group">
+          <label>E-mail</label>
+          <input type="email" id="novo-email" placeholder="maria@grupohokkaido.org">
+        </div>
+        <div class="form-group">
+          <label>Senha provisória (mín. 6 caracteres)</label>
+          <input type="text" id="novo-senha" placeholder="ex: geh2026">
+        </div>
+        <div class="form-group">
+          <label>Papel</label>
+          <select id="novo-papel">
+            <option value="operador">Operador (vende em eventos)</option>
+            <option value="admin">Admin (acesso total)</option>
+          </select>
+        </div>
+      </div>
+      <div id="alerta-novo" class="alert alert-danger hidden"></div>
+      <div id="alerta-ok" class="alert alert-success hidden"></div>
+      <button id="btn-cadastrar" class="btn btn-primary" style="width:auto;padding:0.6rem 1.25rem;">
+        <span data-icon="user-plus" data-size="16"></span> Cadastrar
+      </button>
+    </div>
+
+    <h3 style="color:var(--azul);margin:1.5rem 0 0.75rem;">Usuários cadastrados</h3>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>E-mail</th>
+            <th>Papel</th>
+            <th>Status</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tbl-usuarios">
+          <tr><td colspan="5" class="text-center text-muted">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="alert alert-info" style="margin-top:1.5rem;font-size:0.85rem;">
+      <strong>Dica:</strong> "Desativar" tira o acesso na hora — a pessoa não consegue mais entrar mesmo com a senha.
+      Pra excluir definitivamente da lista de logins do Firebase Auth (caso a pessoa queira que o e-mail dela seja apagado),
+      use o console do Firebase em <em>Authentication → Users</em>.
+    </div>
+  </main>
+
+  <script type="module" src="../js/icons.js"></script>
+  <script type="module">
+    import { montarNav } from "./_nav.js";
+    import { icon, renderIcons } from "../js/icons.js";
+    import {
+      db, auth, firebaseConfig, criarAppSecundario,
+      collection, doc, getDoc, setDoc, updateDoc, deleteDoc,
+      onSnapshot, query, orderBy,
+      createUserWithEmailAndPassword, signOut, sendPasswordResetEmail
+    } from "../js/firebase-config.js";
+    import { SUPER_ADMIN_EMAIL } from "../js/auth-guard.js";
+
+    const navPromise = montarNav('usuarios.html');
+
+    const $  = id => document.getElementById(id);
+    const tbl = $('tbl-usuarios');
+    const alertaNovo = $('alerta-novo');
+    const alertaOk = $('alerta-ok');
+
+    function showErr(msg) {
+      alertaOk.classList.add('hidden');
+      alertaNovo.textContent = msg;
+      alertaNovo.classList.remove('hidden');
+    }
+    function showOk(msg) {
+      alertaNovo.classList.add('hidden');
+      alertaOk.textContent = msg;
+      alertaOk.classList.remove('hidden');
+    }
+
+    // ── Lista usuários em tempo real ──────────────────────────────
+    let perfilAtual = null;
+    navPromise.then(({ perfil }) => { perfilAtual = perfil; });
+
+    onSnapshot(
+      query(collection(db, 'usuarios'), orderBy('nome')),
+      (snap) => {
+        if (snap.empty) {
+          tbl.innerHTML = `
+            <tr><td colspan="5">
+              <div class="empty-state">
+                ${icon('users', { size: 32 })}
+                <p>Ninguém cadastrado ainda. Use o formulário acima.</p>
+              </div>
+            </td></tr>`;
+          renderIcons(tbl);
+          return;
+        }
+        tbl.innerHTML = '';
+        snap.docs.forEach(d => {
+          const u = d.data();
+          const isMe = perfilAtual?.uid === d.id;
+          const isSuper = u.email === SUPER_ADMIN_EMAIL;
+          const badgePapel = u.papel === 'admin'
+            ? '<span class="badge badge-admin">Admin</span>'
+            : '<span class="badge badge-operador">Operador</span>';
+          const badgeStatus = u.ativo === false
+            ? '<span class="badge badge-inativo">Desativado</span>'
+            : '<span class="badge badge-operador">Ativo</span>';
+          const tr = document.createElement('tr');
+          tr.className = 'user-row';
+          tr.innerHTML = `
+            <td>${u.nome || '—'} ${isMe ? '<span style="color:var(--cinza);font-size:0.78rem;">(você)</span>' : ''}</td>
+            <td>${u.email || '—'}</td>
+            <td>${badgePapel}</td>
+            <td>${badgeStatus}</td>
+            <td>
+              <div class="acoes-linha">
+                <button data-acao="papel" data-id="${d.id}" data-papel="${u.papel}">Mudar papel</button>
+                <button data-acao="reset" data-email="${u.email}">Reset senha</button>
+                ${u.ativo === false
+                  ? `<button data-acao="ativar" data-id="${d.id}">Reativar</button>`
+                  : `<button data-acao="desativar" data-id="${d.id}" class="danger" ${isMe || isSuper ? 'disabled title="Não dá pra desativar a si mesma nem o super-admin"' : ''}>Desativar</button>`}
+                <button data-acao="excluir" data-id="${d.id}" class="danger" ${isMe || isSuper ? 'disabled' : ''}>Excluir</button>
+              </div>
+            </td>
+          `;
+          tbl.appendChild(tr);
+        });
+        renderIcons(tbl);
+      },
+      (err) => {
+        tbl.innerHTML = `<tr><td colspan="5" class="text-center" style="color:#B91C1C;">Erro ao carregar: ${err.message}</td></tr>`;
+      }
+    );
+
+    // ── Ações da tabela (delegação) ────────────────────────────────
+    tbl.addEventListener('click', async (e) => {
+      const btn = e.target.closest('button[data-acao]');
+      if (!btn || btn.disabled) return;
+      const acao = btn.dataset.acao;
+      const id   = btn.dataset.id;
+
+      try {
+        if (acao === 'papel') {
+          const atual = btn.dataset.papel;
+          const novo = atual === 'admin' ? 'operador' : 'admin';
+          if (!confirm(`Mudar papel de "${atual}" para "${novo}"?`)) return;
+          await updateDoc(doc(db, 'usuarios', id), { papel: novo });
+        } else if (acao === 'desativar') {
+          if (!confirm('Desativar este usuário? Ele perde acesso imediatamente.')) return;
+          await updateDoc(doc(db, 'usuarios', id), { ativo: false });
+        } else if (acao === 'ativar') {
+          await updateDoc(doc(db, 'usuarios', id), { ativo: true });
+        } else if (acao === 'excluir') {
+          if (!confirm('Excluir este registro? A pessoa perde acesso, mas o login dela continua existindo no Firebase Auth (apague lá no console se quiser remover de vez).')) return;
+          await deleteDoc(doc(db, 'usuarios', id));
+        } else if (acao === 'reset') {
+          const email = btn.dataset.email;
+          await sendPasswordResetEmail(auth, email);
+          showOk(`Link de redefinição enviado para ${email}.`);
+        }
+      } catch (err) {
+        showErr(`Erro: ${err.message}`);
+      }
+    });
+
+    // ── Cadastrar novo usuário ────────────────────────────────────
+    $('btn-cadastrar').onclick = async () => {
+      alertaNovo.classList.add('hidden');
+      alertaOk.classList.add('hidden');
+
+      const nome  = $('novo-nome').value.trim();
+      const email = $('novo-email').value.trim().toLowerCase();
+      const senha = $('novo-senha').value;
+      const papel = $('novo-papel').value;
+
+      if (!nome || !email || !senha) return showErr('Preencha nome, e-mail e senha.');
+      if (senha.length < 6)           return showErr('Senha precisa ter pelo menos 6 caracteres.');
+
+      const btn = $('btn-cadastrar');
+      btn.disabled = true;
+      btn.innerHTML = 'Cadastrando...';
+
+      let secundario = null;
+      try {
+        // Cria o auth do novo usuário num app secundário, pra
+        // não trocar a sessão do admin atual.
+        secundario = criarAppSecundario();
+        const cred = await createUserWithEmailAndPassword(secundario.auth, email, senha);
+
+        // Cria perfil no Firestore (continua usando a sessão do admin)
+        await setDoc(doc(db, 'usuarios', cred.user.uid), {
+          nome, email, papel, ativo: true,
+          criadoEm: new Date(),
+        });
+
+        // Desloga o app secundário e o joga fora
+        await signOut(secundario.auth);
+
+        showOk(`Usuário ${nome} cadastrado! Avise a senha provisória.`);
+        $('novo-nome').value = '';
+        $('novo-email').value = '';
+        $('novo-senha').value = '';
+      } catch (err) {
+        const msg = err.code === 'auth/email-already-in-use'
+          ? 'Este e-mail já tem login. Se a pessoa não estiver na lista, peça pra ela usar "Esqueci minha senha" no login — ou apague o login antigo no console do Firebase.'
+          : err.code === 'auth/weak-password'
+          ? 'Senha muito fraca (mínimo 6 caracteres).'
+          : err.code === 'auth/invalid-email'
+          ? 'E-mail inválido.'
+          : `Erro: ${err.message}`;
+        showErr(msg);
+        if (secundario) { try { await signOut(secundario.auth); } catch (e) {} }
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `${icon('user-plus', { size: 16 })} Cadastrar`;
+      }
+    };
+  </script>
+</body>
+</html>
