@@ -76,6 +76,36 @@
     }
     .busca-wrapper input:not(:placeholder-shown) ~ .busca-clear { display: inline-flex; }
 
+    /* Filtro de categorias — chips horizontais com scroll */
+    .cat-bar {
+      display: flex;
+      gap: 0.4rem;
+      overflow-x: auto;
+      padding: 0.25rem 0.25rem 0.6rem;
+      margin: -0.25rem -0.25rem 0.25rem;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    .cat-bar::-webkit-scrollbar { display: none; }
+    .cat-chip {
+      flex: 0 0 auto;
+      padding: 0.4rem 0.85rem;
+      border-radius: 999px;
+      border: 1px solid var(--cinza-claro);
+      background: var(--branco);
+      color: var(--cinza-escuro);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .cat-chip.ativo {
+      background: var(--azul);
+      color: white;
+      border-color: var(--azul);
+    }
+
     .secao-titulo {
       font-size: 0.78rem;
       letter-spacing: 0.06em;
@@ -317,6 +347,7 @@
       <input type="search" id="busca-prod" placeholder="Buscar produto..." autocomplete="off">
       <button type="button" class="busca-clear" id="busca-clear" aria-label="Limpar busca"><span data-icon="x" data-size="16"></span></button>
     </div>
+    <div id="cat-bar" class="cat-bar" role="tablist" aria-label="Filtro de categorias"></div>
     <div id="produtos-container">
       <p class="text-muted text-center" id="produtos-loading">Carregando produtos...</p>
     </div>
@@ -422,7 +453,46 @@
       });
       // Ordem alfabética dentro de cada grupo
       produtosCache.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+      renderizarCategorias();
       renderizarProdutos();
+    }
+
+    let categoriaAtiva = 'Todos';
+
+    function renderizarCategorias() {
+      const bar = $('cat-bar');
+      const cats = Array.from(new Set(
+        produtosCache.map(p => (p.categoria || 'Geral').trim() || 'Geral')
+      )).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+      // Se só houver uma categoria (ou nenhuma), não mostra a barra
+      if (cats.length <= 1) {
+        bar.style.display = 'none';
+        categoriaAtiva = 'Todos';
+        return;
+      }
+      bar.style.display = '';
+
+      const opcoes = ['Todos', ...cats];
+      bar.innerHTML = '';
+      opcoes.forEach(cat => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'cat-chip' + (cat === categoriaAtiva ? ' ativo' : '');
+        chip.textContent = cat;
+        chip.setAttribute('role', 'tab');
+        chip.setAttribute('aria-selected', cat === categoriaAtiva ? 'true' : 'false');
+        chip.onclick = () => {
+          categoriaAtiva = cat;
+          bar.querySelectorAll('.cat-chip').forEach(c => {
+            const ativo = c.textContent === cat;
+            c.classList.toggle('ativo', ativo);
+            c.setAttribute('aria-selected', ativo ? 'true' : 'false');
+          });
+          renderizarProdutos();
+        };
+        bar.appendChild(chip);
+      });
     }
 
     // Normaliza pra busca (case + acento insensitive)
@@ -432,12 +502,18 @@
     function renderizarProdutos() {
       const cont = $('produtos-container');
       const termo = norm($('busca-prod').value.trim());
-      const filtrados = termo
-        ? produtosCache.filter(p => norm(p.nome).includes(termo) || norm(p.categoria).includes(termo))
+      const porCategoria = categoriaAtiva && categoriaAtiva !== 'Todos'
+        ? produtosCache.filter(p => ((p.categoria || 'Geral').trim() || 'Geral') === categoriaAtiva)
         : produtosCache;
+      const filtrados = termo
+        ? porCategoria.filter(p => norm(p.nome).includes(termo) || norm(p.categoria).includes(termo))
+        : porCategoria;
 
       if (filtrados.length === 0) {
-        cont.innerHTML = `<div class="empty-state">${icon('search', { size: 32 })}<p>Nenhum produto encontrado para "${$('busca-prod').value}".</p></div>`;
+        const msg = termo
+          ? `Nenhum produto encontrado para "${$('busca-prod').value}".`
+          : `Nenhum produto na categoria "${categoriaAtiva}".`;
+        cont.innerHTML = `<div class="empty-state">${icon('search', { size: 32 })}<p>${msg}</p></div>`;
         return;
       }
 
