@@ -112,6 +112,7 @@
     <a href="../index.html" class="back" aria-label="Voltar"><span data-icon="arrow-left" data-size="24"></span></a>
     <img src="../assets/logo.png" alt="GEH" onerror="this.style.display='none'">
     <h1>Operador de Venda</h1>
+    <button id="btn-logout" class="back" title="Sair" aria-label="Sair"><span data-icon="power" data-size="22"></span></button>
   </header>
 
   <main>
@@ -150,8 +151,16 @@
   </main>
   <script type="module" src="../js/icons.js"></script>
   <script type="module">
-    import { db, doc, getDoc } from "../js/firebase-config.js";
+    import { db, doc, getDoc, auth, signOut } from "../js/firebase-config.js";
     import { renderIcons } from "../js/icons.js";
+    import { requireAuth } from "../js/auth-guard.js";
+
+    await requireAuth({ papel: 'operador' });
+
+    document.getElementById('btn-logout').onclick = async () => {
+      await signOut(auth);
+      window.location.href = '../admin/login.html';
+    };
 
     const snap = await getDoc(doc(db, 'config', 'eventoAtivo'));
     const box  = document.getElementById('evento-box');

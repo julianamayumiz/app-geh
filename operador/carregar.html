@@ -55,6 +55,9 @@
       addDoc, serverTimestamp, runTransaction
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
+    import { requireAuth } from "../js/auth-guard.js";
+
+    await requireAuth({ papel: 'operador' });
 
     const params = new URLSearchParams(window.location.search);
     const clienteId = params.get('cliente');
