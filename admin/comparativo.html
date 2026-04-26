@@ -237,20 +237,23 @@
 
     (async function init() {
       // 1) Carrega tudo em paralelo
-      const [evSnap, vdSnap, dpSnap] = await Promise.all([
+      const [evSnap, vdSnap, dpSnap, vpSnap] = await Promise.all([
         getDocs(query(collection(db, 'eventos'), orderBy('criadoEm', 'asc'))),
         getDocs(collection(db, 'vendas')),
         getDocs(collection(db, 'despesas')),
+        getDocs(collection(db, 'vendas_porta')),
       ]);
 
       const eventos = evSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       const vendas  = vdSnap.docs.map(d => d.data());
       const despesas = dpSnap.docs.map(d => d.data());
+      const vendasPorta = vpSnap.docs.map(d => d.data());
 
       // 2) Agrupa por evento
       const stats = eventos.map(ev => {
         const vs = vendas.filter(v => v.eventoId === ev.id);
         const ds = despesas.filter(d => d.eventoId === ev.id);
+        const vp = vendasPorta.filter(v => v.eventoId === ev.id);
         let receita = 0;
         const clientes = new Set();
         const produtos = {};
@@ -268,6 +271,16 @@
             if (!ultima   || t > ultima)   ultima   = t;
           }
         });
+        let receitaPorta = 0;
+        vp.forEach(v => {
+          receitaPorta += v.preco || 0;
+          const t = v.criadoEm?.toDate?.() || v.checkInEm?.toDate?.();
+          if (t) {
+            if (!primeira || t < primeira) primeira = t;
+            if (!ultima   || t > ultima)   ultima   = t;
+          }
+        });
+        receita += receitaPorta;
         const desp = ds.reduce((s, d) => {
           const v = (d.valor || 0);
           // tipo "receita" = doação, soma como redução de despesa
@@ -279,9 +292,11 @@
           nome: ev.nome,
           data: ev.data,
           status: ev.status,
-          numVendas: vs.length,
+          numVendas: vs.length + vp.length,
+          numVendasPorta: vp.length,
+          receitaPorta,
           receita,
-          ticket: vs.length ? receita / vs.length : 0,
+          ticket: (vs.length + vp.length) ? receita / (vs.length + vp.length) : 0,
           clientes: clientes.size,
           despesas: desp,
           lucro: receita - desp,

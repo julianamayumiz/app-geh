@@ -33,6 +33,8 @@
     }
     .badge-pendente { background: rgba(217,119,6,0.14); color: #B45309; }
     .badge-presente { background: rgba(22,163,74,0.14); color: var(--verde); }
+    .badge-pago     { background: rgba(22,163,74,0.14); color: var(--verde); }
+    .badge-aberto   { background: rgba(220,38,38,0.14); color: #B91C1C; }
   </style>
 </head>
 <body>
@@ -53,8 +55,8 @@
           <button id="btn-modelo" class="btn btn-secondary" style="width:auto;padding:0.4rem 0.85rem;font-size:0.85rem;">Baixar modelo</button>
         </div>
         <p style="font-size:0.85rem;color:var(--cinza);margin-bottom:0.75rem;">
-          Colunas esperadas: <code style="background:var(--cinza-claro);padding:2px 6px;border-radius:4px;">Família GEH | Nº convite | Nome convidado | Categoria</code>.
-          A categoria é opcional e pode ficar vazia se não tiver tipos diferentes.
+          Colunas esperadas: <code style="background:var(--cinza-claro);padding:2px 6px;border-radius:4px;">Família GEH | Nº convite | Nome convidado | Categoria | Pago</code>.
+          Categoria e Pago são opcionais. "Pago" aceita sim/não, true/false, pago/aberto — se ficar em branco assume <strong>pago</strong>.
         </p>
         <input type="file" id="arquivo" accept=".xlsx,.xls,.csv" style="margin-bottom:0.75rem;">
         <div id="alerta-import" class="alert hidden"></div>
@@ -85,8 +87,8 @@
         <div class="resumo-box" id="resumo-geral"></div>
         <div class="table-wrapper">
           <table>
-            <thead><tr><th>Família</th><th>Nº</th><th>Nome</th><th>Categoria</th><th>Status</th><th></th></tr></thead>
-            <tbody id="tbl-convites"><tr><td colspan="6" class="text-center text-muted">Carregando...</td></tr></tbody>
+            <thead><tr><th>Família</th><th>Nº</th><th>Nome</th><th>Categoria</th><th>Pgto</th><th>Status</th><th></th></tr></thead>
+            <tbody id="tbl-convites"><tr><td colspan="7" class="text-center text-muted">Carregando...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -96,7 +98,7 @@
   <script type="module">
     import { montarNav, fmtBRL } from "./_nav.js";
     import {
-      db, collection, doc, getDoc, getDocs, addDoc, deleteDoc,
+      db, collection, doc, getDoc, getDocs, addDoc, deleteDoc, updateDoc,
       onSnapshot, query, where, writeBatch, serverTimestamp
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
@@ -138,14 +140,16 @@
       const total = lista.length;
       const presentes = lista.filter(c => c.presente).length;
       const pendentes = total - presentes;
+      const emAberto = lista.filter(c => c.pago === false).length;
       $('resumo-geral').innerHTML = `
         <div class="resumo-card"><div class="num">${total}</div><div class="lbl">Total</div></div>
         <div class="resumo-card"><div class="num" style="color:var(--verde);">${presentes}</div><div class="lbl">Presentes</div></div>
         <div class="resumo-card"><div class="num" style="color:#B45309;">${pendentes}</div><div class="lbl">Pendentes</div></div>
+        <div class="resumo-card"><div class="num" style="color:#B91C1C;">${emAberto}</div><div class="lbl">Pgto em aberto</div></div>
       `;
       const tbody = $('tbl-convites');
       if (total === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Nenhum convite importado pra esse evento.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Nenhum convite importado pra esse evento.</td></tr>';
         return;
       }
       tbody.innerHTML = lista.map(c => `
@@ -154,10 +158,17 @@
           <td><strong>${c.numero}</strong></td>
           <td>${c.nome}</td>
           <td>${c.categoria || '—'}</td>
+          <td><button class="badge-status ${c.pago === false ? 'badge-aberto' : 'badge-pago'}" data-toggle="${c.id}" data-pago="${c.pago !== false}" style="border:none;cursor:pointer;font-family:inherit;">${c.pago === false ? 'Em aberto' : 'Pago'}</button></td>
           <td>${c.presente ? '<span class="badge-status badge-presente">Presente</span>' : '<span class="badge-status badge-pendente">Pendente</span>'}</td>
           <td><button class="btn btn-danger" style="width:auto;padding:0.3rem 0.65rem;font-size:0.75rem;" data-del="${c.id}">×</button></td>
         </tr>
       `).join('');
+      tbody.querySelectorAll('[data-toggle]').forEach(b => {
+        b.onclick = async () => {
+          const novo = b.dataset.pago !== 'true';
+          await updateDoc(doc(db, 'convites_antecipados', b.dataset.toggle), { pago: novo });
+        };
+      });
       tbody.querySelectorAll('[data-del]').forEach(b => {
         b.onclick = async () => {
           if (!(await confirmarAsync('Excluir esse convite?', { destrutivo: true, textoOk: 'Excluir' }))) return;
@@ -178,7 +189,14 @@
       numero:  ['numero', 'numeroconvite', 'noconvite', 'nconvite', 'n', 'no'],
       nome:    ['nome', 'nomeconvidado', 'convidado'],
       categoria: ['categoria', 'tipo'],
+      pago:    ['pago', 'pagamento', 'status'],
     };
+    function parseBoolPago(v) {
+      const s = normalizarHeader(v);
+      if (!s) return true;
+      if (['nao', 'n', 'false', '0', 'pendente', 'aberto', 'emaberto', 'devendo'].includes(s)) return false;
+      return true;
+    }
     function detectarColuna(headers, alvo) {
       const opts = MAPA_HEADERS[alvo];
       for (let i = 0; i < headers.length; i++) {
@@ -203,6 +221,7 @@
         const idxNum = detectarColuna(headers, 'numero');
         const idxNome = detectarColuna(headers, 'nome');
         const idxCat = detectarColuna(headers, 'categoria');
+        const idxPago = detectarColuna(headers, 'pago');
         if (idxNum < 0 || idxNome < 0) {
           throw new Error('Não encontrei colunas obrigatórias "Nº convite" e "Nome convidado". Use o modelo.');
         }
@@ -220,6 +239,7 @@
             numero,
             nome,
             categoria: idxCat >= 0 ? String(l[idxCat] ?? '').trim() : '',
+            pago: idxPago >= 0 ? parseBoolPago(l[idxPago]) : true,
           });
         }
         if (itens.length === 0) throw new Error('Nenhuma linha válida encontrada.');
@@ -316,6 +336,7 @@
             numero: it.numero,
             nome: it.nome,
             categoria: it.categoria,
+            pago: it.pago !== false,
             presente: false,
             checkInEm: null,
             checkInPor: null,
@@ -337,11 +358,11 @@
 
     $('btn-modelo').onclick = () => {
       const dados = [
-        ['Família GEH', 'Nº convite', 'Nome convidado', 'Categoria'],
-        ['Silva',       '001',         'João da Silva',  'Adulto'],
-        ['Silva',       '002',         'Maria Silva',    'Adulto'],
-        ['Tanaka',      '003',         'Hiroshi Tanaka', 'Idoso'],
-        ['Tanaka',      '004',         'Yuki Tanaka',    'Criança'],
+        ['Família GEH', 'Nº convite', 'Nome convidado', 'Categoria', 'Pago'],
+        ['Silva',       '001',         'João da Silva',  'Adulto',   'sim'],
+        ['Silva',       '002',         'Maria Silva',    'Adulto',   'sim'],
+        ['Tanaka',      '003',         'Hiroshi Tanaka', 'Idoso',    'não'],
+        ['Tanaka',      '004',         'Yuki Tanaka',    'Criança',  'sim'],
       ];
       const ws = XLSX.utils.aoa_to_sheet(dados);
       const wb = XLSX.utils.book_new();
