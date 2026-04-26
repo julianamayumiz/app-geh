@@ -62,6 +62,50 @@
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: 0.4; transform: scale(0.85); }
     }
+
+    .estoque-card {
+      border: 1px solid var(--cinza-claro);
+      border-radius: 10px;
+      padding: 0.75rem 0.85rem;
+      background: var(--branco);
+    }
+    .estoque-card .titulo { font-weight: 700; color: var(--cinza-escuro); margin-bottom: 0.4rem; }
+    .estoque-card .row { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.4rem; }
+    .estoque-card .row .lbl { font-size: 0.75rem; color: var(--cinza); min-width: 56px; }
+    .estoque-card .row input {
+      width: 90px;
+      padding: 0.35rem 0.5rem;
+      font-size: 0.9rem;
+      border: 1px solid var(--cinza-claro);
+      border-radius: 6px;
+      background: var(--branco);
+      color: var(--cinza-escuro);
+    }
+    .estoque-card .botoes-qtd { display: inline-flex; gap: 0.25rem; }
+    .estoque-card .botoes-qtd button {
+      width: 30px; height: 30px;
+      border-radius: 6px;
+      border: 1px solid var(--cinza-claro);
+      background: var(--cinza-fundo);
+      color: var(--cinza-escuro);
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .estoque-card .botoes-qtd button:hover { background: var(--azul); color: white; border-color: var(--azul); }
+    .estoque-card .salvar {
+      margin-top: 0.5rem;
+      width: 100%;
+      padding: 0.45rem;
+      border-radius: 6px;
+      border: none;
+      background: var(--azul);
+      color: white;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .estoque-card .salvar:disabled { opacity: 0.4; cursor: not-allowed; }
+    .estoque-card .salvar.ok { background: var(--verde); }
   </style>
 </head>
 <body>
@@ -112,6 +156,15 @@
         </div>
       </div>
 
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.5rem;">
+          <h3 class="card-title" style="margin:0;">Estoque e preço na porta</h3>
+          <span style="font-size:0.78rem;color:var(--cinza);">Ajuste rápido durante o evento — afeta a tela da Recepção em tempo real.</span>
+        </div>
+        <div id="estoque-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:0.6rem;"></div>
+        <p id="estoque-vazio" class="text-muted" style="font-size:0.85rem;text-align:center;padding:0.5rem 0;">Nenhuma categoria com preço de porta. Cadastre em <a href="eventos.html">Eventos</a>.</p>
+      </div>
+
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1rem;">
         <div class="card">
           <h3 class="card-title">Pendentes por família GEH</h3>
@@ -140,7 +193,7 @@
   <script type="module">
     import { montarNav, fmtBRL } from "./_nav.js";
     import {
-      db, collection, doc, getDoc, onSnapshot, query, where
+      db, collection, doc, getDoc, onSnapshot, query, where, runTransaction
     } from "../js/firebase-config.js";
     import { renderIcons } from "../js/icons.js";
 
@@ -176,6 +229,86 @@
           atualizar();
         }
       );
+      onSnapshot(doc(db, 'eventos', eventoAtivoId), (snap) => {
+        if (!snap.exists()) return;
+        const cats = (snap.data().categoriasIngresso || []).filter(c => c.precoPorta != null);
+        renderEstoque(cats);
+      });
+    }
+
+    function renderEstoque(cats) {
+      const grid = $('estoque-grid');
+      const vazio = $('estoque-vazio');
+      if (!cats || cats.length === 0) {
+        grid.innerHTML = '';
+        vazio.style.display = '';
+        return;
+      }
+      vazio.style.display = 'none';
+      grid.innerHTML = cats.map(c => `
+        <div class="estoque-card" data-cat="${c.id}">
+          <div class="titulo">${c.nome}</div>
+          <div class="row">
+            <span class="lbl">Preço</span>
+            <input type="number" step="0.50" min="0" value="${c.precoPorta != null ? c.precoPorta : ''}" data-campo="preco">
+          </div>
+          <div class="row">
+            <span class="lbl">Estoque</span>
+            <div class="botoes-qtd">
+              <button data-acao="dec">−</button>
+              <input type="number" min="0" step="1" value="${c.qtdPorta != null ? c.qtdPorta : ''}" data-campo="qtd" style="width:70px;text-align:center;">
+              <button data-acao="inc">+</button>
+            </div>
+          </div>
+          <button class="salvar" data-acao="salvar">Salvar</button>
+        </div>
+      `).join('');
+
+      grid.querySelectorAll('.estoque-card').forEach(card => {
+        const id = card.dataset.cat;
+        const inputQtd = card.querySelector('[data-campo="qtd"]');
+        const inputPreco = card.querySelector('[data-campo="preco"]');
+        const btnSalvar = card.querySelector('[data-acao="salvar"]');
+        card.querySelector('[data-acao="inc"]').onclick = () => {
+          inputQtd.value = (parseInt(inputQtd.value) || 0) + 1;
+        };
+        card.querySelector('[data-acao="dec"]').onclick = () => {
+          inputQtd.value = Math.max(0, (parseInt(inputQtd.value) || 0) - 1);
+        };
+        btnSalvar.onclick = async () => {
+          const novaQtd = inputQtd.value === '' ? null : parseInt(inputQtd.value);
+          const novoPreco = inputPreco.value === '' ? null : parseFloat(inputPreco.value);
+          btnSalvar.disabled = true;
+          btnSalvar.textContent = 'Salvando...';
+          try {
+            await runTransaction(db, async (tx) => {
+              const evRef = doc(db, 'eventos', eventoAtivoId);
+              const ev = await tx.get(evRef);
+              if (!ev.exists()) throw new Error('Evento sumiu.');
+              const lista = (ev.data().categoriasIngresso || []).slice();
+              const idx = lista.findIndex(x => x.id === id);
+              if (idx < 0) throw new Error('Categoria removida.');
+              lista[idx] = {
+                ...lista[idx],
+                qtdPorta: (novaQtd != null && !isNaN(novaQtd) && novaQtd >= 0) ? novaQtd : null,
+                precoPorta: (novoPreco != null && !isNaN(novoPreco) && novoPreco >= 0) ? novoPreco : null,
+              };
+              tx.update(evRef, { categoriasIngresso: lista });
+            });
+            btnSalvar.textContent = '✓ Salvo';
+            btnSalvar.classList.add('ok');
+            setTimeout(() => {
+              btnSalvar.textContent = 'Salvar';
+              btnSalvar.classList.remove('ok');
+              btnSalvar.disabled = false;
+            }, 1200);
+          } catch (err) {
+            btnSalvar.textContent = 'Erro';
+            alert(err.message);
+            btnSalvar.disabled = false;
+          }
+        };
+      });
     }
 
     function atualizar() {
