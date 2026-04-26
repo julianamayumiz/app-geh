@@ -210,9 +210,11 @@
     } from "../js/firebase-config.js";
     import { renderIcons } from "../js/icons.js";
     import { requireAuth } from "../js/auth-guard.js";
+    import { instalarBannerPWA } from "../js/install-banner.js";
 
     const { perfil } = await requireAuth({ papel: 'recepcao' });
     renderIcons();
+    instalarBannerPWA();
 
     document.getElementById('btn-logout').onclick = async () => {
       await signOut(auth);
