@@ -15,6 +15,7 @@ const GRUPOS = [
       { href: 'dashboard.html',   icone: 'bar-chart', texto: 'Dashboard'   },
       { href: 'comparativo.html', icone: 'git-compare', texto: 'Comparativo' },
       { href: 'recepcao-painel.html', icone: 'door-open', texto: 'Painel Recepção' },
+      { href: 'historico-recepcao.html', icone: 'list-checks', texto: 'Histórico Recepção' },
       { href: 'eventos.html',     icone: 'calendar',  texto: 'Eventos'     },
       { href: 'historico.html',   icone: 'search',    texto: 'Histórico'   },
     ],

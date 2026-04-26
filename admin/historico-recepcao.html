@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Histórico Recepção — Admin GEH</title>
+  <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="manifest" href="../manifest.json">
+  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+  <style>
+    .chip-origem {
+      display: inline-block;
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .chip-origem.ant   { background: rgba(30,58,138,0.12); color: var(--azul); }
+    .chip-origem.porta { background: rgba(124,58,237,0.14); color: #6D28D9; }
+    .chip-pgto.pix     { background: rgba(30,58,138,0.10); color: var(--azul); }
+    .chip-pgto.dinheiro { background: rgba(22,163,74,0.12); color: var(--verde); }
+  </style>
+</head>
+<body>
+  <main class="admin">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;">
+      <h2 style="color:var(--azul);margin:0;display:inline-flex;align-items:center;gap:0.5rem;"><span data-icon="list-checks" data-size="24"></span> Histórico Recepção</h2>
+      <div style="display:flex;gap:0.5rem;">
+        <select id="seletor-evento" style="padding:0.4rem 0.65rem;border-radius:8px;border:1px solid var(--cinza-claro);"></select>
+        <button id="btn-csv" class="btn btn-secondary" style="width:auto;padding:0.4rem 0.85rem;font-size:0.85rem;">Exportar CSV</button>
+      </div>
+    </div>
+
+    <div id="aviso" class="alert hidden"></div>
+
+    <div id="conteudo">
+      <div id="resumo" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0.5rem;margin-bottom:1rem;"></div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.5rem;">
+          <h3 class="card-title" style="margin:0;">Entradas registradas</h3>
+          <input type="text" id="busca" placeholder="Buscar nome, família, nº…" style="padding:0.4rem 0.65rem;border-radius:8px;border:1px solid var(--cinza-claro);min-width:240px;">
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Hora</th>
+                <th>Origem</th>
+                <th>Família</th>
+                <th>Nº</th>
+                <th>Nome</th>
+                <th>Categoria</th>
+                <th>Pgto</th>
+                <th style="text-align:right;">Valor</th>
+                <th>Liberado por</th>
+              </tr>
+            </thead>
+            <tbody id="tbl"><tr><td colspan="9" class="text-center text-muted">Carregando...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { montarNav, fmtBRL } from "./_nav.js";
+    import {
+      db, collection, doc, getDoc, getDocs, onSnapshot, query, where, orderBy
+    } from "../js/firebase-config.js";
+    import { renderIcons } from "../js/icons.js";
+
+    montarNav('historico-recepcao.html');
+    renderIcons();
+    const $ = id => document.getElementById(id);
+
+    let eventoEscolhido = null;
+    let registros = [];
+    let unsubA = null;
+    let unsubB = null;
+
+    function fmtHora(ts) {
+      if (!ts) return '—';
+      const d = ts.toDate ? ts.toDate() : new Date(ts);
+      return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    }
+    function isoHora(ts) {
+      if (!ts) return '';
+      const d = ts.toDate ? ts.toDate() : new Date(ts);
+      return d.toISOString();
+    }
+
+    async function carregarEventos() {
+      const snap = await getDocs(query(collection(db, 'eventos'), orderBy('criadoEm', 'desc')));
+      const sel = $('seletor-evento');
+      sel.innerHTML = snap.docs.map(d => `<option value="${d.id}">${d.data().nome}${d.data().status === 'ativo' ? ' (ativo)' : ''}</option>`).join('');
+      const cfg = await getDoc(doc(db, 'config', 'eventoAtivo'));
+      const ativoId = cfg.exists() ? cfg.data().id : null;
+      if (ativoId && snap.docs.find(d => d.id === ativoId)) sel.value = ativoId;
+      else if (snap.docs.length > 0) sel.value = snap.docs[0].id;
+      eventoEscolhido = sel.value;
+      sel.onchange = () => {
+        eventoEscolhido = sel.value;
+        observar();
+      };
+      observar();
+    }
+
+    function observar() {
+      if (unsubA) unsubA();
+      if (unsubB) unsubB();
+      let antecipados = [];
+      let porta = [];
+      const merge = () => {
+        registros = [
+          ...antecipados.filter(c => c.presente).map(c => ({
+            id: 'a:' + c.id,
+            origem: 'antecipado',
+            quando: c.checkInEm,
+            familia: c.familia || '',
+            numero: c.numero || '',
+            nome: c.nome || '',
+            categoria: c.categoria || '',
+            formaPagamento: c.pago === false ? '(em aberto)' : '(antecipado)',
+            valor: 0,
+            por: c.checkInPor || '',
+          })),
+          ...porta.map(v => ({
+            id: 'p:' + v.id,
+            origem: 'porta',
+            quando: v.checkInEm || v.criadoEm,
+            familia: '',
+            numero: '',
+            nome: v.nomeConvidado || '',
+            categoria: v.categoriaNome || '',
+            formaPagamento: v.formaPagamento || '',
+            valor: v.preco || 0,
+            por: v.checkInPor || '',
+          })),
+        ];
+        registros.sort((a, b) => {
+          const ta = a.quando?.toMillis ? a.quando.toMillis() : 0;
+          const tb = b.quando?.toMillis ? b.quando.toMillis() : 0;
+          return tb - ta;
+        });
+        render();
+      };
+      unsubA = onSnapshot(
+        query(collection(db, 'convites_antecipados'), where('eventoId', '==', eventoEscolhido)),
+        (snap) => { antecipados = snap.docs.map(d => ({ id: d.id, ...d.data() })); merge(); }
+      );
+      unsubB = onSnapshot(
+        query(collection(db, 'vendas_porta'), where('eventoId', '==', eventoEscolhido)),
+        (snap) => { porta = snap.docs.map(d => ({ id: d.id, ...d.data() })); merge(); }
+      );
+    }
+
+    function normaliza(s) {
+      return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    }
+
+    function render() {
+      const termo = normaliza($('busca').value.trim());
+      const filtrados = termo
+        ? registros.filter(r => normaliza(r.nome).includes(termo) || normaliza(r.familia).includes(termo) || String(r.numero).toLowerCase().includes(termo))
+        : registros;
+
+      const totalAnt = registros.filter(r => r.origem === 'antecipado').length;
+      const totalPorta = registros.filter(r => r.origem === 'porta').length;
+      const receitaPorta = registros.filter(r => r.origem === 'porta').reduce((s, r) => s + r.valor, 0);
+      $('resumo').innerHTML = `
+        <div class="card" style="padding:0.6rem 0.85rem;"><div style="font-size:0.72rem;color:var(--cinza);text-transform:uppercase;">Antecipados (presentes)</div><div style="font-size:1.4rem;font-weight:700;color:var(--azul);">${totalAnt}</div></div>
+        <div class="card" style="padding:0.6rem 0.85rem;"><div style="font-size:0.72rem;color:var(--cinza);text-transform:uppercase;">Vendas na porta</div><div style="font-size:1.4rem;font-weight:700;color:#6D28D9;">${totalPorta}</div></div>
+        <div class="card" style="padding:0.6rem 0.85rem;"><div style="font-size:0.72rem;color:var(--cinza);text-transform:uppercase;">Receita porta</div><div style="font-size:1.4rem;font-weight:700;color:var(--verde);">${fmtBRL(receitaPorta)}</div></div>
+        <div class="card" style="padding:0.6rem 0.85rem;"><div style="font-size:0.72rem;color:var(--cinza);text-transform:uppercase;">Total entradas</div><div style="font-size:1.4rem;font-weight:700;">${registros.length}</div></div>
+      `;
+
+      const tbody = $('tbl');
+      if (filtrados.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">Nenhum check-in registrado.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = filtrados.map(r => `
+        <tr>
+          <td>${fmtHora(r.quando)}</td>
+          <td><span class="chip-origem ${r.origem === 'antecipado' ? 'ant' : 'porta'}">${r.origem === 'antecipado' ? 'Antecipado' : 'Porta'}</span></td>
+          <td>${r.familia || '—'}</td>
+          <td>${r.numero || '—'}</td>
+          <td><strong>${r.nome}</strong></td>
+          <td>${r.categoria || '—'}</td>
+          <td>${r.formaPagamento.startsWith('(') ? `<span style="color:var(--cinza);font-size:0.8rem;">${r.formaPagamento}</span>` : `<span class="chip-origem chip-pgto ${r.formaPagamento}">${r.formaPagamento}</span>`}</td>
+          <td style="text-align:right;">${r.valor > 0 ? fmtBRL(r.valor) : '—'}</td>
+          <td>${r.por || '—'}</td>
+        </tr>
+      `).join('');
+    }
+
+    $('busca').oninput = render;
+
+    $('btn-csv').onclick = () => {
+      const linhas = [
+        ['Hora', 'Origem', 'Família', 'Nº', 'Nome', 'Categoria', 'Pagamento', 'Valor', 'Liberado por'],
+        ...registros.map(r => [
+          isoHora(r.quando),
+          r.origem,
+          r.familia,
+          r.numero,
+          r.nome,
+          r.categoria,
+          r.formaPagamento,
+          r.valor.toFixed(2).replace('.', ','),
+          r.por,
+        ]),
+      ];
+      const csv = linhas.map(l => l.map(c => {
+        const s = String(c ?? '');
+        return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      }).join(';')).join('\n');
+      const bom = '﻿';
+      const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8' });
+      const evNome = $('seletor-evento').selectedOptions[0]?.textContent.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'evento';
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `historico-recepcao-${evNome}-${new Date().toISOString().slice(0,10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    };
+
+    carregarEventos();
+  </script>
+</body>
+</html>
