@@ -1,4 +1,4 @@
-const CACHE = 'app-geh-v7';
+const CACHE = 'app-geh-v8';
 const ARQUIVOS = [
   '/',
   '/index.html',
@@ -6,6 +6,7 @@ const ARQUIVOS = [
   '/operador/index.html',
   '/operador/scanner.html',
   '/operador/vender.html',
+  '/operador/consultar.html',
   '/caixa/index.html',
   '/caixa/scanner.html',
   '/caixa/carregar.html',

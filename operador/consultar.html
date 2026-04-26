@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#1E3A8A">
   <meta name="theme-color" content="#0F172A" media="(prefers-color-scheme: dark)">
-  <title>Carregar Saldo — App GEH</title>
+  <title>Consultar Saldo — App GEH</title>
   <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
   <link rel="stylesheet" href="../css/style.css">
   <link rel="manifest" href="../manifest.json">
@@ -14,7 +14,7 @@
 <body>
   <header class="header">
     <a href="index.html" class="back" aria-label="Voltar"><span data-icon="arrow-left" data-size="24"></span></a>
-    <h1 id="titulo" style="display:inline-flex;align-items:center;gap:0.5rem;"><span data-icon="wallet" data-size="22"></span> Carregar Saldo</h1>
+    <h1 id="titulo" style="display:inline-flex;align-items:center;gap:0.5rem;"><span data-icon="eye" data-size="22"></span> Saldo do cliente</h1>
   </header>
 
   <main>
@@ -26,22 +26,6 @@
 
     <div id="alerta" class="alert hidden"></div>
 
-    <div id="form-recarga" class="card">
-      <div class="form-group">
-        <label>Valor a carregar (R$)</label>
-        <input type="number" id="valor" step="0.50" min="0" placeholder="Ex: 20,00" inputmode="decimal">
-      </div>
-      <div class="form-group">
-        <label>Forma de pagamento</label>
-        <select id="forma-pagto">
-          <option value="dinheiro">Dinheiro</option>
-          <option value="pix">Pix</option>
-          <option value="cartao">Cartão</option>
-        </select>
-      </div>
-      <button id="btn-carregar" class="btn btn-success"><span data-icon="plus" data-size="18"></span> Adicionar saldo</button>
-    </div>
-
     <div id="historico" class="hidden">
       <h3 style="color:var(--azul);margin:1rem 0 0.75rem;display:inline-flex;align-items:center;gap:0.5rem;"><span data-icon="clock" data-size="20"></span> Histórico</h3>
       <div id="lista-hist" class="hist-list"></div>
@@ -51,8 +35,7 @@
 
   <script type="module">
     import {
-      db, doc, getDoc, getDocs, collection, query, where, orderBy,
-      addDoc, serverTimestamp, runTransaction
+      db, doc, getDoc, getDocs, collection, query, where, orderBy
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
     import { requireAuth } from "../js/auth-guard.js";
@@ -61,15 +44,17 @@
 
     const params = new URLSearchParams(window.location.search);
     const clienteId = params.get('cliente');
-    const somenteConsulta = params.get('somente') === '1';
     if (!clienteId) window.location.href = 'index.html';
 
-    if (somenteConsulta) {
-      document.getElementById('titulo').innerHTML = `${icon('eye', { size: 22 })} Saldo do cliente`;
-      document.getElementById('form-recarga').classList.add('hidden');
-    }
-
     const fmtBRL = (v) => `R$ ${Number(v || 0).toFixed(2).replace('.', ',')}`;
+    const $ = (id) => document.getElementById(id);
+    const alerta = $('alerta');
+
+    function mostrarAlerta(msg, tipo = 'info') {
+      alerta.textContent = msg;
+      alerta.className = `alert alert-${tipo}`;
+      alerta.classList.remove('hidden');
+    }
 
     async function carregarHistorico() {
       const [movSnap, vendasSnap] = await Promise.all([
@@ -101,7 +86,7 @@
       });
       movs.sort((a, b) => b.quando - a.quando);
 
-      const lista = document.getElementById('lista-hist');
+      const lista = $('lista-hist');
       if (movs.length === 0) {
         lista.innerHTML = `<div class="empty-state">${icon('inbox', { size: 32 })}<p>Sem movimentações.</p></div>`;
       } else {
@@ -120,22 +105,8 @@
           </div>`;
         }).join('');
       }
-      document.getElementById('historico').classList.remove('hidden');
+      $('historico').classList.remove('hidden');
       renderIcons();
-    }
-
-    // Evento ativo — precisa estar no doc da movimentação pra relatório filtrar por evento
-    let eventoAtivo = null;
-    getDoc(doc(db, 'config', 'eventoAtivo')).then(s => { if (s.exists()) eventoAtivo = s.data(); });
-
-    const $ = (id) => document.getElementById(id);
-    const alerta = $('alerta');
-    const vibrar = (padrao) => { try { navigator.vibrate?.(padrao); } catch(_) {} };
-
-    function mostrarAlerta(msg, tipo = 'info') {
-      alerta.textContent = msg;
-      alerta.className = `alert alert-${tipo}`;
-      alerta.classList.remove('hidden');
     }
 
     async function carregarCliente() {
@@ -143,56 +114,13 @@
       const snap = await getDoc(ref);
       if (!snap.exists()) {
         $('cliente-nome').innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('x-circle', { size: 20 })} Cliente não cadastrado</span>`;
-        mostrarAlerta(`Cliente ${clienteId} não encontrado. Cadastre no admin antes.`, 'danger');
-        return null;
+        mostrarAlerta(`Cliente ${clienteId} não encontrado.`, 'danger');
+        return;
       }
-      const dados = { id: clienteId, ...snap.data() };
       $('cliente-nome').textContent = clienteId;
-      $('cliente-saldo').textContent = fmtBRL(dados.saldo);
-      if (somenteConsulta) carregarHistorico();
-      return dados;
+      $('cliente-saldo').textContent = fmtBRL(snap.data().saldo);
+      carregarHistorico();
     }
-
-    $('btn-carregar')?.addEventListener('click', async () => {
-      const valor = parseFloat($('valor').value);
-      if (!valor || valor <= 0) return mostrarAlerta('Digite um valor maior que zero', 'warning');
-
-      const forma = $('forma-pagto').value;
-      $('btn-carregar').disabled = true;
-      $('btn-carregar').innerHTML = '<div class="loader"></div> Processando...';
-
-      try {
-        await runTransaction(db, async (tx) => {
-          const ref = doc(db, 'clientes', clienteId);
-          const snap = await tx.get(ref);
-          if (!snap.exists()) throw new Error('Cliente não encontrado');
-          const saldo = snap.data().saldo || 0;
-          tx.update(ref, { saldo: saldo + valor });
-
-          const movRef = doc(collection(db, 'movimentacoes_saldo'));
-          tx.set(movRef, {
-            clienteId,
-            tipo: 'recarga',
-            valor,
-            forma,
-            eventoId: eventoAtivo?.id || null,
-            eventoNome: eventoAtivo?.nome || null,
-            criadoEm: serverTimestamp()
-          });
-        });
-
-        vibrar([40, 60, 40, 60, 80]);
-        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 18 })} R$ ${valor.toFixed(2).replace('.', ',')} adicionados!</span>`;
-        alerta.className = 'alert alert-success';
-        alerta.classList.remove('hidden');
-        setTimeout(() => window.location.href = 'index.html', 1500);
-      } catch (err) {
-        vibrar([100, 50, 100]);
-        mostrarAlerta(`Erro: ${err.message}`, 'danger');
-        $('btn-carregar').disabled = false;
-        $('btn-carregar').innerHTML = `${icon('plus', { size: 18 })} Adicionar saldo`;
-      }
-    });
 
     carregarCliente();
   </script>

@@ -55,10 +55,9 @@
     const { icon } = await import('../js/icons.js');
     const titulos = {
       vender:    { ic: 'shopping-cart', txt: 'Vender para cliente' },
-      carregar:  { ic: 'wallet', txt: 'Carregar saldo' },
       consultar: { ic: 'eye', txt: 'Consultar saldo' }
     };
-    const t = titulos[acao];
+    const t = titulos[acao] || titulos.consultar;
     const h1 = document.getElementById('titulo-acao');
     h1.innerHTML = `${icon(t.ic, { size: 20 })} ${t.txt}`;
     h1.style.display = 'inline-flex';
@@ -70,10 +69,8 @@
     function irPara(clienteId) {
       if (acao === 'vender') {
         window.location.href = `vender.html?cliente=${encodeURIComponent(clienteId)}`;
-      } else if (acao === 'carregar') {
-        window.location.href = `carregar.html?cliente=${encodeURIComponent(clienteId)}`;
       } else {
-        window.location.href = `carregar.html?cliente=${encodeURIComponent(clienteId)}&somente=1`;
+        window.location.href = `consultar.html?cliente=${encodeURIComponent(clienteId)}`;
       }
     }
 
