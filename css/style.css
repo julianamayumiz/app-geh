@@ -39,6 +39,11 @@ html, body {
   font-feature-settings: 'ss01', 'cv11';
 }
 
+/* Rede de segurança: nunca permitir scroll horizontal da página inteira.
+   Tabelas largas usam .table-wrapper { overflow-x: auto } pra rolar
+   internamente. */
+body { overflow-x: hidden; }
+
 /* Fundo geral: cinza claro com um leve halo no topo
    pra dar profundidade sem chamar atenção. */
 body {
@@ -137,6 +142,10 @@ main {
 main.admin {
   max-width: 1200px;
   padding: 2rem 1.5rem 3rem;
+  min-width: 0;
+}
+@media (max-width: 640px) {
+  main.admin { padding: 1.25rem 1rem 2rem; }
 }
 
 main h2 {
