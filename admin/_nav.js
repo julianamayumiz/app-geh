@@ -14,8 +14,6 @@ const GRUPOS = [
     itens: [
       { href: 'dashboard.html',   icone: 'bar-chart', texto: 'Dashboard'   },
       { href: 'comparativo.html', icone: 'git-compare', texto: 'Comparativo' },
-      { href: 'recepcao-painel.html', icone: 'door-open', texto: 'Painel Recepção' },
-      { href: 'historico-recepcao.html', icone: 'list-checks', texto: 'Histórico Recepção' },
       { href: 'eventos.html',     icone: 'calendar',  texto: 'Eventos'     },
       { href: 'historico.html',   icone: 'search',    texto: 'Histórico'   },
     ],
@@ -25,7 +23,14 @@ const GRUPOS = [
     itens: [
       { href: 'produtos.html', icone: 'package', texto: 'Produtos' },
       { href: 'clientes.html', icone: 'users',   texto: 'Clientes' },
-      { href: 'convites-antecipados.html', icone: 'ticket', texto: 'Convites antecipados' },
+    ],
+  },
+  {
+    titulo: 'Recepção',
+    itens: [
+      { href: 'recepcao-painel.html',     icone: 'door-open',   texto: 'Painel ao vivo'      },
+      { href: 'convites-antecipados.html', icone: 'ticket',      texto: 'Convites antecipados' },
+      { href: 'historico-recepcao.html',  icone: 'list-checks', texto: 'Histórico'           },
     ],
   },
   {
