@@ -9,7 +9,9 @@ rules_version = '2';
 // - ADMIN: tem doc em /usuarios/{uid} com papel='admin' e ativo=true.
 //   Faz qualquer coisa.
 // - OPERADOR: doc em /usuarios/{uid} com papel='operador' e ativo=true.
-//   Lê dados do evento e registra vendas/recargas.
+//   Lê dados do evento e registra vendas.
+// - CAIXA: doc em /usuarios/{uid} com papel='caixa' e ativo=true.
+//   Recarrega saldo dos clientes (lendo o QR).
 // - QUALQUER OUTRO: bloqueado.
 
 service cloud.firestore {
@@ -35,6 +37,14 @@ service cloud.firestore {
     function isOperador() {
       return isAdmin() || (temPerfilAtivo() && perfil().papel == 'operador');
     }
+    function isCaixa() {
+      return isAdmin() || (temPerfilAtivo() && perfil().papel == 'caixa');
+    }
+    // Qualquer membro da equipe (operador, caixa ou admin) — usado em
+    // leituras compartilhadas como /clientes, /config/eventoAtivo.
+    function isEquipe() {
+      return isAdmin() || isOperador() || isCaixa();
+    }
 
     // /usuarios — gerenciamento de acesso.
     // Cada um lê o próprio doc (pro auth-guard funcionar).
@@ -52,8 +62,8 @@ service cloud.firestore {
     }
 
     match /clientes/{doc} {
-      allow read: if isOperador();
-      allow update: if isOperador();
+      allow read: if isEquipe();
+      allow update: if isEquipe();
       allow create, delete: if isAdmin();
     }
 
@@ -63,7 +73,10 @@ service cloud.firestore {
     }
 
     match /movimentacoes_saldo/{doc} {
-      allow read, create: if isOperador();
+      // Read aberto a toda equipe (operador consulta histórico do cliente).
+      allow read: if isEquipe();
+      // Create só pelo Caixa — recargas no fluxo normal.
+      allow create: if isCaixa();
       allow update, delete: if isAdmin();
     }
 
@@ -73,7 +86,7 @@ service cloud.firestore {
     }
 
     match /config/{doc} {
-      allow read: if isOperador();
+      allow read: if isEquipe();
       allow write: if isAdmin();
     }
 
