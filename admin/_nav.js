@@ -23,6 +23,7 @@ const GRUPOS = [
     itens: [
       { href: 'produtos.html', icone: 'package', texto: 'Produtos' },
       { href: 'clientes.html', icone: 'users',   texto: 'Clientes' },
+      { href: 'convites-antecipados.html', icone: 'ticket', texto: 'Convites antecipados' },
     ],
   },
   {

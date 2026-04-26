@@ -12,6 +12,8 @@ rules_version = '2';
 //   Lê dados do evento e registra vendas.
 // - CAIXA: doc em /usuarios/{uid} com papel='caixa' e ativo=true.
 //   Recarrega saldo dos clientes (lendo o QR).
+// - RECEPCAO: doc em /usuarios/{uid} com papel='recepcao' e ativo=true.
+//   Confere convites antecipados, registra check-in e venda na porta.
 // - QUALQUER OUTRO: bloqueado.
 
 service cloud.firestore {
@@ -40,10 +42,13 @@ service cloud.firestore {
     function isCaixa() {
       return isAdmin() || (temPerfilAtivo() && perfil().papel == 'caixa');
     }
-    // Qualquer membro da equipe (operador, caixa ou admin) — usado em
-    // leituras compartilhadas como /clientes, /config/eventoAtivo.
+    function isRecepcao() {
+      return isAdmin() || (temPerfilAtivo() && perfil().papel == 'recepcao');
+    }
+    // Qualquer membro da equipe (operador, caixa, recepcao ou admin) —
+    // usado em leituras compartilhadas como /clientes, /config/eventoAtivo.
     function isEquipe() {
-      return isAdmin() || isOperador() || isCaixa();
+      return isAdmin() || isOperador() || isCaixa() || isRecepcao();
     }
 
     // /usuarios — gerenciamento de acesso.
@@ -111,6 +116,22 @@ service cloud.firestore {
     match /ajustes_saldo/{doc} {
       allow read, create: if isAdmin();
       allow update, delete: if false;
+    }
+
+    // Convites antecipados (lista de conferência da recepção):
+    // importados em lote via Excel. Recepção lê, busca e marca check-in
+    // (update do campo presente/checkInEm). Admin gerencia.
+    match /convites_antecipados/{doc} {
+      allow read: if isRecepcao();
+      allow update: if isRecepcao();
+      allow create, delete: if isAdmin();
+    }
+
+    // Vendas na porta — convites criados na hora pela recepção.
+    // Histórico imutável (só admin pode corrigir/excluir).
+    match /vendas_porta/{doc} {
+      allow read, create: if isRecepcao();
+      allow update, delete: if isAdmin();
     }
   }
 }

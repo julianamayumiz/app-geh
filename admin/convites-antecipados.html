@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Convites antecipados — Admin GEH</title>
+  <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="manifest" href="../manifest.json">
+  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    .resumo-box {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .resumo-card {
+      background: var(--cinza-fundo);
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      border: 1px solid var(--cinza-claro);
+    }
+    .resumo-card .num { font-size: 1.5rem; font-weight: 700; color: var(--azul); }
+    .resumo-card .lbl { font-size: 0.75rem; color: var(--cinza); text-transform: uppercase; letter-spacing: 0.05em; }
+    .badge-status {
+      display: inline-block;
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+    .badge-pendente { background: rgba(217,119,6,0.14); color: #B45309; }
+    .badge-presente { background: rgba(22,163,74,0.14); color: var(--verde); }
+  </style>
+</head>
+<body>
+  <main class="admin">
+    <h2 style="color:var(--azul);margin-bottom:0.25rem;display:inline-flex;align-items:center;gap:0.5rem;">
+      <span data-icon="ticket" data-size="24"></span> Convites antecipados
+    </h2>
+    <p style="color:var(--cinza);margin-bottom:1rem;">Lista de conferência da recepção — vinculada ao evento ativo.</p>
+
+    <div id="evento-aviso" class="alert alert-warning hidden">
+      Não há evento ativo. Crie e ative um evento em <a href="eventos.html">Eventos</a> antes de importar convites.
+    </div>
+
+    <div id="conteudo" class="hidden">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.5rem;">
+          <h3 class="card-title" style="margin:0;">Importar planilha (.xlsx ou .csv)</h3>
+          <button id="btn-modelo" class="btn btn-secondary" style="width:auto;padding:0.4rem 0.85rem;font-size:0.85rem;">Baixar modelo</button>
+        </div>
+        <p style="font-size:0.85rem;color:var(--cinza);margin-bottom:0.75rem;">
+          Colunas esperadas: <code style="background:var(--cinza-claro);padding:2px 6px;border-radius:4px;">Família GEH | Nº convite | Nome convidado | Categoria</code>.
+          A categoria é opcional e pode ficar vazia se não tiver tipos diferentes.
+        </p>
+        <input type="file" id="arquivo" accept=".xlsx,.xls,.csv" style="margin-bottom:0.75rem;">
+        <div id="alerta-import" class="alert hidden"></div>
+
+        <div id="preview-box" class="hidden">
+          <h4 style="margin:0.5rem 0;font-size:0.95rem;">Pré-visualização</h4>
+          <div class="resumo-box" id="resumo-import"></div>
+          <div class="table-wrapper" style="max-height:300px;overflow-y:auto;" data-no-enhance>
+            <table>
+              <thead><tr><th>Família</th><th>Nº</th><th>Nome</th><th>Categoria</th><th></th></tr></thead>
+              <tbody id="tbl-preview"></tbody>
+            </table>
+          </div>
+          <div style="display:flex;gap:0.5rem;margin-top:0.75rem;">
+            <button id="btn-confirmar-import" class="btn btn-primary" style="max-width:280px;">Confirmar importação</button>
+            <button id="btn-cancelar-import" class="btn btn-secondary" style="max-width:160px;">Cancelar</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.5rem;">
+          <h3 class="card-title" style="margin:0;">Convites cadastrados</h3>
+          <div style="display:flex;gap:0.5rem;">
+            <button id="btn-limpar" class="btn btn-danger" style="width:auto;padding:0.4rem 0.85rem;font-size:0.85rem;">Limpar todos</button>
+          </div>
+        </div>
+        <div class="resumo-box" id="resumo-geral"></div>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Família</th><th>Nº</th><th>Nome</th><th>Categoria</th><th>Status</th><th></th></tr></thead>
+            <tbody id="tbl-convites"><tr><td colspan="6" class="text-center text-muted">Carregando...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { montarNav, fmtBRL } from "./_nav.js";
+    import {
+      db, collection, doc, getDoc, getDocs, addDoc, deleteDoc,
+      onSnapshot, query, where, writeBatch, serverTimestamp
+    } from "../js/firebase-config.js";
+    import { icon, renderIcons } from "../js/icons.js";
+    import { confirmarAsync } from "../js/ui.js";
+
+    montarNav('convites-antecipados.html');
+    renderIcons();
+    const $ = id => document.getElementById(id);
+
+    let eventoAtivoId = null;
+    let importBuffer = [];
+
+    async function init() {
+      const cfg = await getDoc(doc(db, 'config', 'eventoAtivo'));
+      eventoAtivoId = cfg.exists() ? cfg.data().id : null;
+      if (!eventoAtivoId) {
+        $('evento-aviso').classList.remove('hidden');
+        return;
+      }
+      $('conteudo').classList.remove('hidden');
+      observarConvites();
+    }
+
+    function observarConvites() {
+      onSnapshot(
+        query(collection(db, 'convites_antecipados'), where('eventoId', '==', eventoAtivoId)),
+        (snap) => renderConvites(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      );
+    }
+
+    function renderConvites(lista) {
+      lista.sort((a, b) => {
+        const fa = (a.familia || '').localeCompare(b.familia || '');
+        if (fa !== 0) return fa;
+        const na = parseInt(a.numero) || 0;
+        const nb = parseInt(b.numero) || 0;
+        return na - nb;
+      });
+      const total = lista.length;
+      const presentes = lista.filter(c => c.presente).length;
+      const pendentes = total - presentes;
+      $('resumo-geral').innerHTML = `
+        <div class="resumo-card"><div class="num">${total}</div><div class="lbl">Total</div></div>
+        <div class="resumo-card"><div class="num" style="color:var(--verde);">${presentes}</div><div class="lbl">Presentes</div></div>
+        <div class="resumo-card"><div class="num" style="color:#B45309;">${pendentes}</div><div class="lbl">Pendentes</div></div>
+      `;
+      const tbody = $('tbl-convites');
+      if (total === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Nenhum convite importado pra esse evento.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = lista.map(c => `
+        <tr>
+          <td>${c.familia || '—'}</td>
+          <td><strong>${c.numero}</strong></td>
+          <td>${c.nome}</td>
+          <td>${c.categoria || '—'}</td>
+          <td>${c.presente ? '<span class="badge-status badge-presente">Presente</span>' : '<span class="badge-status badge-pendente">Pendente</span>'}</td>
+          <td><button class="btn btn-danger" style="width:auto;padding:0.3rem 0.65rem;font-size:0.75rem;" data-del="${c.id}">×</button></td>
+        </tr>
+      `).join('');
+      tbody.querySelectorAll('[data-del]').forEach(b => {
+        b.onclick = async () => {
+          if (!(await confirmarAsync('Excluir esse convite?', { destrutivo: true, textoOk: 'Excluir' }))) return;
+          await deleteDoc(doc(db, 'convites_antecipados', b.dataset.del));
+        };
+      });
+    }
+
+    // ----- Parser do arquivo -----
+    function normalizarHeader(s) {
+      return String(s || '')
+        .toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9]/g, '');
+    }
+    const MAPA_HEADERS = {
+      familia: ['familia', 'familiageh', 'geh'],
+      numero:  ['numero', 'numeroconvite', 'noconvite', 'nconvite', 'n', 'no'],
+      nome:    ['nome', 'nomeconvidado', 'convidado'],
+      categoria: ['categoria', 'tipo'],
+    };
+    function detectarColuna(headers, alvo) {
+      const opts = MAPA_HEADERS[alvo];
+      for (let i = 0; i < headers.length; i++) {
+        if (opts.includes(normalizarHeader(headers[i]))) return i;
+      }
+      return -1;
+    }
+
+    $('arquivo').onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const alerta = $('alerta-import');
+      alerta.classList.add('hidden');
+      try {
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const linhas = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        if (linhas.length < 2) throw new Error('Arquivo vazio.');
+        const headers = linhas[0];
+        const idxFam = detectarColuna(headers, 'familia');
+        const idxNum = detectarColuna(headers, 'numero');
+        const idxNome = detectarColuna(headers, 'nome');
+        const idxCat = detectarColuna(headers, 'categoria');
+        if (idxNum < 0 || idxNome < 0) {
+          throw new Error('Não encontrei colunas obrigatórias "Nº convite" e "Nome convidado". Use o modelo.');
+        }
+        const itens = [];
+        for (let i = 1; i < linhas.length; i++) {
+          const l = linhas[i];
+          const numero = String(l[idxNum] ?? '').trim();
+          const nome = String(l[idxNome] ?? '').trim();
+          if (!numero && !nome) continue;
+          if (!numero || !nome) {
+            throw new Error(`Linha ${i + 1}: número ou nome em branco.`);
+          }
+          itens.push({
+            familia: idxFam >= 0 ? String(l[idxFam] ?? '').trim() : '',
+            numero,
+            nome,
+            categoria: idxCat >= 0 ? String(l[idxCat] ?? '').trim() : '',
+          });
+        }
+        if (itens.length === 0) throw new Error('Nenhuma linha válida encontrada.');
+
+        // Detecta duplicatas dentro do arquivo
+        const numSet = new Set();
+        const dups = [];
+        for (const it of itens) {
+          if (numSet.has(it.numero)) dups.push(it.numero);
+          numSet.add(it.numero);
+        }
+        if (dups.length > 0) {
+          throw new Error(`Números repetidos no arquivo: ${[...new Set(dups)].join(', ')}.`);
+        }
+
+        importBuffer = itens;
+        renderPreview(itens);
+      } catch (err) {
+        alerta.textContent = `Erro ao ler arquivo: ${err.message}`;
+        alerta.className = 'alert alert-danger';
+      }
+    };
+
+    function renderPreview(itens) {
+      const porFamilia = {};
+      const porCat = {};
+      itens.forEach(it => {
+        porFamilia[it.familia || '(sem família)'] = (porFamilia[it.familia || '(sem família)'] || 0) + 1;
+        porCat[it.categoria || '(sem categoria)'] = (porCat[it.categoria || '(sem categoria)'] || 0) + 1;
+      });
+      $('resumo-import').innerHTML = `
+        <div class="resumo-card"><div class="num">${itens.length}</div><div class="lbl">Linhas</div></div>
+        <div class="resumo-card"><div class="num">${Object.keys(porFamilia).length}</div><div class="lbl">Famílias</div></div>
+        <div class="resumo-card"><div class="num">${Object.keys(porCat).length}</div><div class="lbl">Categorias</div></div>
+      `;
+      const tbody = $('tbl-preview');
+      const max = Math.min(50, itens.length);
+      tbody.innerHTML = itens.slice(0, max).map(it => `
+        <tr>
+          <td>${it.familia || '—'}</td>
+          <td><strong>${it.numero}</strong></td>
+          <td>${it.nome}</td>
+          <td>${it.categoria || '—'}</td>
+          <td></td>
+        </tr>
+      `).join('');
+      if (itens.length > max) {
+        tbody.innerHTML += `<tr><td colspan="5" class="text-center text-muted">... e mais ${itens.length - max} linhas</td></tr>`;
+      }
+      $('preview-box').classList.remove('hidden');
+    }
+
+    $('btn-cancelar-import').onclick = () => {
+      importBuffer = [];
+      $('preview-box').classList.add('hidden');
+      $('arquivo').value = '';
+      $('alerta-import').classList.add('hidden');
+    };
+
+    $('btn-confirmar-import').onclick = async () => {
+      if (importBuffer.length === 0) return;
+      const alerta = $('alerta-import');
+
+      // Verifica conflitos com convites já cadastrados pro evento
+      const existentesSnap = await getDocs(query(collection(db, 'convites_antecipados'), where('eventoId', '==', eventoAtivoId)));
+      const numerosExistentes = new Set(existentesSnap.docs.map(d => d.data().numero));
+      const conflitos = importBuffer.filter(it => numerosExistentes.has(it.numero));
+      if (conflitos.length > 0) {
+        const ok = await confirmarAsync(
+          `${conflitos.length} número(s) já existem pra esse evento (${conflitos.slice(0, 5).map(c => c.numero).join(', ')}${conflitos.length > 5 ? '...' : ''}). Pular esses e importar o resto?`,
+          { textoOk: 'Pular e importar' }
+        );
+        if (!ok) return;
+      }
+      const aImportar = importBuffer.filter(it => !numerosExistentes.has(it.numero));
+      if (aImportar.length === 0) {
+        alerta.textContent = 'Nada novo pra importar.';
+        alerta.className = 'alert alert-warning';
+        return;
+      }
+
+      $('btn-confirmar-import').disabled = true;
+      $('btn-confirmar-import').innerHTML = '<div class="loader"></div> Importando...';
+
+      // Firestore batch limita a 500 ops — fatia se necessário
+      const FATIA = 400;
+      for (let i = 0; i < aImportar.length; i += FATIA) {
+        const lote = aImportar.slice(i, i + FATIA);
+        const batch = writeBatch(db);
+        lote.forEach(it => {
+          batch.set(doc(collection(db, 'convites_antecipados')), {
+            eventoId: eventoAtivoId,
+            familia: it.familia,
+            numero: it.numero,
+            nome: it.nome,
+            categoria: it.categoria,
+            presente: false,
+            checkInEm: null,
+            checkInPor: null,
+            criadoEm: serverTimestamp(),
+          });
+        });
+        await batch.commit();
+      }
+
+      importBuffer = [];
+      $('preview-box').classList.add('hidden');
+      $('arquivo').value = '';
+      alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} ${aImportar.length} convite(s) importado(s)!</span>`;
+      alerta.className = 'alert alert-success';
+      $('btn-confirmar-import').disabled = false;
+      $('btn-confirmar-import').textContent = 'Confirmar importação';
+      setTimeout(() => alerta.classList.add('hidden'), 3500);
+    };
+
+    $('btn-modelo').onclick = () => {
+      const dados = [
+        ['Família GEH', 'Nº convite', 'Nome convidado', 'Categoria'],
+        ['Silva',       '001',         'João da Silva',  'Adulto'],
+        ['Silva',       '002',         'Maria Silva',    'Adulto'],
+        ['Tanaka',      '003',         'Hiroshi Tanaka', 'Idoso'],
+        ['Tanaka',      '004',         'Yuki Tanaka',    'Criança'],
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(dados);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Convites');
+      XLSX.writeFile(wb, 'modelo-convites-antecipados.xlsx');
+    };
+
+    $('btn-limpar').onclick = async () => {
+      if (!(await confirmarAsync('Apagar TODOS os convites antecipados desse evento? Não dá pra desfazer.', { destrutivo: true, textoOk: 'Apagar tudo' }))) return;
+      const snap = await getDocs(query(collection(db, 'convites_antecipados'), where('eventoId', '==', eventoAtivoId)));
+      const FATIA = 400;
+      const docs = snap.docs;
+      for (let i = 0; i < docs.length; i += FATIA) {
+        const batch = writeBatch(db);
+        docs.slice(i, i + FATIA).forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      }
+    };
+
+    init();
+  </script>
+</body>
+</html>
