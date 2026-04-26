@@ -25,6 +25,26 @@
 
     .dp-acao-btn { width:auto; padding:0.35rem 0.7rem; font-size:0.82rem; }
     .dp-filtros-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; align-items: end; }
+
+    .dp-radio-group { display:flex; gap:0.5rem; }
+    .dp-radio-group label {
+      flex:1; cursor:pointer; padding:0.55rem 0.8rem; border:1px solid var(--cinza-claro);
+      border-radius:8px; text-align:center; font-size:0.88rem; transition:all 0.15s;
+      display:inline-flex; align-items:center; justify-content:center; gap:0.35rem;
+    }
+    .dp-radio-group input[type="radio"] { display:none; }
+    .dp-radio-group input[type="radio"]:checked + span {
+      color:white;
+    }
+    .dp-radio-group label:has(input:checked) { background: var(--azul); border-color:var(--azul); color:white; }
+    .dp-radio-group label:has(input[value="doacao"]:checked) { background: var(--verde); border-color:var(--verde); }
+
+    .badge-doacao {
+      display:inline-block; padding:1px 7px; border-radius:999px;
+      font-size:0.68rem; font-weight:700; letter-spacing:0.04em;
+      background: rgba(22,163,74,0.15); color: var(--verde); margin-left:4px;
+    }
+    .valor-doacao { color: var(--verde); text-decoration: line-through; opacity: 0.75; font-weight:500; }
   </style>
 </head>
 <body>
@@ -95,6 +115,17 @@
         </div>
       </div>
       <div class="form-group">
+        <label>Tipo</label>
+        <div class="dp-radio-group">
+          <label><input type="radio" name="dp-tipo" value="compra" checked><span data-icon="shopping-cart" data-size="14"></span> Compra</label>
+          <label><input type="radio" name="dp-tipo" value="doacao"><span data-icon="heart" data-size="14"></span> Doação</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label id="dp-resp-label">Pago por</label>
+        <input type="text" id="dp-responsavel" placeholder="Nome de quem realizou a compra" autocomplete="off">
+      </div>
+      <div class="form-group">
         <label>Descrição</label>
         <input type="text" id="dp-descricao" placeholder="Ex: Compra de chocolate granulado para brigadeiro">
       </div>
@@ -140,6 +171,14 @@
           </select>
         </div>
         <div class="form-group" style="margin-bottom:0;">
+          <label>Tipo</label>
+          <select id="f-tipo">
+            <option value="">Todos</option>
+            <option value="compra">Compras</option>
+            <option value="doacao">Doações</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
           <button id="btn-limpar" class="btn btn-secondary" style="padding:0.55rem 0.9rem;">Limpar</button>
         </div>
       </div>
@@ -153,6 +192,35 @@
       </div>
     </div>
 
+    <!-- Importação em lote -->
+    <div class="card">
+      <h3 class="card-title" style="display:inline-flex;align-items:center;gap:0.4rem;"><span data-icon="upload" data-size="18"></span> Importar em lote (CSV / Excel)</h3>
+      <p class="text-muted" style="font-size:0.85rem;margin-bottom:0.75rem;">
+        Uma despesa por linha:
+        <code style="background:var(--cinza-claro);padding:2px 6px;border-radius:4px;">Data, Descrição, Valor, Categoria, Forma, Tipo, Responsável, Insumo</code><br>
+        <strong>Data</strong> aceita <code>AAAA-MM-DD</code> ou <code>DD/MM/AAAA</code>.
+        <strong>Valor</strong> aceita ponto ou vírgula.
+        <strong>Forma</strong>: pix, dinheiro, debito, credito, boleto, outro.
+        <strong>Tipo</strong>: compra (padrão) ou doacao.
+        <strong>Insumo</strong> e <strong>Responsável</strong> são opcionais.
+      </p>
+      <pre style="background:var(--cinza-claro);padding:0.75rem;border-radius:8px;font-size:0.8rem;margin-bottom:0.75rem;">2026-04-15, Granulado de chocolate, 45.00, Matéria-prima, pix, compra, Maria, Brigadeiro
+16/04/2026, Caixinhas de papel, 30,00, Embalagem, dinheiro, doacao, João,
+2026-04-17, "Aluguel de barraca, evento abril", 200, Serviços, pix, compra, Diretoria,</pre>
+      <div class="form-group">
+        <label>Cole o CSV aqui</label>
+        <textarea id="lote-despesas" rows="8" style="font-family:monospace;font-size:0.875rem;" placeholder="Data, Descrição, Valor, Categoria, Forma, Tipo, Responsável, Insumo"></textarea>
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:0.5rem;">
+        <input type="checkbox" id="lote-vincular-evento" style="width:20px;height:20px;cursor:pointer;" checked>
+        <label for="lote-vincular-evento" style="cursor:pointer;margin-bottom:0;">
+          Vincular tudo ao evento ativo (<span id="lote-evento-nome" style="color:var(--azul);font-weight:600;">—</span>)
+        </label>
+      </div>
+      <div id="alerta-lote" class="alert hidden"></div>
+      <button id="btn-lote" class="btn btn-primary" style="max-width:240px;">Importar lote</button>
+    </div>
+
     <!-- Tabela -->
     <h3 style="color:var(--azul);margin:1.5rem 0 0.75rem;">Lançamentos <span id="tbl-contador" style="color:var(--cinza);font-size:0.85rem;font-weight:400;"></span></h3>
     <div class="table-wrapper">
@@ -163,12 +231,13 @@
             <th>Descrição</th>
             <th>Categoria</th>
             <th>Insumo</th>
+            <th>Responsável</th>
             <th>Forma</th>
             <th style="text-align:right;">Valor</th>
             <th></th>
           </tr>
         </thead>
-        <tbody id="tbl"><tr><td colspan="7" class="text-center text-muted">Carregando...</td></tr></tbody>
+        <tbody id="tbl"><tr><td colspan="8" class="text-center text-muted">Carregando...</td></tr></tbody>
       </table>
     </div>
   </main>
@@ -177,7 +246,7 @@
     import { montarNav, fmtBRL } from "./_nav.js";
     import {
       db, collection, doc, getDoc, addDoc, updateDoc, deleteDoc, onSnapshot,
-      query, orderBy, serverTimestamp
+      query, orderBy, serverTimestamp, writeBatch
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
     import { confirmarAsync } from "../js/ui.js";
@@ -215,14 +284,27 @@
         const snap = await getDoc(doc(db, 'config', 'eventoAtivo'));
         if (snap.exists()) {
           eventoAtivo = snap.data();
-          $('dp-evento-nome').textContent = eventoAtivo.nome || eventoAtivo.id || '—';
+          const nome = eventoAtivo.nome || eventoAtivo.id || '—';
+          $('dp-evento-nome').textContent = nome;
+          $('lote-evento-nome').textContent = nome;
         } else {
           $('dp-evento-nome').textContent = 'nenhum';
+          $('lote-evento-nome').textContent = 'nenhum';
           $('dp-vincular-evento').checked = false;
           $('dp-vincular-evento').disabled = true;
+          $('lote-vincular-evento').checked = false;
+          $('lote-vincular-evento').disabled = true;
         }
       } catch (_) {}
     })();
+
+    // Tipo: troca label do "responsável" e cor do bloco
+    function atualizarLabelResponsavel() {
+      const tipo = document.querySelector('input[name="dp-tipo"]:checked')?.value || 'compra';
+      $('dp-resp-label').textContent = tipo === 'doacao' ? 'Doado por' : 'Pago por';
+      $('dp-responsavel').placeholder = tipo === 'doacao' ? 'Nome de quem doou' : 'Nome de quem realizou a compra';
+    }
+    document.querySelectorAll('input[name="dp-tipo"]').forEach(r => r.addEventListener('change', atualizarLabelResponsavel));
 
     // Insumos — onSnapshot
     onSnapshot(collection(db, 'insumos'), (snap) => {
@@ -298,52 +380,60 @@
       const de    = $('f-de').value;
       const ate   = $('f-ate').value;
       const forma = $('f-forma').value;
+      const tipo  = $('f-tipo').value;
       return lista.filter(d => {
+        const dTipo = d.tipo || 'compra';
         if (cat && (d.categoria || '').toLowerCase() !== cat) return false;
         if (de && (d.data || '') < de) return false;
         if (ate && (d.data || '') > ate) return false;
         if (forma && d.formaPagamento !== forma) return false;
+        if (tipo && dTipo !== tipo) return false;
         return true;
       });
     }
 
+    // Doação não soma no custo (custo zero no final)
+    const custo = (d) => (d.tipo === 'doacao' ? 0 : (d.valor || 0));
+
     function renderizar() {
       const filtradas = aplicarFiltros(despesas);
 
-      // KPIs (mês corrente — sempre, ignora filtros)
+      // KPIs (mês corrente — sempre, ignora filtros). Doação = custo zero.
       const hoje = new Date();
       const ym = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
       const doMes = despesas.filter(d => (d.data || '').startsWith(ym));
-      const totalMes = doMes.reduce((s, d) => s + (d.valor || 0), 0);
+      const totalMes = doMes.reduce((s, d) => s + custo(d), 0);
+      const doacoesMes = doMes.filter(d => d.tipo === 'doacao').length;
       $('kpi-mes').textContent = fmtBRL(totalMes);
-      $('kpi-mes-sub').textContent = `${doMes.length} lançamento${doMes.length === 1 ? '' : 's'}`;
+      $('kpi-mes-sub').textContent = `${doMes.length} lançamento${doMes.length === 1 ? '' : 's'}` +
+        (doacoesMes ? ` • ${doacoesMes} doação${doacoesMes === 1 ? '' : 'ões'}` : '');
 
       const porCatMes = new Map();
       doMes.forEach(d => {
         const c = d.categoria || '—';
-        porCatMes.set(c, (porCatMes.get(c) || 0) + (d.valor || 0));
+        porCatMes.set(c, (porCatMes.get(c) || 0) + custo(d));
       });
-      const maior = Array.from(porCatMes.entries()).sort((a, b) => b[1] - a[1])[0];
+      const maior = Array.from(porCatMes.entries()).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1])[0];
       if (maior) {
         $('kpi-cat').textContent = maior[0];
         const pct = totalMes > 0 ? Math.round((maior[1] / totalMes) * 100) : 0;
         $('kpi-cat-sub').textContent = `${fmtBRL(maior[1])} (${pct}% do mês)`;
       } else {
         $('kpi-cat').textContent = '—';
-        $('kpi-cat-sub').textContent = 'sem dados no mês';
+        $('kpi-cat-sub').textContent = 'sem custos no mês';
       }
 
-      const totalGeral = despesas.reduce((s, d) => s + (d.valor || 0), 0);
+      const totalGeral = despesas.reduce((s, d) => s + custo(d), 0);
       $('kpi-total').textContent = fmtBRL(totalGeral);
       $('kpi-total-sub').textContent = `${despesas.length} lançamento${despesas.length === 1 ? '' : 's'}`;
 
-      // Gráfico — usa filtros
+      // Gráfico — usa filtros, doações entram com custo zero
       const porCat = new Map();
       filtradas.forEach(d => {
         const c = d.categoria || '—';
-        porCat.set(c, (porCat.get(c) || 0) + (d.valor || 0));
+        porCat.set(c, (porCat.get(c) || 0) + custo(d));
       });
-      const ordenado = Array.from(porCat.entries()).sort((a, b) => b[1] - a[1]);
+      const ordenado = Array.from(porCat.entries()).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
       const totalFiltrado = ordenado.reduce((s, [, v]) => s + v, 0);
       const maxVal = ordenado[0]?.[1] || 1;
       const grafico = $('grafico');
@@ -374,14 +464,20 @@
       tbody.innerHTML = '';
       filtradas.forEach(d => {
         const dataFmt = d.data ? new Date(d.data + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
+        const ehDoacao = d.tipo === 'doacao';
+        const badge = ehDoacao ? `<span class="badge-doacao">DOAÇÃO</span>` : '';
+        const valorHtml = ehDoacao
+          ? `<span class="valor-doacao">${fmtBRL(d.valor)}</span>`
+          : `<span style="font-weight:600;">${fmtBRL(d.valor)}</span>`;
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${dataFmt}</td>
-          <td>${d.descricao || '—'}</td>
+          <td>${d.descricao || '—'}${badge}</td>
           <td>${d.categoria || '—'}</td>
           <td>${d.insumoNome || '—'}</td>
+          <td>${d.responsavel || '—'}</td>
           <td>${FORMAS_LABEL[d.formaPagamento] || d.formaPagamento || '—'}</td>
-          <td style="text-align:right;font-weight:600;">${fmtBRL(d.valor)}</td>
+          <td style="text-align:right;">${valorHtml}</td>
           <td>
             <button class="btn btn-secondary dp-acao-btn" data-edit="${d.id}">Editar</button>
             <button class="btn btn-danger dp-acao-btn" data-del="${d.id}">Excluir</button>
@@ -405,6 +501,10 @@
       atualizarSelectInsumos();
       $('dp-insumo').value = d.insumoId || '';
       $('dp-descricao').value = d.descricao || '';
+      const tipo = d.tipo || 'compra';
+      document.querySelector(`input[name="dp-tipo"][value="${tipo}"]`).checked = true;
+      atualizarLabelResponsavel();
+      $('dp-responsavel').value = d.responsavel || '';
       $('dp-vincular-evento').checked = !!d.eventoId;
       $('form-titulo').textContent = `Editando lançamento`;
       $('btn-cancelar').classList.remove('hidden');
@@ -419,6 +519,9 @@
       $('dp-categoria').value = '';
       $('dp-insumo').innerHTML = '<option value="">— nenhum —</option>';
       $('dp-descricao').value = '';
+      document.querySelector('input[name="dp-tipo"][value="compra"]').checked = true;
+      atualizarLabelResponsavel();
+      $('dp-responsavel').value = '';
       $('dp-vincular-evento').checked = !!eventoAtivo;
       $('form-titulo').textContent = 'Nova despesa';
       $('btn-cancelar').classList.add('hidden');
@@ -443,6 +546,8 @@
       }
 
       const insumo = insumoId ? insumos.find(i => i.id === insumoId) : null;
+      const tipo = document.querySelector('input[name="dp-tipo"]:checked')?.value || 'compra';
+      const responsavel = $('dp-responsavel').value.trim();
       const dados = {
         data,
         descricao,
@@ -451,6 +556,8 @@
         categoria,
         insumoId: insumoId || null,
         insumoNome: insumo?.nome || null,
+        tipo,
+        responsavel: responsavel || null,
         eventoId: vincular ? (eventoAtivo.id || null) : null,
         eventoNome: vincular ? (eventoAtivo.nome || null) : null
       };
@@ -473,7 +580,7 @@
     };
 
     // Filtros
-    ['f-categoria', 'f-de', 'f-ate', 'f-forma'].forEach(id => {
+    ['f-categoria', 'f-de', 'f-ate', 'f-forma', 'f-tipo'].forEach(id => {
       $(id).addEventListener('change', renderizar);
     });
     $('btn-limpar').onclick = () => {
@@ -481,7 +588,130 @@
       $('f-de').value = '';
       $('f-ate').value = '';
       $('f-forma').value = '';
+      $('f-tipo').value = '';
       renderizar();
+    };
+
+    // ===== Importação em lote =====
+    const FORMAS_ALIAS = {
+      'pix': 'pix',
+      'dinheiro': 'dinheiro', 'cash': 'dinheiro', 'especie': 'dinheiro', 'espécie': 'dinheiro',
+      'debito': 'cartao_debito', 'débito': 'cartao_debito', 'cartao_debito': 'cartao_debito',
+      'cartão débito': 'cartao_debito', 'cartao debito': 'cartao_debito', 'cartão_débito': 'cartao_debito',
+      'credito': 'cartao_credito', 'crédito': 'cartao_credito', 'cartao_credito': 'cartao_credito',
+      'cartão crédito': 'cartao_credito', 'cartao credito': 'cartao_credito', 'cartão_crédito': 'cartao_credito',
+      'boleto': 'boleto',
+      'outro': 'outro', 'outros': 'outro'
+    };
+
+    function parseLinhaCSV(linha) {
+      const campos = [];
+      let atual = '', dentroAspas = false;
+      for (let i = 0; i < linha.length; i++) {
+        const c = linha[i];
+        if (c === '"') { dentroAspas = !dentroAspas; continue; }
+        if ((c === ',' || c === ';') && !dentroAspas) { campos.push(atual.trim()); atual = ''; continue; }
+        atual += c;
+      }
+      campos.push(atual.trim());
+      return campos;
+    }
+
+    function parseData(s) {
+      if (!s) return null;
+      const t = s.trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+      const m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+      return null;
+    }
+
+    $('btn-lote').onclick = async () => {
+      const texto = $('lote-despesas').value.trim();
+      const alertaLote = $('alerta-lote');
+      if (!texto) {
+        alertaLote.textContent = 'Cole pelo menos uma linha.';
+        alertaLote.className = 'alert alert-warning';
+        return;
+      }
+      const linhas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      const erros = [];
+      const validos = [];
+      const vincular = $('lote-vincular-evento').checked && eventoAtivo;
+
+      linhas.forEach((linha, i) => {
+        const p = parseLinhaCSV(linha);
+        const data = parseData(p[0]);
+        const descricao = p[1] || '';
+        const valor = parseFloat((p[2] || '').replace(',', '.'));
+        const categoria = p[3] || '';
+        const formaRaw = (p[4] || 'pix').toLowerCase();
+        const formaPagamento = FORMAS_ALIAS[formaRaw] || 'outro';
+        const tipoRaw = (p[5] || 'compra').toLowerCase().replace(/[çã]/g, m => m === 'ç' ? 'c' : 'a');
+        const tipo = tipoRaw.startsWith('doa') ? 'doacao' : 'compra';
+        const responsavel = (p[6] || '').trim() || null;
+        const insumoNomeBruto = (p[7] || '').trim();
+
+        const linhaErros = [];
+        if (!data) linhaErros.push('data inválida');
+        if (!descricao) linhaErros.push('descrição vazia');
+        if (isNaN(valor) || valor < 0) linhaErros.push('valor inválido');
+        if (!categoria) linhaErros.push('categoria vazia');
+        if (linhaErros.length) {
+          erros.push(`Linha ${i + 1}: ${linhaErros.join(', ')} — "${linha}"`);
+          return;
+        }
+
+        // Match de insumo por nome (mesma categoria, case-insensitive)
+        let insumoMatch = null;
+        if (insumoNomeBruto) {
+          insumoMatch = insumos.find(ins =>
+            (ins.nome || '').toLowerCase() === insumoNomeBruto.toLowerCase() &&
+            (ins.categoria || '').toLowerCase() === categoria.toLowerCase()
+          ) || null;
+        }
+
+        validos.push({
+          data, descricao, valor, categoria, formaPagamento, tipo, responsavel,
+          insumoId: insumoMatch?.id || null,
+          insumoNome: insumoMatch?.nome || (insumoNomeBruto || null),
+          eventoId: vincular ? (eventoAtivo.id || null) : null,
+          eventoNome: vincular ? (eventoAtivo.nome || null) : null
+        });
+      });
+
+      if (erros.length) {
+        alertaLote.innerHTML = `<strong>${erros.length} erro(s) — corrija antes de importar:</strong><br>${erros.join('<br>')}`;
+        alertaLote.className = 'alert alert-danger';
+        return;
+      }
+
+      if (!(await confirmarAsync(`Importar ${validos.length} despesa(s)?`, { textoOk: 'Importar' }))) return;
+
+      $('btn-lote').disabled = true;
+      $('btn-lote').innerHTML = '<div class="loader"></div> Importando...';
+
+      try {
+        // Firestore writeBatch limita 500 ops — particiona se passar
+        for (let i = 0; i < validos.length; i += 450) {
+          const fatia = validos.slice(i, i + 450);
+          const batch = writeBatch(db);
+          fatia.forEach(d => {
+            batch.set(doc(collection(db, 'despesas')), { ...d, criadoEm: serverTimestamp() });
+          });
+          await batch.commit();
+        }
+        $('lote-despesas').value = '';
+        alertaLote.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} ${validos.length} despesa(s) importada(s).</span>`;
+        alertaLote.className = 'alert alert-success';
+        setTimeout(() => alertaLote.classList.add('hidden'), 3500);
+      } catch (err) {
+        alertaLote.textContent = `Erro: ${err.message}`;
+        alertaLote.className = 'alert alert-danger';
+      } finally {
+        $('btn-lote').disabled = false;
+        $('btn-lote').innerHTML = 'Importar lote';
+      }
     };
   </script>
 </body>
