@@ -169,6 +169,14 @@
       </div>
     </div>
 
+    <!-- Alerta de estoque — só aparece quando há produtos baixos/esgotados -->
+    <div id="card-estoque" class="card hidden" style="margin-top:1rem;border-left:4px solid var(--vermelho);">
+      <h3 class="card-title" style="display:inline-flex;align-items:center;gap:0.5rem;">
+        <span data-icon="alert-triangle" data-size="18"></span> Alerta de estoque
+      </h3>
+      <div id="lista-estoque" style="display:flex;flex-wrap:wrap;gap:0.5rem;"></div>
+    </div>
+
     <!-- Gráficos — só aparecem quando há evento ativo -->
     <div id="graficos" class="hidden" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem;margin-top:1.5rem;">
       <div class="card">
@@ -476,6 +484,37 @@
           atualizarGraficos(snap.docs);
         }
       );
+
+      // Alerta de estoque (real time)
+      const ESTOQUE_BAIXO = 10;
+      onSnapshot(collection(db, 'produtos'), s => {
+        const baixos = [];
+        const zerados = [];
+        s.forEach(d => {
+          const p = { id: d.id, ...d.data() };
+          const est = p.estoque ?? 0;
+          if (est <= 0) zerados.push(p);
+          else if (est <= ESTOQUE_BAIXO) baixos.push(p);
+        });
+        const card = $('card-estoque');
+        const lista = $('lista-estoque');
+        if (zerados.length === 0 && baixos.length === 0) {
+          card.classList.add('hidden');
+          return;
+        }
+        card.classList.remove('hidden');
+        card.style.borderLeftColor = zerados.length > 0 ? 'var(--vermelho)' : 'var(--amarelo)';
+        const chip = (p, cor, txt, icone) => `
+          <span style="display:inline-flex;align-items:center;gap:0.4rem;background:${cor.bg};color:${cor.fg};padding:6px 12px;border-radius:999px;font-size:0.85rem;font-weight:600;">
+            ${icon(icone, { size: 14 })} ${p.nome} <span style="opacity:0.85;font-weight:500;">— ${txt}</span>
+          </span>`;
+        const corVerm = { bg: 'var(--vermelho)', fg: '#fff' };
+        const corAmar = { bg: 'var(--amarelo)', fg: '#1F2937' };
+        lista.innerHTML =
+          zerados.map(p => chip(p, corVerm, 'esgotado', 'x-circle')).join('') +
+          baixos.sort((a,b) => (a.estoque||0) - (b.estoque||0))
+                .map(p => chip(p, corAmar, `restam ${p.estoque}`, 'alert-triangle')).join('');
+      });
 
       // Saldo + clientes (globais)
       onSnapshot(collection(db, 'clientes'), s => {
