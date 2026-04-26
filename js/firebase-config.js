@@ -32,6 +32,9 @@ const firebaseConfig = {
 // ============================================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
+  initializeAppCheck, ReCaptchaV3Provider
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js";
+import {
   getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc,
   query, where, orderBy, limit, onSnapshot, serverTimestamp, runTransaction, deleteDoc, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -41,7 +44,22 @@ import {
   sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
+// reCAPTCHA v3 site key (pública — pode versionar)
+const RECAPTCHA_SITE_KEY = "6Ldb1MssAAAAAEhOjOpntslCUGGFn--3g6TFFDaw";
+
+// Em dev local: gere um debug token no console do App Check e
+// cole no localStorage do browser, OU descomente a linha abaixo
+// pra ele aparecer no console pra você registrar:
+// self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+
 const app  = initializeApp(firebaseConfig);
+
+// App Check — protege Firestore/Auth contra abuso fora do navegador
+initializeAppCheck(app, {
+  provider: new ReCaptchaV3Provider(RECAPTCHA_SITE_KEY),
+  isTokenAutoRefreshEnabled: true,
+});
+
 const db   = getFirestore(app);
 const auth = getAuth(app);
 
@@ -50,6 +68,10 @@ const auth = getAuth(app);
 // trocaria a sessão.
 function criarAppSecundario() {
   const secundario = initializeApp(firebaseConfig, 'cadastro-' + Date.now());
+  initializeAppCheck(secundario, {
+    provider: new ReCaptchaV3Provider(RECAPTCHA_SITE_KEY),
+    isTokenAutoRefreshEnabled: true,
+  });
   return { app: secundario, auth: getAuth(secundario) };
 }
 
