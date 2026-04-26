@@ -2,7 +2,9 @@
 import { auth, signOut } from "../js/firebase-config.js";
 import { requireAuth } from "../js/auth-guard.js";
 import { icon } from "../js/icons.js";
-import { enhanceAllTables } from "../js/ui.js";
+import { enhanceAllTables, autoSkeleton } from "../js/ui.js";
+import { instalarAtalhos } from "../js/shortcuts.js";
+import { instalarBannerPWA } from "../js/install-banner.js";
 
 // Itens agrupados por área de responsabilidade — ajuda a orientar
 // o olhar na sidebar quando ela cresce.
@@ -118,9 +120,15 @@ export function montarNav(paginaAtiva = '') {
     `;
   });
 
-  // Adiciona busca + ordenação em todas as tabelas da página
+  // Adiciona busca + ordenação + export CSV em todas as tabelas da página
   // (opt-out por tabela com data-no-enhance no .table-wrapper)
   enhanceAllTables();
+  // Substitui placeholders "Carregando..." por linhas-skeleton
+  autoSkeleton();
+  // Atalhos de teclado (/, g d, g h, ?, …)
+  instalarAtalhos();
+  // Banner de instalação PWA — só aparece se o browser oferecer
+  instalarBannerPWA();
 }
 
 function linkNav({ href, icone, texto }, ativa) {

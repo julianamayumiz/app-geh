@@ -1106,3 +1106,241 @@ tr:hover td { background: var(--cinza-claro); }
 }
 :root[data-theme="dark"] .hist-detalhe { color: #CBD5E1; }
 :root[data-theme="dark"] .hist-quando { color: #94A3B8; }
+
+/* ===== Skeleton loaders =====
+   Usados no lugar de "Carregando..." em tabelas e cards.
+   `enhanceAllTables` converte automaticamente <td colspan>Carregando</td> em
+   linhas-skeleton com base no número de colunas. */
+@keyframes geh-skel-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skel {
+  display: inline-block;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    rgba(15,29,77,0.06) 0%,
+    rgba(15,29,77,0.12) 50%,
+    rgba(15,29,77,0.06) 100%
+  );
+  background-size: 200% 100%;
+  animation: geh-skel-shimmer 1.4s ease-in-out infinite;
+  color: transparent !important;
+  user-select: none;
+  vertical-align: middle;
+  height: 1em;
+  width: 100%;
+  min-width: 40px;
+}
+:root[data-theme="dark"] .skel {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.05) 0%,
+    rgba(255,255,255,0.12) 50%,
+    rgba(255,255,255,0.05) 100%
+  );
+  background-size: 200% 100%;
+}
+.skel-text   { height: 0.85em; }
+.skel-title  { height: 1.4em;  width: 60%; }
+.skel-pill   { height: 1.1em;  width: 70px; border-radius: 999px; }
+.skel-num    { height: 1.6em;  width: 80px; }
+@media (prefers-reduced-motion: reduce) {
+  .skel { animation: none; }
+}
+
+/* Linha de skeleton dentro do tbody — o JS preenche colunas com .skel */
+tr.skel-row td {
+  background: transparent !important;
+  border-bottom: 1px solid var(--cinza-claro);
+}
+tr.skel-row + tr.skel-row td { border-top: 0; }
+
+/* ===== Banner de instalação PWA =====
+   Aparece quando o navegador dispara `beforeinstallprompt`. */
+.install-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%) translateY(120%);
+  width: min(94vw, 440px);
+  background: var(--branco);
+  border: 1px solid rgba(15,29,77,0.08);
+  border-radius: var(--radius);
+  box-shadow: var(--sombra-forte);
+  padding: 0.85rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  z-index: 1500;
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.install-banner.show { transform: translateX(-50%) translateY(0); }
+.install-banner .ico {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--azul) 0%, var(--azul-escuro) 100%);
+  color: white;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.install-banner .txt { flex: 1; min-width: 0; }
+.install-banner .txt strong { display: block; font-size: 0.92rem; color: var(--cinza-escuro); }
+.install-banner .txt span    { font-size: 0.78rem; color: var(--cinza); }
+.install-banner button {
+  border: 0;
+  background: var(--azul);
+  color: white;
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.install-banner .dismiss {
+  background: transparent;
+  color: var(--cinza);
+  font-size: 1.2rem;
+  padding: 0.25rem 0.5rem;
+}
+
+/* ===== Cheatsheet de atalhos (admin) ===== */
+.shortcut-help {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.55rem 1.25rem;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+}
+.shortcut-help dt { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.shortcut-help dd { color: var(--cinza-escuro); align-self: center; }
+:root[data-theme="dark"] .shortcut-help dd { color: var(--cinza-escuro); }
+
+kbd {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8em;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--cinza-claro);
+  border: 1px solid rgba(15,29,77,0.15);
+  border-bottom-width: 2px;
+  color: var(--cinza-escuro);
+  line-height: 1.3;
+}
+:root[data-theme="dark"] kbd {
+  background: #0F172A;
+  border-color: #334155;
+}
+
+/* ===== Botão Export CSV na toolbar da tabela ===== */
+.btn-csv {
+  background: var(--branco);
+  border: 1px solid rgba(15,29,77,0.12);
+  color: var(--cinza-escuro);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.5rem 0.8rem;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: background 0.12s, border-color 0.12s;
+}
+.btn-csv:hover { background: var(--cinza-claro); border-color: var(--azul); color: var(--azul); }
+:root[data-theme="dark"] .btn-csv {
+  background: #0F172A;
+  border-color: #334155;
+}
+
+/* ===== Modal de detalhes da venda =====
+   Reaproveita backdrop do confirm, mas com largura maior. */
+.detalhes-modal {
+  background: var(--branco);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  max-width: 520px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: var(--sombra-forte);
+}
+.detalhes-modal h3 {
+  color: var(--azul);
+  margin-bottom: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.detalhes-modal .meta {
+  color: var(--cinza);
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+}
+.detalhes-modal .itens {
+  border-top: 1px solid var(--cinza-claro);
+  margin-top: 0.75rem;
+}
+.detalhes-modal .item {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--cinza-claro);
+  font-size: 0.92rem;
+}
+.detalhes-modal .item .qtd {
+  color: var(--cinza);
+  margin-right: 0.5rem;
+  font-variant-numeric: tabular-nums;
+}
+.detalhes-modal .total {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.85rem 0 0.25rem;
+  font-weight: 700;
+  color: var(--azul);
+  font-size: 1.05rem;
+}
+
+/* ===== Página 404 ===== */
+.erro-404 {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.25rem;
+  text-align: center;
+}
+.erro-404 .codigo {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(5rem, 18vw, 9rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  background: linear-gradient(135deg, var(--azul) 0%, var(--azul-claro) 50%, var(--amarelo) 110%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin-bottom: 0.25rem;
+}
+.erro-404 h1 {
+  font-size: 1.5rem;
+  color: var(--cinza-escuro);
+  margin-bottom: 0.5rem;
+}
+.erro-404 p {
+  color: var(--cinza);
+  max-width: 38ch;
+  margin: 0 auto 2rem;
+  line-height: 1.5;
+}
+.erro-404 .acoes {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.erro-404 .acoes .btn { width: auto; }
