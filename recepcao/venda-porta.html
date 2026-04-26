@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1E3A8A">
+  <title>Venda na porta — Recepção GEH</title>
+  <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="manifest" href="../manifest.json">
+  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+  <style>
+    .grid-cat {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 0.6rem;
+      margin-bottom: 1rem;
+    }
+    .cat-btn {
+      background: var(--branco);
+      border: 2px solid var(--cinza-claro);
+      border-radius: 12px;
+      padding: 0.85rem;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s ease;
+      color: var(--cinza-escuro);
+    }
+    .cat-btn:hover { border-color: var(--azul); }
+    .cat-btn.selecionada {
+      border-color: var(--azul);
+      background: rgba(30,58,138,0.06);
+      box-shadow: 0 0 0 3px rgba(30,58,138,0.12);
+    }
+    .cat-btn.esgotada { opacity: 0.4; cursor: not-allowed; }
+    .cat-btn .nome { font-weight: 700; font-size: 1rem; margin-bottom: 0.2rem; }
+    .cat-btn .preco { font-size: 1.2rem; font-weight: 800; color: var(--azul); }
+    .cat-btn .estoque { font-size: 0.75rem; color: var(--cinza); margin-top: 0.2rem; }
+    .cat-btn .estoque.baixo { color: #B45309; font-weight: 700; }
+
+    .pgto-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.6rem;
+      margin-bottom: 1rem;
+    }
+    .pgto-btn {
+      background: var(--branco);
+      border: 2px solid var(--cinza-claro);
+      border-radius: 12px;
+      padding: 1rem;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      justify-content: center;
+      color: var(--cinza-escuro);
+    }
+    .pgto-btn.selecionado {
+      border-color: var(--verde);
+      background: rgba(22,163,74,0.08);
+      box-shadow: 0 0 0 3px rgba(22,163,74,0.15);
+    }
+
+    .resumo-final {
+      background: linear-gradient(135deg, var(--azul) 0%, var(--azul-escuro) 100%);
+      color: white;
+      border-radius: 14px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .resumo-final .lbl { font-size: 0.78rem; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.04em; }
+    .resumo-final .total { font-size: 2rem; font-weight: 800; }
+
+    .toast-ok {
+      position: fixed;
+      bottom: 1rem; left: 1rem; right: 1rem;
+      background: var(--verde);
+      color: white;
+      padding: 1rem;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px -8px rgba(0,0,0,0.3);
+      text-align: center;
+      font-weight: 700;
+      z-index: 200;
+    }
+    .toast-ok.hidden { display: none; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <a href="index.html" class="back" aria-label="Voltar"><span data-icon="arrow-left" data-size="24"></span></a>
+    <img src="../assets/logo.png" alt="GEH" onerror="this.style.display='none'">
+    <h1>Venda na porta</h1>
+    <button id="btn-logout" class="back" title="Sair" aria-label="Sair"><span data-icon="power" data-size="22"></span></button>
+  </header>
+
+  <main>
+    <div id="aviso" class="alert hidden"></div>
+
+    <h3 style="color:var(--cinza-escuro);margin-bottom:0.5rem;font-size:0.95rem;">1. Categoria do convite</h3>
+    <div id="grid-cat" class="grid-cat"></div>
+
+    <h3 style="color:var(--cinza-escuro);margin-bottom:0.5rem;font-size:0.95rem;">2. Forma de pagamento</h3>
+    <div class="pgto-grid">
+      <button class="pgto-btn" data-pgto="pix">💳 Pix</button>
+      <button class="pgto-btn" data-pgto="dinheiro">💵 Dinheiro</button>
+    </div>
+
+    <h3 style="color:var(--cinza-escuro);margin-bottom:0.5rem;font-size:0.95rem;">3. Nome do convidado</h3>
+    <div class="form-group">
+      <input type="text" id="conv-nome" placeholder="Nome completo (lista de segurança)" autocomplete="off">
+    </div>
+
+    <div id="resumo-final" class="resumo-final hidden">
+      <div class="lbl">Total a cobrar</div>
+      <div class="total" id="total-final">R$ —</div>
+    </div>
+
+    <button id="btn-confirmar" class="btn btn-primary" disabled style="font-size:1.05rem;padding:1rem;">
+      Confirmar venda e liberar entrada
+    </button>
+  </main>
+
+  <div id="toast" class="toast-ok hidden"></div>
+
+  <script type="module" src="../js/icons.js"></script>
+  <script type="module">
+    import {
+      db, collection, doc, getDoc, runTransaction, addDoc, serverTimestamp, auth, signOut
+    } from "../js/firebase-config.js";
+    import { renderIcons } from "../js/icons.js";
+    import { requireAuth } from "../js/auth-guard.js";
+
+    const { perfil } = await requireAuth({ papel: 'recepcao' });
+    renderIcons();
+
+    document.getElementById('btn-logout').onclick = async () => {
+      await signOut(auth);
+      window.location.href = '../admin/login.html';
+    };
+
+    const $ = id => document.getElementById(id);
+    const aviso = $('aviso');
+
+    function fmtBRL(v) { return `R$ ${Number(v || 0).toFixed(2).replace('.', ',')}`; }
+
+    let eventoAtivoId = null;
+    let categorias = [];
+    let categoriaEscolhida = null;
+    let pgtoEscolhido = null;
+
+    async function carregar() {
+      const cfg = await getDoc(doc(db, 'config', 'eventoAtivo'));
+      eventoAtivoId = cfg.exists() ? cfg.data().id : null;
+      if (!eventoAtivoId) {
+        aviso.textContent = 'Sem evento ativo. Avise a diretoria.';
+        aviso.className = 'alert alert-warning';
+        return;
+      }
+      const ev = await getDoc(doc(db, 'eventos', eventoAtivoId));
+      categorias = (ev.exists() ? ev.data().categoriasIngresso : []) || [];
+      categorias = categorias.filter(c => c.precoPorta != null);
+      if (categorias.length === 0) {
+        aviso.textContent = 'Nenhuma categoria com preço de porta cadastrada. Peça pra admin cadastrar em Eventos → Categorias de ingresso.';
+        aviso.className = 'alert alert-warning';
+        return;
+      }
+      renderCategorias();
+    }
+
+    function renderCategorias() {
+      $('grid-cat').innerHTML = categorias.map(c => {
+        const esgotada = c.qtdPorta != null && c.qtdPorta <= 0;
+        const baixo = c.qtdPorta != null && c.qtdPorta > 0 && c.qtdPorta <= 5;
+        return `
+          <button class="cat-btn ${esgotada ? 'esgotada' : ''}" data-cat="${c.id}" ${esgotada ? 'disabled' : ''}>
+            <div class="nome">${c.nome}</div>
+            <div class="preco">${fmtBRL(c.precoPorta)}</div>
+            <div class="estoque ${baixo ? 'baixo' : ''}">${c.qtdPorta != null ? `Estoque porta: ${c.qtdPorta}` : 'Estoque livre'}</div>
+          </button>
+        `;
+      }).join('');
+      $('grid-cat').querySelectorAll('[data-cat]').forEach(b => {
+        b.onclick = () => {
+          if (b.disabled) return;
+          categoriaEscolhida = b.dataset.cat;
+          $('grid-cat').querySelectorAll('.cat-btn').forEach(x => x.classList.remove('selecionada'));
+          b.classList.add('selecionada');
+          atualizarTotal();
+          atualizarBtn();
+        };
+      });
+    }
+
+    document.querySelectorAll('.pgto-btn').forEach(b => {
+      b.onclick = () => {
+        pgtoEscolhido = b.dataset.pgto;
+        document.querySelectorAll('.pgto-btn').forEach(x => x.classList.remove('selecionado'));
+        b.classList.add('selecionado');
+        atualizarBtn();
+      };
+    });
+
+    $('conv-nome').oninput = atualizarBtn;
+
+    function atualizarTotal() {
+      if (!categoriaEscolhida) {
+        $('resumo-final').classList.add('hidden');
+        return;
+      }
+      const cat = categorias.find(c => c.id === categoriaEscolhida);
+      $('total-final').textContent = fmtBRL(cat?.precoPorta || 0);
+      $('resumo-final').classList.remove('hidden');
+    }
+
+    function atualizarBtn() {
+      const ok = categoriaEscolhida && pgtoEscolhido && $('conv-nome').value.trim().length >= 2;
+      $('btn-confirmar').disabled = !ok;
+    }
+
+    function showToast(msg) {
+      const t = $('toast');
+      t.textContent = msg;
+      t.classList.remove('hidden');
+      setTimeout(() => t.classList.add('hidden'), 2500);
+    }
+
+    function resetForm() {
+      categoriaEscolhida = null;
+      pgtoEscolhido = null;
+      $('grid-cat').querySelectorAll('.cat-btn').forEach(x => x.classList.remove('selecionada'));
+      document.querySelectorAll('.pgto-btn').forEach(x => x.classList.remove('selecionado'));
+      $('conv-nome').value = '';
+      $('resumo-final').classList.add('hidden');
+      $('btn-confirmar').disabled = true;
+    }
+
+    $('btn-confirmar').onclick = async () => {
+      const cat = categorias.find(c => c.id === categoriaEscolhida);
+      if (!cat) return;
+      const nome = $('conv-nome').value.trim();
+      const total = cat.precoPorta || 0;
+
+      $('btn-confirmar').disabled = true;
+      $('btn-confirmar').textContent = 'Processando…';
+
+      try {
+        // Transação: decrementa qtdPorta atomicamente (se houver controle de estoque)
+        const evRef = doc(db, 'eventos', eventoAtivoId);
+        await runTransaction(db, async (tx) => {
+          const evSnap = await tx.get(evRef);
+          if (!evSnap.exists()) throw new Error('Evento não encontrado');
+          const lista = (evSnap.data().categoriasIngresso || []).slice();
+          const idx = lista.findIndex(x => x.id === cat.id);
+          if (idx < 0) throw new Error('Categoria não existe mais');
+          const c = { ...lista[idx] };
+          if (c.qtdPorta != null) {
+            if (c.qtdPorta <= 0) throw new Error(`Estoque de "${c.nome}" esgotado`);
+            c.qtdPorta = c.qtdPorta - 1;
+            lista[idx] = c;
+            tx.update(evRef, { categoriasIngresso: lista });
+          }
+        });
+
+        // Registra a venda na porta (já com check-in)
+        await addDoc(collection(db, 'vendas_porta'), {
+          eventoId: eventoAtivoId,
+          categoriaId: cat.id,
+          categoriaNome: cat.nome,
+          preco: total,
+          formaPagamento: pgtoEscolhido,
+          nomeConvidado: nome,
+          presente: true,
+          checkInEm: serverTimestamp(),
+          checkInPor: perfil.nome || perfil.email || 'recepção',
+          criadoEm: serverTimestamp(),
+        });
+
+        // Recarrega categorias pra atualizar contador na UI
+        const ev = await getDoc(evRef);
+        categorias = ((ev.data().categoriasIngresso) || []).filter(c => c.precoPorta != null);
+        renderCategorias();
+        resetForm();
+        showToast(`✓ Entrada liberada: ${nome} (${fmtBRL(total)} ${pgtoEscolhido})`);
+      } catch (err) {
+        aviso.textContent = `Erro: ${err.message}`;
+        aviso.className = 'alert alert-danger';
+        $('btn-confirmar').disabled = false;
+      }
+      $('btn-confirmar').textContent = 'Confirmar venda e liberar entrada';
+    };
+
+    carregar();
+  </script>
+</body>
+</html>
