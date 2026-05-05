@@ -288,7 +288,18 @@
         resetForm();
         showToast(`✓ Entrada liberada: ${nome} (${fmtBRL(total)} ${pgtoEscolhido})`);
       } catch (err) {
-        aviso.textContent = `Erro: ${err.message}`;
+        const eContencao = err.code === 'failed-precondition'
+                        || err.code === 'aborted'
+                        || /stored version/i.test(err.message || '');
+        let msg;
+        if ((err.message || '').includes('esgotado')) {
+          msg = err.message + '. Atualize a tela e tente outra categoria.';
+        } else if (eContencao) {
+          msg = 'Conflito com outra venda simultânea. A entrada NÃO foi registrada — clique Confirmar de novo.';
+        } else {
+          msg = `Erro: ${err.message}. Tente de novo.`;
+        }
+        aviso.textContent = msg;
         aviso.className = 'alert alert-danger';
         $('btn-confirmar').disabled = false;
       }
