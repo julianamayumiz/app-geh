@@ -753,6 +753,14 @@
       $('btn-finalizar').disabled = true;
       $('btn-finalizar').innerHTML = '<div class="loader"></div> Processando...';
 
+      // Se o servidor demorar pra confirmar (wifi/3G ruim), avisa o operador
+      // que ainda está aguardando — não trava nem cancela a transação.
+      const timerLento = setTimeout(() => {
+        $('btn-finalizar').innerHTML = '<div class="loader"></div> Conexão lenta — aguardando servidor…';
+      }, 5000);
+
+      let vendaIdGerado = null;
+
       try {
         await runTransaction(db, async (tx) => {
           const clienteRef = doc(db, 'clientes', cliente.id);
@@ -775,6 +783,7 @@
           tx.update(clienteRef, { saldo: saldoAtual - total });
 
           const vendaRef = doc(collection(db, 'vendas'));
+          vendaIdGerado = vendaRef.id;
           tx.set(vendaRef, {
             clienteId: cliente.id,
             clienteNome: cliente.id,   // mesmo valor por ora; campo já existe pra quando tiver nome
@@ -795,16 +804,19 @@
           });
         });
 
+        clearTimeout(timerLento);
         fecharModal();
         const saldoFinal = (cliente.saldo || 0) - total;
         cliente.saldo = saldoFinal;
         atualizarSaldoExibido();
-        toast(`Venda concluída — ${fmtBRL(total)} · saldo final ${fmtBRL(saldoFinal)}`, {
+        const idCurto = (vendaIdGerado || '').slice(-6).toUpperCase();
+        toast(`Venda #${idCurto} — ${fmtBRL(total)} · saldo final ${fmtBRL(saldoFinal)}`, {
           tipo: 'sucesso',
           duracao: 2500,
         });
         setTimeout(() => window.location.href = 'index.html', 2500);
       } catch (err) {
+        clearTimeout(timerLento);
         vibrar([100, 50, 100]); // padrão de erro
 
         // Diferencia os tipos de erro pra dar mensagem útil pro operador.

@@ -161,15 +161,25 @@
       $('btn-carregar').disabled = true;
       $('btn-carregar').innerHTML = '<div class="loader"></div> Processando...';
 
+      // Aviso de "conexão lenta" se o servidor demorar pra confirmar
+      const timerLento = setTimeout(() => {
+        $('btn-carregar').innerHTML = '<div class="loader"></div> Conexão lenta — aguardando servidor…';
+      }, 5000);
+
+      let movIdGerado = null;
+      let saldoFinal = null;
+
       try {
         await runTransaction(db, async (tx) => {
           const ref = doc(db, 'clientes', clienteId);
           const snap = await tx.get(ref);
           if (!snap.exists()) throw new Error('Cliente não encontrado');
           const saldo = snap.data().saldo || 0;
-          tx.update(ref, { saldo: saldo + valor });
+          saldoFinal = saldo + valor;
+          tx.update(ref, { saldo: saldoFinal });
 
           const movRef = doc(collection(db, 'movimentacoes_saldo'));
+          movIdGerado = movRef.id;
           tx.set(movRef, {
             clienteId,
             tipo: 'recarga',
@@ -185,14 +195,31 @@
           });
         });
 
+        clearTimeout(timerLento);
         vibrar([40, 60, 40, 60, 80]);
-        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 18 })} R$ ${valor.toFixed(2).replace('.', ',')} adicionados!</span>`;
+        $('cliente-saldo').textContent = fmtBRL(saldoFinal);
+        const idCurto = (movIdGerado || '').slice(-6).toUpperCase();
+        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 18 })} Recarga #${idCurto} — +${fmtBRL(valor)} · saldo agora ${fmtBRL(saldoFinal)}</span>`;
         alerta.className = 'alert alert-success';
         alerta.classList.remove('hidden');
         setTimeout(() => window.location.href = 'index.html', 1500);
       } catch (err) {
+        clearTimeout(timerLento);
         vibrar([100, 50, 100]);
-        mostrarAlerta(`Erro: ${err.message}`, 'danger');
+
+        // Mensagens específicas — espelha o padrão do vender.html
+        const eContencao = err.code === 'failed-precondition'
+                       || err.code === 'aborted'
+                       || /stored version/i.test(err.message || '');
+        let mensagem;
+        if (err.message === 'Cliente não encontrado') {
+          mensagem = 'Cliente não encontrado.';
+        } else if (eContencao) {
+          mensagem = 'Conflito com outra operação simultânea. A recarga NÃO foi registrada — clique de novo.';
+        } else {
+          mensagem = `Erro: ${err.message}. Tente de novo.`;
+        }
+        mostrarAlerta(mensagem, 'danger');
         $('btn-carregar').disabled = false;
         $('btn-carregar').innerHTML = `${icon('plus', { size: 18 })} Adicionar saldo`;
       }
