@@ -249,6 +249,11 @@
       $('btn-confirmar').disabled = true;
       $('btn-confirmar').textContent = 'Processando…';
 
+      // Aviso de "conexão lenta" se o servidor demorar pra confirmar
+      const timerLento = setTimeout(() => {
+        $('btn-confirmar').textContent = 'Conexão lenta — aguardando servidor…';
+      }, 5000);
+
       try {
         // Transação: decrementa qtdPorta atomicamente (se houver controle de estoque)
         const evRef = doc(db, 'eventos', eventoAtivoId);
@@ -268,7 +273,7 @@
         });
 
         // Registra a venda na porta (já com check-in)
-        await addDoc(collection(db, 'vendas_porta'), {
+        const vendaRef = await addDoc(collection(db, 'vendas_porta'), {
           eventoId: eventoAtivoId,
           categoriaId: cat.id,
           categoriaNome: cat.nome,
@@ -281,13 +286,17 @@
           criadoEm: serverTimestamp(),
         });
 
+        clearTimeout(timerLento);
+
         // Recarrega categorias pra atualizar contador na UI
         const ev = await getDoc(evRef);
         categorias = ((ev.data().categoriasIngresso) || []).filter(c => c.precoPorta != null);
         renderCategorias();
         resetForm();
-        showToast(`✓ Entrada liberada: ${nome} (${fmtBRL(total)} ${pgtoEscolhido})`);
+        const idCurto = (vendaRef.id || '').slice(-6).toUpperCase();
+        showToast(`✓ Venda #${idCurto} — ${nome} (${fmtBRL(total)} ${pgtoEscolhido})`);
       } catch (err) {
+        clearTimeout(timerLento);
         const eContencao = err.code === 'failed-precondition'
                         || err.code === 'aborted'
                         || /stored version/i.test(err.message || '');

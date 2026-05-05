@@ -6,7 +6,8 @@
       "Bash(curl -s http://localhost:5000/css/style.css)",
       "PowerShell(git add -A)",
       "PowerShell(git mv \"admin/compras.html\" \"admin/estoque.html\")",
-      "PowerShell(git add admin/_nav.js admin/eventos.html admin/convites-antecipados.html firestore.rules js/icons.js)"
+      "PowerShell(git add admin/_nav.js admin/eventos.html admin/convites-antecipados.html firestore.rules js/icons.js)",
+      "PowerShell(git diff 68a4402 d5ebf2d -- operador/vender.html caixa/carregar.html)"
     ]
   }
 }
