@@ -9,7 +9,9 @@
       "PowerShell(git add admin/_nav.js admin/eventos.html admin/convites-antecipados.html firestore.rules js/icons.js)",
       "PowerShell(git diff 68a4402 d5ebf2d -- operador/vender.html caixa/carregar.html)",
       "PowerShell(git rm --cached .claude/worktrees/venda-porta-feedback)",
-      "PowerShell(git rm --cached .firebase/hosting..cache)"
+      "PowerShell(git rm --cached .firebase/hosting..cache)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }

@@ -5,30 +5,29 @@
 // Otimizado para câmeras Android (especialmente Samsung), que
 // costumam ter problemas comuns:
 //
-//  - Selecionam a lente ultra-wide por padrão quando se pede
-//    apenas facingMode:"environment", deixando o QR pequeno.
+//  - Selecionam a lente ultra-wide ou frontal por padrão.
 //  - Foco fixo no infinito quando focusMode não é declarado.
 //  - Falham silenciosamente se zoom for passado nos constraints
 //    iniciais sem checar capabilities.
 //  - BarcodeDetector nativo da Samsung Internet tem bugs com
 //    QR codes pequenos.
 //
+// Mostra um seletor de câmera (quando há mais de uma) para o
+// usuário escolher manualmente caso a heurística falhe. A escolha
+// fica salva em localStorage.
+//
 // API:
 //   import { iniciarScanner } from '../js/scanner.js';
 //   const handle = await iniciarScanner({
 //     elementId: 'reader',
 //     onDetected: (texto) => { ... },
-//     onReady: () => { ... },
-//     onError: (err) => { ... }
+//     onReady: () => { ... }
 //   });
-//   handle.stop();   // para encerrar manualmente
+//   handle.stop();
 // ============================================================
 
-// Refina a escolha entre câmeras traseiras: se houver mais de uma
-// e os labels permitirem identificar ultra-wide/tele, prefere a
-// principal. Só retorna deviceId quando a identificação é segura —
-// caso contrário devolve null e deixamos o navegador resolver via
-// facingMode (que é mais confiável que adivinhar pela ordem).
+const STORAGE_KEY = 'scanner-camera-id';
+
 function escolherTraseiraPrincipal(cameras) {
   if (!cameras || cameras.length < 2) return null;
 
@@ -36,24 +35,17 @@ function escolherTraseiraPrincipal(cameras) {
   const ehEvitar = (label) => /(wide|ultra|0\.5|tele|2x|3x|5x|depth|mono|bokeh)/i.test(label);
   const ehTraseira = (label) => /(back|rear|traseir|environment)/i.test(label);
 
-  // Filtra: explicitamente traseira E não ultra-wide/tele
   const candidatas = cameras.filter(c =>
     c.label && ehTraseira(c.label) && !ehFrontal(c.label) && !ehEvitar(c.label)
   );
 
-  // Só usa deviceId se conseguiu identificar com certeza
   if (candidatas.length > 0) return candidatas[0];
   return null;
 }
 
-// Aplica foco contínuo e zoom moderado, se suportados.
-// Tem que rodar DEPOIS do scanner.start, porque depende da track
-// real já estar aberta.
-async function ajustarTrack(scanner) {
+async function ajustarTrack(elementId) {
   try {
-    // html5-qrcode expõe getRunningTrackSettings/Capabilities,
-    // mas para applyConstraints precisamos do MediaStreamTrack.
-    const video = document.querySelector('#reader video');
+    const video = document.querySelector(`#${elementId} video`);
     if (!video || !video.srcObject) return;
     const track = video.srcObject.getVideoTracks?.()[0];
     if (!track || !track.getCapabilities) return;
@@ -65,9 +57,6 @@ async function ajustarTrack(scanner) {
       advanced.push({ focusMode: 'continuous' });
     }
 
-    // Zoom moderado se suportado: ajuda a "fechar" o campo de
-    // visão de câmeras ultra-wide. Limita entre 1.5x e 2.5x para
-    // não estourar o limite da lente.
     if (caps.zoom) {
       const min = caps.zoom.min ?? 1;
       const max = caps.zoom.max ?? 1;
@@ -81,41 +70,72 @@ async function ajustarTrack(scanner) {
       await track.applyConstraints({ advanced });
     }
   } catch (e) {
-    // Silencioso: ajustes são best-effort
     console.debug('[scanner] ajustarTrack falhou:', e);
   }
+}
+
+// Cria (ou reutiliza) o seletor de câmera acima do #reader.
+function montarSeletor(elementId, cameras, deviceIdAtual, onTrocar) {
+  const reader = document.getElementById(elementId);
+  if (!reader || cameras.length < 2) return;
+
+  let wrap = document.getElementById('camera-select-wrap');
+  if (!wrap) {
+    wrap = document.createElement('div');
+    wrap.id = 'camera-select-wrap';
+    wrap.className = 'form-group mb-2';
+    wrap.style.cssText = 'display:flex;align-items:center;gap:0.5rem;';
+
+    const label = document.createElement('label');
+    label.textContent = 'Câmera:';
+    label.style.cssText = 'margin:0;white-space:nowrap;font-size:0.9rem;';
+    label.htmlFor = 'camera-select';
+
+    const select = document.createElement('select');
+    select.id = 'camera-select';
+    select.style.cssText = 'flex:1;padding:0.4rem;';
+
+    wrap.appendChild(label);
+    wrap.appendChild(select);
+    reader.parentNode.insertBefore(wrap, reader);
+  }
+
+  const select = wrap.querySelector('select');
+  select.innerHTML = '';
+  cameras.forEach((cam, i) => {
+    const opt = document.createElement('option');
+    opt.value = cam.id;
+    opt.textContent = cam.label || `Câmera ${i + 1}`;
+    if (cam.id === deviceIdAtual) opt.selected = true;
+    select.appendChild(opt);
+  });
+
+  select.onchange = () => onTrocar(select.value);
 }
 
 export async function iniciarScanner({
   elementId = 'reader',
   onDetected,
-  onReady,
-  onError
+  onReady
 }) {
   if (typeof Html5Qrcode === 'undefined') {
     throw new Error('html5-qrcode não carregado');
   }
 
   const scanner = new Html5Qrcode(elementId);
+  let scanAtivo = true;
+  let cameras = [];
+  let deviceIdAtual = null;
 
-  // Estratégia: por padrão, deixa o navegador escolher a traseira
-  // via facingMode exact — funciona em ~todos os Androids modernos
-  // sem risco de cair na frontal.
-  // Só usa deviceId quando conseguimos identificar com SEGURANÇA
-  // pelos labels qual é a traseira principal (não ultra-wide).
-  let cameraConfig = { facingMode: { exact: 'environment' } };
-  try {
-    const cameras = await Html5Qrcode.getCameras();
-    const escolhida = escolherTraseiraPrincipal(cameras);
-    if (escolhida) {
-      cameraConfig = { deviceId: { exact: escolhida.id } };
-      console.debug('[scanner] usando câmera específica:', escolhida.label);
-    } else {
-      console.debug('[scanner] usando facingMode environment (fallback)');
-    }
-  } catch (e) {
-    console.debug('[scanner] getCameras falhou, usando facingMode:', e);
-  }
+  const onDecoded = (decoded) => {
+    if (!scanAtivo) return;
+    scanAtivo = false;
+    const texto = (decoded || '').trim();
+    scanner.stop().catch(() => {}).finally(() => {
+      try { onDetected?.(texto); } catch (e) { console.error(e); }
+    });
+  };
+  const onFrameErr = () => {};
 
   const scanConfig = {
     fps: 10,
@@ -128,8 +148,6 @@ export async function iniciarScanner({
       width: { ideal: 1920 },
       height: { ideal: 1080 }
     },
-    // BarcodeDetector nativo tem bugs em Samsung Internet com
-    // QRs pequenos — força o decoder JS, mais robusto.
     experimentalFeatures: {
       useBarCodeDetectorIfSupported: false
     },
@@ -137,32 +155,48 @@ export async function iniciarScanner({
     showTorchButtonIfSupported: true
   };
 
-  let scanAtivo = true;
-
-  const onDecoded = (decoded) => {
-    if (!scanAtivo) return;
-    scanAtivo = false;
-    const texto = (decoded || '').trim();
-    scanner.stop().catch(() => {}).finally(() => {
-      try { onDetected?.(texto); } catch (e) { console.error(e); }
-    });
-  };
-  const onFrameErr = () => {};
-
+  // Lista câmeras (precisa de permissão — getCameras() já pede)
   try {
-    await scanner.start(cameraConfig, scanConfig, onDecoded, onFrameErr);
+    cameras = await Html5Qrcode.getCameras();
   } catch (e) {
-    // Fallback: alguns devices antigos rejeitam exact:'environment'
-    // ou deviceId específico. Tenta facingMode solto.
-    console.debug('[scanner] start falhou, tentando fallback:', e);
-    cameraConfig = { facingMode: 'environment' };
-    await scanner.start(cameraConfig, scanConfig, onDecoded, onFrameErr);
+    console.debug('[scanner] getCameras falhou:', e);
   }
 
-  // Foco contínuo + zoom: aplicar depois do start
-  ajustarTrack(scanner);
+  // Decide câmera inicial:
+  // 1. Salva no localStorage (se ainda existe)
+  // 2. Heurística (traseira principal pelo label)
+  // 3. facingMode environment (browser decide)
+  let cameraConfig;
+  const salvo = localStorage.getItem(STORAGE_KEY);
+  if (salvo && cameras.some(c => c.id === salvo)) {
+    cameraConfig = { deviceId: { exact: salvo } };
+    deviceIdAtual = salvo;
+  } else {
+    const escolhida = escolherTraseiraPrincipal(cameras);
+    if (escolhida) {
+      cameraConfig = { deviceId: { exact: escolhida.id } };
+      deviceIdAtual = escolhida.id;
+    } else {
+      cameraConfig = { facingMode: { exact: 'environment' } };
+    }
+  }
 
-  // Tap-to-focus: se suportado, ajuda quando o foco se perde
+  async function startCom(config) {
+    try {
+      await scanner.start(config, scanConfig, onDecoded, onFrameErr);
+    } catch (e) {
+      console.debug('[scanner] start falhou, tentando fallback:', e);
+      await scanner.start(
+        { facingMode: 'environment' },
+        scanConfig, onDecoded, onFrameErr
+      );
+    }
+    ajustarTrack(elementId);
+  }
+
+  await startCom(cameraConfig);
+
+  // Tap-to-focus
   const video = document.querySelector(`#${elementId} video`);
   if (video) {
     video.addEventListener('click', () => {
@@ -178,6 +212,16 @@ export async function iniciarScanner({
       } catch {}
     });
   }
+
+  // Seletor de câmera (só se houver mais de uma)
+  montarSeletor(elementId, cameras, deviceIdAtual, async (novoId) => {
+    deviceIdAtual = novoId;
+    localStorage.setItem(STORAGE_KEY, novoId);
+    scanAtivo = false;
+    try { await scanner.stop(); } catch {}
+    scanAtivo = true;
+    await startCom({ deviceId: { exact: novoId } });
+  });
 
   try { onReady?.(); } catch (e) { console.error(e); }
 
