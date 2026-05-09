@@ -35,6 +35,20 @@
     .badge-presente { background: rgba(22,163,74,0.14); color: var(--verde); }
     .badge-pago     { background: rgba(22,163,74,0.14); color: var(--verde); }
     .badge-aberto   { background: rgba(220,38,38,0.14); color: #B91C1C; }
+    th.sortable {
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    th.sortable:hover { color: var(--azul); }
+    th.sortable .sort-ind {
+      display: inline-block;
+      margin-left: 0.25rem;
+      font-size: 0.7em;
+      opacity: 0.35;
+    }
+    th.sortable.sort-asc .sort-ind,
+    th.sortable.sort-desc .sort-ind { opacity: 1; color: var(--azul); }
   </style>
 </head>
 <body>
@@ -87,7 +101,15 @@
         <div class="resumo-box" id="resumo-geral"></div>
         <div class="table-wrapper">
           <table>
-            <thead><tr><th>Família</th><th>Nº</th><th>Nome</th><th>Categoria</th><th>Pgto</th><th>Status</th><th></th></tr></thead>
+            <thead><tr id="thead-convites">
+              <th class="sortable" data-sort="familia">Família<span class="sort-ind">▲▼</span></th>
+              <th class="sortable" data-sort="numero">Nº<span class="sort-ind">▲▼</span></th>
+              <th class="sortable" data-sort="nome">Nome<span class="sort-ind">▲▼</span></th>
+              <th class="sortable" data-sort="categoria">Categoria<span class="sort-ind">▲▼</span></th>
+              <th class="sortable" data-sort="pago">Pgto<span class="sort-ind">▲▼</span></th>
+              <th class="sortable" data-sort="presente">Status<span class="sort-ind">▲▼</span></th>
+              <th></th>
+            </tr></thead>
             <tbody id="tbl-convites"><tr><td colspan="7" class="text-center text-muted">Carregando...</td></tr></tbody>
           </table>
         </div>
@@ -110,6 +132,48 @@
 
     let eventoAtivoId = null;
     let importBuffer = [];
+    let convitesCache = [];
+    let sortState = { col: 'numero', dir: 'asc' };
+
+    const COMPARADORES = {
+      familia:   (a, b) => (a.familia || '').localeCompare(b.familia || '', 'pt-BR', { sensitivity: 'base' }),
+      numero:    (a, b) => {
+        const na = parseInt(a.numero), nb = parseInt(b.numero);
+        if (!isNaN(na) && !isNaN(nb) && na !== nb) return na - nb;
+        return String(a.numero || '').localeCompare(String(b.numero || ''), 'pt-BR', { numeric: true });
+      },
+      nome:      (a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR', { sensitivity: 'base' }),
+      categoria: (a, b) => (a.categoria || '').localeCompare(b.categoria || '', 'pt-BR', { sensitivity: 'base' }),
+      pago:      (a, b) => (a.pago === false ? 1 : 0) - (b.pago === false ? 1 : 0),
+      presente:  (a, b) => (a.presente ? 0 : 1) - (b.presente ? 0 : 1),
+    };
+
+    function ordenar(lista) {
+      const cmp = COMPARADORES[sortState.col] || COMPARADORES.familia;
+      const tieFamilia = COMPARADORES.familia;
+      const tieNumero = COMPARADORES.numero;
+      const sinal = sortState.dir === 'desc' ? -1 : 1;
+      return [...lista].sort((a, b) => {
+        let r = cmp(a, b);
+        if (r !== 0) return r * sinal;
+        // desempate estável: família depois número
+        r = tieFamilia(a, b); if (r !== 0) return r;
+        return tieNumero(a, b);
+      });
+    }
+
+    function atualizarIndicadoresSort() {
+      document.querySelectorAll('#thead-convites th.sortable').forEach(th => {
+        th.classList.remove('sort-asc', 'sort-desc');
+        const ind = th.querySelector('.sort-ind');
+        if (th.dataset.sort === sortState.col) {
+          th.classList.add(sortState.dir === 'desc' ? 'sort-desc' : 'sort-asc');
+          if (ind) ind.textContent = sortState.dir === 'desc' ? '▼' : '▲';
+        } else {
+          if (ind) ind.textContent = '▲▼';
+        }
+      });
+    }
 
     async function init() {
       const cfg = await getDoc(doc(db, 'config', 'eventoAtivo'));
@@ -130,11 +194,9 @@
     }
 
     function renderConvites(lista) {
-      lista.sort((a, b) => {
-        const na = parseInt(a.numero), nb = parseInt(b.numero);
-        if (!isNaN(na) && !isNaN(nb) && na !== nb) return na - nb;
-        return String(a.numero || '').localeCompare(String(b.numero || ''), 'pt-BR', { numeric: true });
-      });
+      convitesCache = lista;
+      lista = ordenar(lista);
+      atualizarIndicadoresSort();
       const total = lista.length;
       const presentes = lista.filter(c => c.presente).length;
       const pendentes = total - presentes;
@@ -379,6 +441,21 @@
         await batch.commit();
       }
     };
+
+    document.querySelectorAll('#thead-convites th.sortable').forEach(th => {
+      th.onclick = () => {
+        const col = th.dataset.sort;
+        if (sortState.col === col) {
+          sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+        } else {
+          sortState.col = col;
+          sortState.dir = 'asc';
+        }
+        if (convitesCache.length > 0) renderConvites(convitesCache);
+        else atualizarIndicadoresSort();
+      };
+    });
+    atualizarIndicadoresSort();
 
     init();
   </script>
