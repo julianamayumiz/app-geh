@@ -47,6 +47,7 @@ const GRUPOS = [
     titulo: 'Sistema',
     itens: [
       { href: 'usuarios.html', icone: 'user-check', texto: 'Usuários' },
+      { href: 'backup.html',   icone: 'hard-drive', texto: 'Backup'   },
     ],
   },
 ];
