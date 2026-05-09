@@ -133,7 +133,7 @@
     let eventoAtivoId = null;
     let importBuffer = [];
     let convitesCache = [];
-    let sortState = { col: 'numero', dir: 'asc' };
+    let sortState = { col: 'familia', dir: 'asc' };
 
     const COMPARADORES = {
       familia:   (a, b) => (a.familia || '').localeCompare(b.familia || '', 'pt-BR', { sensitivity: 'base' }),
