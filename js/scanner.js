@@ -24,32 +24,26 @@
 //   handle.stop();   // para encerrar manualmente
 // ============================================================
 
-// Escolhe a melhor câmera traseira disponível.
-// Em Samsungs com múltiplas lentes, evita ultra-wide / telephoto
-// e prefere a câmera principal (1x).
-function escolherCameraTraseira(cameras) {
-  if (!cameras || cameras.length === 0) return null;
-  if (cameras.length === 1) return cameras[0];
+// Refina a escolha entre câmeras traseiras: se houver mais de uma
+// e os labels permitirem identificar ultra-wide/tele, prefere a
+// principal. Só retorna deviceId quando a identificação é segura —
+// caso contrário devolve null e deixamos o navegador resolver via
+// facingMode (que é mais confiável que adivinhar pela ordem).
+function escolherTraseiraPrincipal(cameras) {
+  if (!cameras || cameras.length < 2) return null;
 
-  const evitar = /(front|user|wide|ultra|0\.5|tele|depth|mono|bokeh)/i;
-  const preferir = /(back|rear|traseir|environment)/i;
+  const ehFrontal = (label) => /(front|user|frontal|frente)/i.test(label);
+  const ehEvitar = (label) => /(wide|ultra|0\.5|tele|2x|3x|5x|depth|mono|bokeh)/i.test(label);
+  const ehTraseira = (label) => /(back|rear|traseir|environment)/i.test(label);
 
-  // Primeiro: traseiras que NÃO sejam ultra-wide/tele
-  const traseirasOk = cameras.filter(c =>
-    preferir.test(c.label) && !evitar.test(c.label)
+  // Filtra: explicitamente traseira E não ultra-wide/tele
+  const candidatas = cameras.filter(c =>
+    c.label && ehTraseira(c.label) && !ehFrontal(c.label) && !ehEvitar(c.label)
   );
-  if (traseirasOk.length > 0) return traseirasOk[0];
 
-  // Segundo: qualquer câmera que não seja explicitamente "evitar"
-  const naoEvitar = cameras.filter(c => !evitar.test(c.label));
-  if (naoEvitar.length > 0) {
-    // Em muitos Androids, a câmera principal traseira é a última
-    // da lista (front costuma vir primeiro). Se não houver pista
-    // pelo label, pega a última.
-    return naoEvitar[naoEvitar.length - 1];
-  }
-
-  return cameras[cameras.length - 1];
+  // Só usa deviceId se conseguiu identificar com certeza
+  if (candidatas.length > 0) return candidatas[0];
+  return null;
 }
 
 // Aplica foco contínuo e zoom moderado, se suportados.
@@ -104,20 +98,24 @@ export async function iniciarScanner({
 
   const scanner = new Html5Qrcode(elementId);
 
-  // Escolhe a câmera explicitamente, em vez de só passar
-  // facingMode — Samsungs tendem a cair na ultra-wide nesse caso.
-  let cameraId = null;
+  // Estratégia: por padrão, deixa o navegador escolher a traseira
+  // via facingMode exact — funciona em ~todos os Androids modernos
+  // sem risco de cair na frontal.
+  // Só usa deviceId quando conseguimos identificar com SEGURANÇA
+  // pelos labels qual é a traseira principal (não ultra-wide).
+  let cameraConfig = { facingMode: { exact: 'environment' } };
   try {
     const cameras = await Html5Qrcode.getCameras();
-    const escolhida = escolherCameraTraseira(cameras);
-    if (escolhida) cameraId = escolhida.id;
+    const escolhida = escolherTraseiraPrincipal(cameras);
+    if (escolhida) {
+      cameraConfig = { deviceId: { exact: escolhida.id } };
+      console.debug('[scanner] usando câmera específica:', escolhida.label);
+    } else {
+      console.debug('[scanner] usando facingMode environment (fallback)');
+    }
   } catch (e) {
     console.debug('[scanner] getCameras falhou, usando facingMode:', e);
   }
-
-  const cameraConfig = cameraId
-    ? { deviceId: { exact: cameraId } }
-    : { facingMode: 'environment' };
 
   const scanConfig = {
     fps: 10,
@@ -141,22 +139,25 @@ export async function iniciarScanner({
 
   let scanAtivo = true;
 
-  await scanner.start(
-    cameraConfig,
-    scanConfig,
-    (decoded) => {
-      if (!scanAtivo) return;
-      scanAtivo = false;
-      const texto = (decoded || '').trim();
-      // Para a câmera antes de navegar para evitar leak da track
-      scanner.stop().catch(() => {}).finally(() => {
-        try { onDetected?.(texto); } catch (e) { console.error(e); }
-      });
-    },
-    () => {
-      // erros por frame: ignorar
-    }
-  );
+  const onDecoded = (decoded) => {
+    if (!scanAtivo) return;
+    scanAtivo = false;
+    const texto = (decoded || '').trim();
+    scanner.stop().catch(() => {}).finally(() => {
+      try { onDetected?.(texto); } catch (e) { console.error(e); }
+    });
+  };
+  const onFrameErr = () => {};
+
+  try {
+    await scanner.start(cameraConfig, scanConfig, onDecoded, onFrameErr);
+  } catch (e) {
+    // Fallback: alguns devices antigos rejeitam exact:'environment'
+    // ou deviceId específico. Tenta facingMode solto.
+    console.debug('[scanner] start falhou, tentando fallback:', e);
+    cameraConfig = { facingMode: 'environment' };
+    await scanner.start(cameraConfig, scanConfig, onDecoded, onFrameErr);
+  }
 
   // Foco contínuo + zoom: aplicar depois do start
   ajustarTrack(scanner);
