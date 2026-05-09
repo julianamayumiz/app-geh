@@ -74,6 +74,8 @@
     h1.style.gap = '0.5rem';
 
     const alerta = document.getElementById('alerta');
+    const statusTexto = document.getElementById('status-texto');
+    const dicaScan = document.getElementById('dica-scan');
 
     function irPara(clienteId) {
       if (acao === 'vender') {
@@ -83,79 +85,32 @@
       }
     }
 
-    // Scanner com configurações otimizadas para QR codes pequenos
-    const scanner = new Html5Qrcode("reader");
-    const statusTexto = document.getElementById('status-texto');
-    const dicaScan = document.getElementById('dica-scan');
-    
-    // Configurações de câmera com alta resolução
-    const cameraConfig = {
-      facingMode: "environment",
-      advanced: [
-        { zoom: 2.0 }  // Zoom digital para melhor captura de QR pequenos
-      ]
-    };
-    
-    // Configurações de scan otimizadas
-    const scanConfig = {
-      fps: 10,  // Reduzido de 30 para 10 - mais tempo de processamento por frame
-      qrbox: (w, h) => {
-        // Área reduzida de 80% para 60% - melhor foco em QR pequenos
-        const size = Math.min(w, h) * 0.6;
-        return { width: size, height: size };
-      },
-      aspectRatio: 1.0,
-      videoConstraints: {
-        width: { ideal: 1920 },    // Alta resolução para capturar detalhes
-        height: { ideal: 1080 },
-        facingMode: "environment"
-      },
-      experimentalFeatures: {
-        useBarCodeDetectorIfSupported: true
-      },
-      rememberLastUsedCamera: true,
-      showTorchButtonIfSupported: true  // Botão de lanterna se disponível
-    };
-    
-    let scanAtivo = true;
-    
-    scanner.start(
-      cameraConfig,
-      scanConfig,
-      (decoded) => {
-        if (!scanAtivo) return;  // Prevenir múltiplas leituras
-        scanAtivo = false;
-        
-        statusTexto.textContent = '✓ QR code detectado!';
-        statusTexto.style.color = 'var(--verde)';
-        dicaScan.style.display = 'none';
-        
-        scanner.stop().then(() => {
-          irPara(decoded.trim());
-        }).catch(() => {
-          irPara(decoded.trim());
-        });
-      },
-      () => {
-        // Ignorar erros de frame, mas atualizar status
-        if (scanAtivo) {
-          statusTexto.textContent = 'Procurando QR code...';
-          statusTexto.style.color = '';
+    const { iniciarScanner } = await import('../js/scanner.js');
+
+    let scannerHandle = null;
+    try {
+      scannerHandle = await iniciarScanner({
+        elementId: 'reader',
+        onDetected: (texto) => {
+          statusTexto.textContent = '✓ QR code detectado!';
+          statusTexto.style.color = 'var(--verde)';
+          dicaScan.style.display = 'none';
+          irPara(texto);
+        },
+        onReady: () => {
+          statusTexto.textContent = 'Câmera pronta - Aproxime o QR code';
+          statusTexto.style.color = 'var(--azul)';
         }
-      }
-    ).then(() => {
-      statusTexto.textContent = 'Câmera pronta - Aproxime o QR code';
-      statusTexto.style.color = 'var(--azul)';
-    }).catch(err => {
+      });
+    } catch (err) {
       console.error('Erro ao iniciar scanner:', err);
       alerta.textContent = "Não consegui acessar a câmera. Use o botão abaixo para digitar o ID.";
       alerta.className = "alert alert-warning mt-2";
       dicaScan.style.display = 'none';
       statusTexto.textContent = 'Câmera indisponível';
       statusTexto.style.color = 'var(--vermelho)';
-    });
+    }
 
-    // Entrada manual
     document.getElementById('btn-manual').onclick = () => {
       document.getElementById('manual-form').classList.toggle('hidden');
       if (!document.getElementById('manual-form').classList.contains('hidden')) {
@@ -165,8 +120,7 @@
     window.usarIdManual = () => {
       const id = document.getElementById('id-manual').value.trim();
       if (!id) return alert('Digite um ID');
-      scanAtivo = false;
-      scanner.stop().catch(()=>{});
+      scannerHandle?.stop();
       irPara(id);
     };
   </script>
