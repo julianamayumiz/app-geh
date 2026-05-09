@@ -74,43 +74,72 @@ async function ajustarTrack(elementId) {
   }
 }
 
-// Cria (ou reutiliza) o seletor de câmera acima do #reader.
-function montarSeletor(elementId, cameras, deviceIdAtual, onTrocar) {
+// Cria botão flutuante de troca de câmera dentro do container do reader.
+// Cicla entre as câmeras disponíveis a cada toque.
+const SWITCH_ICON_SVG = `
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M11 19H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5"/>
+  <path d="M13 5h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-5"/>
+  <circle cx="12" cy="12" r="3"/>
+  <path d="m18 22-3-3 3-3"/>
+  <path d="m6 2 3 3-3 3"/>
+</svg>`;
+
+function montarBotaoTroca(elementId, cameras, getDeviceIdAtual, onTrocar) {
+  if (!cameras || cameras.length < 2) return;
   const reader = document.getElementById(elementId);
-  if (!reader || cameras.length < 2) return;
+  if (!reader) return;
 
-  let wrap = document.getElementById('camera-select-wrap');
-  if (!wrap) {
-    wrap = document.createElement('div');
-    wrap.id = 'camera-select-wrap';
-    wrap.className = 'form-group mb-2';
-    wrap.style.cssText = 'display:flex;align-items:center;gap:0.5rem;';
-
-    const label = document.createElement('label');
-    label.textContent = 'Câmera:';
-    label.style.cssText = 'margin:0;white-space:nowrap;font-size:0.9rem;';
-    label.htmlFor = 'camera-select';
-
-    const select = document.createElement('select');
-    select.id = 'camera-select';
-    select.style.cssText = 'flex:1;padding:0.4rem;';
-
-    wrap.appendChild(label);
-    wrap.appendChild(select);
-    reader.parentNode.insertBefore(wrap, reader);
+  // Garante que o container do reader é position:relative para
+  // ancorar o botão absoluto.
+  const container = reader.parentElement;
+  if (container && getComputedStyle(container).position === 'static') {
+    container.style.position = 'relative';
   }
 
-  const select = wrap.querySelector('select');
-  select.innerHTML = '';
-  cameras.forEach((cam, i) => {
-    const opt = document.createElement('option');
-    opt.value = cam.id;
-    opt.textContent = cam.label || `Câmera ${i + 1}`;
-    if (cam.id === deviceIdAtual) opt.selected = true;
-    select.appendChild(opt);
-  });
+  let btn = document.getElementById('btn-trocar-camera');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'btn-trocar-camera';
+    btn.type = 'button';
+    btn.setAttribute('aria-label', 'Trocar câmera');
+    btn.title = 'Trocar câmera';
+    btn.innerHTML = SWITCH_ICON_SVG;
+    btn.style.cssText = [
+      'position:absolute',
+      'top:0.75rem',
+      'right:0.75rem',
+      'z-index:10',
+      'width:44px',
+      'height:44px',
+      'border-radius:50%',
+      'border:none',
+      'background:rgba(0,0,0,0.55)',
+      'color:#fff',
+      'display:flex',
+      'align-items:center',
+      'justify-content:center',
+      'cursor:pointer',
+      'backdrop-filter:blur(4px)',
+      '-webkit-backdrop-filter:blur(4px)',
+      'box-shadow:0 2px 8px rgba(0,0,0,0.3)',
+      'transition:transform 0.15s ease, background 0.15s ease',
+      'padding:0'
+    ].join(';');
+    btn.addEventListener('mousedown', () => { btn.style.transform = 'scale(0.92)'; });
+    btn.addEventListener('mouseup', () => { btn.style.transform = ''; });
+    btn.addEventListener('mouseleave', () => { btn.style.transform = ''; });
+    btn.addEventListener('touchstart', () => { btn.style.transform = 'scale(0.92)'; }, { passive: true });
+    btn.addEventListener('touchend', () => { btn.style.transform = ''; });
+    container.appendChild(btn);
+  }
 
-  select.onchange = () => onTrocar(select.value);
+  btn.onclick = () => {
+    const atual = getDeviceIdAtual();
+    const idx = cameras.findIndex(c => c.id === atual);
+    const proxima = cameras[(idx + 1) % cameras.length];
+    if (proxima) onTrocar(proxima.id);
+  };
 }
 
 export async function iniciarScanner({
@@ -213,15 +242,20 @@ export async function iniciarScanner({
     });
   }
 
-  // Seletor de câmera (só se houver mais de uma)
-  montarSeletor(elementId, cameras, deviceIdAtual, async (novoId) => {
-    deviceIdAtual = novoId;
-    localStorage.setItem(STORAGE_KEY, novoId);
-    scanAtivo = false;
-    try { await scanner.stop(); } catch {}
-    scanAtivo = true;
-    await startCom({ deviceId: { exact: novoId } });
-  });
+  // Botão flutuante de troca de câmera (só se houver mais de uma)
+  montarBotaoTroca(
+    elementId,
+    cameras,
+    () => deviceIdAtual,
+    async (novoId) => {
+      deviceIdAtual = novoId;
+      localStorage.setItem(STORAGE_KEY, novoId);
+      scanAtivo = false;
+      try { await scanner.stop(); } catch {}
+      scanAtivo = true;
+      await startCom({ deviceId: { exact: novoId } });
+    }
+  );
 
   try { onReady?.(); } catch (e) { console.error(e); }
 
