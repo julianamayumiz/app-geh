@@ -21,11 +21,20 @@
   <main>
     <div class="card">
       <p class="text-center text-muted mb-2">Aponte a câmera para o QR code do cliente</p>
-      <div id="scanner-container">
+      <div id="dica-scan" class="alert alert-info mb-2">
+        <strong>💡 Dica:</strong> Para QR codes pequenos, aproxime a câmera e centralize o código na área marcada
+      </div>
+      <div id="scanner-container" style="position: relative;">
         <div id="reader" style="width: 100%;"></div>
+        <div id="scan-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; display: flex; align-items: center; justify-content: center;">
+          <div style="border: 3px solid rgba(30, 58, 138, 0.6); border-radius: 12px; width: 60%; height: 60%; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.3);"></div>
+        </div>
       </div>
 
       <div id="alerta" class="alert alert-info mt-2 hidden"></div>
+      <div id="status-scan" class="text-center text-muted mt-2" style="font-size: 0.9rem;">
+        <span id="status-texto">Inicializando câmera...</span>
+      </div>
 
       <div class="mt-2">
         <button id="btn-manual" class="btn btn-secondary">
@@ -74,33 +83,89 @@
       }
     }
 
-    // Scanner
+    // Scanner com configurações otimizadas para QR codes pequenos
     const scanner = new Html5Qrcode("reader");
+    const statusTexto = document.getElementById('status-texto');
+    const dicaScan = document.getElementById('dica-scan');
+    
+    // Configurações de câmera com alta resolução
+    const cameraConfig = {
+      facingMode: "environment",
+      advanced: [
+        { zoom: 2.0 }  // Zoom digital para melhor captura de QR pequenos
+      ]
+    };
+    
+    // Configurações de scan otimizadas
+    const scanConfig = {
+      fps: 10,  // Reduzido de 30 para 10 - mais tempo de processamento por frame
+      qrbox: (w, h) => {
+        // Área reduzida de 80% para 60% - melhor foco em QR pequenos
+        const size = Math.min(w, h) * 0.6;
+        return { width: size, height: size };
+      },
+      aspectRatio: 1.0,
+      videoConstraints: {
+        width: { ideal: 1920 },    // Alta resolução para capturar detalhes
+        height: { ideal: 1080 },
+        facingMode: "environment"
+      },
+      experimentalFeatures: {
+        useBarCodeDetectorIfSupported: true
+      },
+      rememberLastUsedCamera: true,
+      showTorchButtonIfSupported: true  // Botão de lanterna se disponível
+    };
+    
+    let scanAtivo = true;
+    
     scanner.start(
-      { facingMode: "environment" },
-      {
-        fps: 30,
-        qrbox: (w, h) => ({ width: Math.min(w, h) * 0.8, height: Math.min(w, h) * 0.8 }),
-        aspectRatio: 1.0,
-        experimentalFeatures: { useBarCodeDetectorIfSupported: true }
-      },
+      cameraConfig,
+      scanConfig,
       (decoded) => {
-        scanner.stop();
-        irPara(decoded.trim());
+        if (!scanAtivo) return;  // Prevenir múltiplas leituras
+        scanAtivo = false;
+        
+        statusTexto.textContent = '✓ QR code detectado!';
+        statusTexto.style.color = 'var(--verde)';
+        dicaScan.style.display = 'none';
+        
+        scanner.stop().then(() => {
+          irPara(decoded.trim());
+        }).catch(() => {
+          irPara(decoded.trim());
+        });
       },
-      () => { /* ignorar erros de frame */ }
-    ).catch(err => {
+      () => {
+        // Ignorar erros de frame, mas atualizar status
+        if (scanAtivo) {
+          statusTexto.textContent = 'Procurando QR code...';
+          statusTexto.style.color = '';
+        }
+      }
+    ).then(() => {
+      statusTexto.textContent = 'Câmera pronta - Aproxime o QR code';
+      statusTexto.style.color = 'var(--azul)';
+    }).catch(err => {
+      console.error('Erro ao iniciar scanner:', err);
       alerta.textContent = "Não consegui acessar a câmera. Use o botão abaixo para digitar o ID.";
       alerta.className = "alert alert-warning mt-2";
+      dicaScan.style.display = 'none';
+      statusTexto.textContent = 'Câmera indisponível';
+      statusTexto.style.color = 'var(--vermelho)';
     });
 
     // Entrada manual
     document.getElementById('btn-manual').onclick = () => {
       document.getElementById('manual-form').classList.toggle('hidden');
+      if (!document.getElementById('manual-form').classList.contains('hidden')) {
+        document.getElementById('id-manual').focus();
+      }
     };
     window.usarIdManual = () => {
       const id = document.getElementById('id-manual').value.trim();
       if (!id) return alert('Digite um ID');
+      scanAtivo = false;
       scanner.stop().catch(()=>{});
       irPara(id);
     };
