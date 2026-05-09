@@ -166,6 +166,9 @@ export async function iniciarScanner({
   };
   const onFrameErr = () => {};
 
+  // IMPORTANTE: NÃO definir videoConstraints aqui — o html5-qrcode
+  // sobrescreve o cameraConfig com videoConstraints, fazendo o
+  // navegador escolher a default (frontal em alguns Samsungs).
   const scanConfig = {
     fps: 10,
     qrbox: (w, h) => {
@@ -173,57 +176,84 @@ export async function iniciarScanner({
       return { width: size, height: size };
     },
     aspectRatio: 1.0,
-    videoConstraints: {
-      width: { ideal: 1920 },
-      height: { ideal: 1080 }
-    },
     experimentalFeatures: {
       useBarCodeDetectorIfSupported: false
     },
-    rememberLastUsedCamera: true,
     showTorchButtonIfSupported: true
   };
 
   // Lista câmeras (precisa de permissão — getCameras() já pede)
   try {
     cameras = await Html5Qrcode.getCameras();
+    console.info('[scanner] câmeras detectadas:', cameras.map(c => ({ id: c.id.slice(0, 8), label: c.label })));
   } catch (e) {
-    console.debug('[scanner] getCameras falhou:', e);
+    console.warn('[scanner] getCameras falhou:', e);
+  }
+
+  // Lê o facingMode REAL da track aberta (post-start).
+  function lerFacingModeAtual() {
+    const video = document.querySelector(`#${elementId} video`);
+    const track = video?.srcObject?.getVideoTracks?.()[0];
+    return track?.getSettings?.().facingMode || null;
   }
 
   // Decide câmera inicial:
-  // 1. Salva no localStorage (se ainda existe)
+  // 1. Salva no localStorage (se ainda existe na lista)
   // 2. Heurística (traseira principal pelo label)
   // 3. facingMode environment (browser decide)
-  let cameraConfig;
-  const salvo = localStorage.getItem(STORAGE_KEY);
-  if (salvo && cameras.some(c => c.id === salvo)) {
-    cameraConfig = { deviceId: { exact: salvo } };
-    deviceIdAtual = salvo;
-  } else {
+  function decidirConfigInicial() {
+    const salvo = localStorage.getItem(STORAGE_KEY);
+    if (salvo && cameras.some(c => c.id === salvo)) {
+      deviceIdAtual = salvo;
+      return { deviceId: { exact: salvo } };
+    }
     const escolhida = escolherTraseiraPrincipal(cameras);
     if (escolhida) {
-      cameraConfig = { deviceId: { exact: escolhida.id } };
       deviceIdAtual = escolhida.id;
-    } else {
-      cameraConfig = { facingMode: { exact: 'environment' } };
+      return { deviceId: { exact: escolhida.id } };
     }
+    return { facingMode: { exact: 'environment' } };
   }
 
   async function startCom(config) {
     try {
       await scanner.start(config, scanConfig, onDecoded, onFrameErr);
     } catch (e) {
-      console.debug('[scanner] start falhou, tentando fallback:', e);
+      console.warn('[scanner] start falhou, tentando facingMode solto:', e);
       await scanner.start(
         { facingMode: 'environment' },
         scanConfig, onDecoded, onFrameErr
       );
     }
     ajustarTrack(elementId);
+    const facing = lerFacingModeAtual();
+    console.info('[scanner] facingMode real após start:', facing);
+    return facing;
   }
 
-  await startCom(cameraConfig);
+  let cameraConfig = decidirConfigInicial();
+  let facing = await startCom(cameraConfig);
+
+  // Se abriu a frontal sem nossa intenção, descarta a preferência
+  // salva e tenta uma câmera diferente da que abriu agora.
+  if (facing === 'user' && cameras.length > 1) {
+    console.warn('[scanner] abriu câmera frontal — tentando outra');
+    localStorage.removeItem(STORAGE_KEY);
+
+    const idAtual = deviceIdAtual;
+    const outra = cameras.find(c =>
+      c.id !== idAtual && !/(front|user|frontal|frente)/i.test(c.label)
+    ) || cameras.find(c => c.id !== idAtual);
+
+    if (outra) {
+      try { await scanner.stop(); } catch {}
+      deviceIdAtual = outra.id;
+      facing = await startCom({ deviceId: { exact: outra.id } });
+      if (facing !== 'user') {
+        localStorage.setItem(STORAGE_KEY, outra.id);
+      }
+    }
+  }
 
   // Tap-to-focus
   const video = document.querySelector(`#${elementId} video`);
