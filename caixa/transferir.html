@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="../css/style.css">
   <link rel="manifest" href="../manifest.json">
   <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <style>
     .lado-cliente {
       border: 1px solid var(--cinza-claro);
@@ -158,6 +159,81 @@
     }
     .tx-modal-acoes { display: flex; gap: 0.5rem; }
     .tx-modal-acoes .btn { flex: 1; width: auto; }
+
+    /* Acoes vazio (Escanear / Buscar) */
+    .acoes-vazio {
+      display: grid; gap: 0.4rem; margin-top: 0.5rem;
+    }
+    .acao-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      gap: 0.5rem; width: 100%;
+    }
+    .busca-bloco { margin-top: 0.5rem; }
+    .link-cancelar {
+      background: none; border: none;
+      color: var(--cinza); font-size: 0.78rem;
+      cursor: pointer; padding: 0.4rem 0;
+      text-decoration: underline;
+      display: block; margin-top: 0.25rem;
+    }
+    .link-cancelar:hover { color: var(--cinza-escuro); }
+
+    /* Scanner overlay full-screen */
+    .scanner-overlay {
+      position: fixed; inset: 0;
+      background: #000;
+      z-index: 2000;
+      display: flex; flex-direction: column;
+    }
+    .scanner-overlay.hidden { display: none; }
+    .scanner-overlay-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.75rem 1rem;
+      color: white;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 2;
+    }
+    .scanner-overlay-titulo {
+      font-weight: 700; font-size: 1.05rem;
+      display: inline-flex; align-items: center; gap: 0.4rem;
+    }
+    .scanner-overlay-sub {
+      font-size: 0.78rem; opacity: 0.75; margin-top: 0.15rem;
+    }
+    .scanner-overlay-fechar {
+      background: rgba(255,255,255,0.15);
+      border: none; color: white;
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; flex-shrink: 0;
+    }
+    .scanner-overlay-fechar:active { transform: scale(0.94); }
+    .scanner-overlay-corpo {
+      flex: 1;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 1rem; gap: 0.75rem;
+      color: white;
+      overflow: hidden;
+    }
+    .scanner-overlay-status {
+      font-size: 0.9rem; opacity: 0.85;
+      text-align: center; min-height: 1.2em;
+    }
+    #reader-tx { width: 100%; max-width: 480px; }
+    .scanner-overlay-rodape {
+      padding: 0.75rem 1rem 1.25rem;
+      display: flex; justify-content: center;
+    }
+    .scanner-overlay-rodape .btn {
+      width: auto;
+      background: rgba(255,255,255,0.12);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.25);
+    }
   </style>
 </head>
 <body>
@@ -177,8 +253,22 @@
     <div class="card">
       <div class="lado-cliente origem">
         <div class="lado-titulo"><span data-icon="arrow-up-right" data-size="14"></span> De (origem) — vai sair saldo</div>
-        <input type="text" id="busca-origem" placeholder="ID ou nome do cliente origem" autocomplete="off">
-        <div id="chips-origem" class="chips-clientes"></div>
+
+        <div id="acoes-origem" class="acoes-vazio">
+          <button type="button" class="btn btn-primary acao-btn" data-acao="scan" data-lado="origem">
+            <span data-icon="qr-code" data-size="20"></span> Escanear QR
+          </button>
+          <button type="button" class="btn btn-secondary acao-btn" data-acao="buscar" data-lado="origem">
+            <span data-icon="search" data-size="18"></span> Buscar por ID/nome
+          </button>
+        </div>
+
+        <div id="busca-origem-bloco" class="busca-bloco hidden">
+          <input type="text" id="busca-origem" placeholder="ID ou nome do cliente" autocomplete="off">
+          <div id="chips-origem" class="chips-clientes"></div>
+          <button type="button" class="link-cancelar" data-cancelar="origem">Cancelar busca</button>
+        </div>
+
         <div id="sel-origem" class="selecionado hidden">
           <div class="info">
             <span class="nome-cli" id="origem-nome">—</span>
@@ -196,8 +286,22 @@
 
       <div class="lado-cliente destino">
         <div class="lado-titulo"><span data-icon="arrow-down-right" data-size="14"></span> Para (destino) — vai receber saldo</div>
-        <input type="text" id="busca-destino" placeholder="ID ou nome do cliente destino" autocomplete="off">
-        <div id="chips-destino" class="chips-clientes"></div>
+
+        <div id="acoes-destino" class="acoes-vazio">
+          <button type="button" class="btn btn-primary acao-btn" data-acao="scan" data-lado="destino">
+            <span data-icon="qr-code" data-size="20"></span> Escanear QR
+          </button>
+          <button type="button" class="btn btn-secondary acao-btn" data-acao="buscar" data-lado="destino">
+            <span data-icon="search" data-size="18"></span> Buscar por ID/nome
+          </button>
+        </div>
+
+        <div id="busca-destino-bloco" class="busca-bloco hidden">
+          <input type="text" id="busca-destino" placeholder="ID ou nome do cliente" autocomplete="off">
+          <div id="chips-destino" class="chips-clientes"></div>
+          <button type="button" class="link-cancelar" data-cancelar="destino">Cancelar busca</button>
+        </div>
+
         <div id="sel-destino" class="selecionado hidden">
           <div class="info">
             <span class="nome-cli" id="destino-nome">—</span>
@@ -256,6 +360,29 @@
     <div id="lista-tx" class="hist-list"><div class="empty-state"><p class="text-muted">Carregando…</p></div></div>
   </main>
 
+  <div id="scanner-overlay" class="scanner-overlay hidden" role="dialog" aria-modal="true" aria-label="Escanear QR code">
+    <header class="scanner-overlay-header">
+      <div>
+        <div class="scanner-overlay-titulo">
+          <span data-icon="qr-code" data-size="20"></span> Escanear QR
+        </div>
+        <div class="scanner-overlay-sub" id="scanner-sub">Selecionando origem</div>
+      </div>
+      <button id="btn-fechar-scanner" type="button" class="scanner-overlay-fechar" aria-label="Fechar">
+        <span data-icon="x" data-size="22"></span>
+      </button>
+    </header>
+    <div class="scanner-overlay-corpo">
+      <div id="scanner-status" class="scanner-overlay-status">Inicializando câmera…</div>
+      <div id="reader-tx"></div>
+    </div>
+    <div class="scanner-overlay-rodape">
+      <button id="btn-scanner-manual" type="button" class="btn">
+        <span data-icon="keyboard" data-size="18"></span> Digitar ID manualmente
+      </button>
+    </div>
+  </div>
+
   <div id="modal-confirmar" class="tx-modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-titulo">
     <div class="tx-modal-card">
       <h3 id="modal-titulo">
@@ -289,6 +416,7 @@
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
     import { requireAuth } from "../js/auth-guard.js";
+    import { iniciarScanner } from "../js/scanner.js";
 
     const { perfil } = await requireAuth({ papel: ['caixa', 'operador'] });
 
@@ -363,6 +491,22 @@
     let todosClientes = [];
     let origem = null;
     let destino = null;
+    let scannerHandle = null;
+    let scannerLado = null;
+
+    // Estados por lado: 'vazio' (acoes) | 'buscando' (input + chips) | 'selecionado'
+    function setEstado(lado, estado) {
+      const acoes = $(`acoes-${lado}`);
+      const busca = $(`busca-${lado}-bloco`);
+      const sel   = $(`sel-${lado}`);
+      acoes.classList.toggle('hidden', estado !== 'vazio');
+      busca.classList.toggle('hidden', estado !== 'buscando');
+      sel.classList.toggle('hidden',   estado !== 'selecionado');
+      if (estado === 'buscando') {
+        renderChips(lado, '');
+        setTimeout(() => $(`busca-${lado}`).focus(), 0);
+      }
+    }
 
     async function carregarClientes() {
       const snap = await getDocs(collection(db, 'clientes'));
@@ -412,29 +556,37 @@
         origem = dados;
         $('origem-nome').textContent = dados.nome ? `${id} — ${dados.nome}` : id;
         $('origem-saldo').textContent = fmtBRL(dados.saldo || 0);
-        $('sel-origem').classList.remove('hidden');
         $('busca-origem').value = '';
-        renderChips('origem', '');
-        renderChips('destino', $('busca-destino').value);
+        setEstado('origem', 'selecionado');
+        // Re-renderiza o outro lado pra excluir o cliente recem-selecionado
+        if (!$('busca-destino-bloco').classList.contains('hidden')) {
+          renderChips('destino', $('busca-destino').value);
+        }
       } else {
         if (origem?.id === id) return showAlerta('Origem e destino não podem ser o mesmo cliente.', 'warning');
         destino = dados;
         $('destino-nome').textContent = dados.nome ? `${id} — ${dados.nome}` : id;
         $('destino-saldo').textContent = fmtBRL(dados.saldo || 0);
-        $('sel-destino').classList.remove('hidden');
         $('busca-destino').value = '';
-        renderChips('destino', '');
-        renderChips('origem', $('busca-origem').value);
+        setEstado('destino', 'selecionado');
+        if (!$('busca-origem-bloco').classList.contains('hidden')) {
+          renderChips('origem', $('busca-origem').value);
+        }
       }
+      alerta.classList.add('hidden');
       atualizarPreview();
       atualizarBotao();
     }
 
     function limpar(lado) {
-      if (lado === 'origem') { origem = null; $('sel-origem').classList.add('hidden'); }
-      else { destino = null; $('sel-destino').classList.add('hidden'); }
-      renderChips('origem', $('busca-origem').value);
-      renderChips('destino', $('busca-destino').value);
+      if (lado === 'origem')  origem  = null;
+      else                    destino = null;
+      setEstado(lado, 'vazio');
+      // Atualiza chips do outro lado caso esteja em busca
+      const outro = lado === 'origem' ? 'destino' : 'origem';
+      if (!$(`busca-${outro}-bloco`).classList.contains('hidden')) {
+        renderChips(outro, $(`busca-${outro}`).value);
+      }
       atualizarPreview();
       atualizarBotao();
     }
@@ -446,15 +598,13 @@
       if (origem) {
         $('origem-nome').textContent = origem.nome ? `${origem.id} — ${origem.nome}` : origem.id;
         $('origem-saldo').textContent = fmtBRL(origem.saldo || 0);
-        $('sel-origem').classList.remove('hidden');
-      } else $('sel-origem').classList.add('hidden');
+        setEstado('origem', 'selecionado');
+      } else setEstado('origem', 'vazio');
       if (destino) {
         $('destino-nome').textContent = destino.nome ? `${destino.id} — ${destino.nome}` : destino.id;
         $('destino-saldo').textContent = fmtBRL(destino.saldo || 0);
-        $('sel-destino').classList.remove('hidden');
-      } else $('sel-destino').classList.add('hidden');
-      renderChips('origem', $('busca-origem').value);
-      renderChips('destino', $('busca-destino').value);
+        setEstado('destino', 'selecionado');
+      } else setEstado('destino', 'vazio');
       atualizarPreview();
       atualizarBotao();
     }
@@ -488,6 +638,108 @@
     $('btn-trocar-origem').onclick = () => limpar('origem');
     $('btn-trocar-destino').onclick = () => limpar('destino');
     $('btn-inverter').onclick = inverter;
+
+    // Botoes [Escanear] / [Buscar] e cancelar busca
+    document.querySelectorAll('.acao-btn').forEach(btn => {
+      btn.onclick = () => {
+        const lado = btn.dataset.lado;
+        const acao = btn.dataset.acao;
+        if (acao === 'scan') abrirScanner(lado);
+        else if (acao === 'buscar') setEstado(lado, 'buscando');
+      };
+    });
+    document.querySelectorAll('[data-cancelar]').forEach(btn => {
+      btn.onclick = () => {
+        const lado = btn.dataset.cancelar;
+        $(`busca-${lado}`).value = '';
+        setEstado(lado, 'vazio');
+      };
+    });
+
+    // ---- Scanner ----
+    async function abrirScanner(lado) {
+      scannerLado = lado;
+      $('scanner-sub').textContent = lado === 'origem' ? 'Selecionando origem' : 'Selecionando destino';
+      $('scanner-status').textContent = 'Inicializando câmera…';
+      $('scanner-status').style.color = '';
+      $('scanner-overlay').classList.remove('hidden');
+      renderIcons($('scanner-overlay'));
+      try {
+        scannerHandle = await iniciarScanner({
+          elementId: 'reader-tx',
+          onDetected: (texto) => tratarScan(texto),
+          onReady: () => {
+            $('scanner-status').textContent = 'Câmera pronta — aproxime o QR code';
+            $('scanner-status').style.color = '#93c5fd';
+          }
+        });
+      } catch (err) {
+        console.error('Erro scanner:', err);
+        $('scanner-status').textContent = 'Câmera indisponível — use o botão abaixo pra digitar o ID';
+        $('scanner-status').style.color = '#fca5a5';
+      }
+    }
+
+    function fecharScanner() {
+      try { scannerHandle?.stop?.(); } catch (_) {}
+      scannerHandle = null;
+      // O botao de troca de camera tem id fixo dentro do reader; remove
+      // pra que a proxima abertura recrie com closures novos.
+      document.getElementById('btn-trocar-camera')?.remove();
+      $('scanner-overlay').classList.add('hidden');
+      scannerLado = null;
+    }
+
+    async function tratarScan(texto) {
+      const lado = scannerLado;
+      const id = (texto || '').trim();
+      if (!id) {
+        showAlerta('QR vazio. Tenta de novo.', 'warning');
+        fecharScanner();
+        return;
+      }
+      // Conflito direto: mesmo cliente nos dois lados
+      const outro = lado === 'origem' ? destino : origem;
+      if (outro && outro.id === id) {
+        $('scanner-status').textContent = 'Esse cliente já está do outro lado.';
+        $('scanner-status').style.color = '#fca5a5';
+        setTimeout(() => {
+          // Reabre scanner sem fechar o overlay (re-roda iniciarScanner)
+          fecharScanner();
+        }, 1500);
+        return;
+      }
+      try {
+        const snap = await getDoc(doc(db, 'clientes', id));
+        if (!snap.exists()) {
+          $('scanner-status').textContent = `Cliente ${id} não cadastrado.`;
+          $('scanner-status').style.color = '#fca5a5';
+          setTimeout(fecharScanner, 1500);
+          return;
+        }
+        try { navigator.vibrate?.(40); } catch (_) {}
+        fecharScanner();
+        await selecionar(lado, id);
+      } catch (err) {
+        console.error(err);
+        $('scanner-status').textContent = `Erro: ${err.message}`;
+        $('scanner-status').style.color = '#fca5a5';
+        setTimeout(fecharScanner, 2000);
+      }
+    }
+
+    $('btn-fechar-scanner').onclick = fecharScanner;
+    $('btn-scanner-manual').onclick = () => {
+      const lado = scannerLado;
+      fecharScanner();
+      setEstado(lado, 'buscando');
+    };
+    // ESC fecha o scanner
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !$('scanner-overlay').classList.contains('hidden')) {
+        fecharScanner();
+      }
+    });
     $('valor').addEventListener('input', () => { atualizarPreview(); atualizarBotao(); });
     $('btn-tudo').onclick = () => {
       if (!origem) return showAlerta('Selecione a origem primeiro.', 'warning');
