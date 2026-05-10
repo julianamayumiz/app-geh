@@ -42,6 +42,16 @@
       border-left: 4px solid #f59e0b;
     }
     [data-theme="dark"] .bk-aviso { background: #422006; color: #fde68a; }
+    .bk-aviso.erro {
+      background: #fee2e2; color: #991b1b;
+      border-left-color: #dc2626;
+    }
+    [data-theme="dark"] .bk-aviso.erro { background: #7f1d1d; color: #fecaca; }
+    .bk-aviso code {
+      background: rgba(0,0,0,0.08); padding: 0.05rem 0.3rem;
+      border-radius: 0.25rem; font-size: 0.85em;
+    }
+    [data-theme="dark"] .bk-aviso code { background: rgba(255,255,255,0.08); }
     .bk-pasta {
       display: flex; align-items: center; gap: 0.75rem;
       padding: 0.75rem; background: var(--cinza-claro);
@@ -77,9 +87,22 @@
       <span data-icon="hard-drive" data-size="24"></span> Backup do Banco
     </h2>
 
+    <div id="bk-incompativel" class="bk-aviso erro hidden">
+      <strong>Navegador não suportado.</strong> O backup automático precisa do
+      <strong>Chrome</strong> ou <strong>Edge</strong> num computador
+      (a API <code>showDirectoryPicker</code> não existe no Firefox, Safari nem em celulares).
+    </div>
+
     <div id="bk-status" class="bk-status inativo">
       <span class="bk-dot"></span>
       <span id="bk-status-texto">Carregando…</span>
+    </div>
+
+    <div id="bk-precisa-permissao" class="bk-aviso hidden">
+      <strong>Permissão da pasta expirou.</strong> Clique em
+      <strong>Trocar pasta</strong> abaixo (ou em <strong>Iniciar agora</strong>)
+      pra liberar o acesso de novo — o navegador esquece a permissão quando
+      a janela é totalmente fechada.
     </div>
 
     <div class="bk-aviso">
@@ -159,13 +182,15 @@
     const $ = (id) => document.getElementById(id);
 
     // ---- estado ----
-    let dirHandle      = null;
-    let timerId        = null;
-    let countdownId    = null;
-    let proximoEm      = 0;
-    let rodando        = false;
-    let eventoAtivo    = null;
-    let auto           = localStorage.getItem(LS_AUTO_KEY) !== '0';
+    let dirHandle        = null;
+    let timerId          = null;
+    let countdownId      = null;
+    let proximoEm        = 0;
+    let rodando          = false;
+    let eventoAtivo      = null;
+    let auto             = localStorage.getItem(LS_AUTO_KEY) !== '0';
+    let precisaPermissao = false;
+    const SUPORTADO      = 'showDirectoryPicker' in window;
 
     // ---- IndexedDB minimo (pra guardar o handle da pasta) ----
     function idbOpen() {
@@ -197,10 +222,7 @@
 
     // ---- pasta ----
     async function escolherPasta() {
-      if (!window.showDirectoryPicker) {
-        alert('Seu navegador não suporta seleção de pasta. Use Chrome ou Edge.');
-        return;
-      }
+      if (!SUPORTADO) return;
       try {
         const handle = await window.showDirectoryPicker({
           mode: 'readwrite',
@@ -208,6 +230,7 @@
           startIn: 'desktop',
         });
         dirHandle = handle;
+        precisaPermissao = false;
         await idbSet(IDB_HANDLE_KEY, handle);
         atualizarUI();
         // Tenta auto-iniciar caso ja tenha evento rolando
@@ -222,9 +245,10 @@
       if (!h) return false;
       const opts = { mode: 'readwrite' };
       const perm = await h.queryPermission(opts);
-      if (perm === 'granted') { dirHandle = h; return true; }
-      // 'prompt' — precisa gesto do usuario; deixa o botao guiar
       dirHandle = h;
+      if (perm === 'granted') { precisaPermissao = false; return true; }
+      // 'prompt' / 'denied' — precisa gesto do usuario; sinaliza no UI
+      precisaPermissao = true;
       return false;
     }
 
@@ -232,9 +256,12 @@
       if (!dirHandle) return false;
       const opts = { mode: 'readwrite' };
       const perm = await dirHandle.queryPermission(opts);
-      if (perm === 'granted') return true;
+      if (perm === 'granted') { precisaPermissao = false; atualizarUI(); return true; }
       const req = await dirHandle.requestPermission(opts);
-      return req === 'granted';
+      const ok = req === 'granted';
+      precisaPermissao = !ok;
+      atualizarUI();
+      return ok;
     }
 
     // ---- conversao Firestore -> celula ----
@@ -398,6 +425,12 @@
         info.textContent = 'Nenhuma pasta escolhida.';
       }
 
+      // Aviso de permissao pendente
+      $('bk-precisa-permissao').classList.toggle('hidden', !precisaPermissao);
+
+      // Texto dinamico do botao de pasta
+      $('bk-escolher-pasta').textContent = dirHandle ? 'Trocar pasta' : 'Escolher pasta';
+
       // Botoes
       $('bk-iniciar').disabled = ativo || !dirHandle;
       $('bk-parar').disabled   = !ativo;
@@ -437,6 +470,13 @@
 
     // ---- bootstrap ----
     (async () => {
+      if (!SUPORTADO) {
+        $('bk-incompativel').classList.remove('hidden');
+        $('bk-status-texto').textContent = 'INDISPONÍVEL neste navegador';
+        ['bk-escolher-pasta','bk-iniciar','bk-parar','bk-agora','bk-auto']
+          .forEach(id => { const el = $(id); if (el) el.disabled = true; });
+        return;
+      }
       try {
         await restaurarPasta();
       } catch (e) { console.error(e); }
