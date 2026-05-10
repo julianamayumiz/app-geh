@@ -56,6 +56,14 @@
       flex-shrink: 0;
     }
     .selecionado button.trocar:hover { background: rgba(30,58,138,0.08); }
+    [data-theme="dark"] .selecionado button.trocar:hover { background: rgba(96,165,250,0.18); }
+    .selecionado button.trocar:active { transform: scale(0.96); }
+    .btn-ver-mais {
+      width: auto !important;
+      display: block;
+      margin: 0.6rem auto 0;
+      font-size: 0.85rem;
+    }
     .chips-clientes {
       display: flex;
       flex-wrap: wrap;
@@ -541,7 +549,15 @@
           `<span class="text-muted" style="font-size:0.75rem;align-self:center;">+${lista.length - 24}…</span>`);
       }
       if (lista.length === 0) {
-        chips.innerHTML = '<span class="text-muted" style="font-size:0.82rem;">Nenhum cliente.</span>';
+        if (f) {
+          chips.innerHTML = `<span class="text-muted" style="font-size:0.82rem;">Nenhum cliente bate com "${esc(filtro)}". <button type="button" class="link-cancelar" style="display:inline;margin-top:0;padding:0;">Limpar filtro</button></span>`;
+          chips.querySelector('button').onclick = () => {
+            $(`busca-${lado}`).value = '';
+            renderChips(lado, '');
+          };
+        } else {
+          chips.innerHTML = '<span class="text-muted" style="font-size:0.82rem;">Nenhum cliente.</span>';
+        }
       }
     }
 
@@ -857,40 +873,59 @@
       }
     };
 
-    // Últimas transferências (live, top 30)
+    // Últimas transferências (live)
+    let todosTx = [];
+    let mostrarN = 10;
+    const LOTE = 10;
+
+    function renderHistorico() {
+      const lista = $('lista-tx');
+      if (todosTx.length === 0) {
+        lista.innerHTML = `<div class="empty-state">${icon('inbox', { size: 32 })}<p>Nenhuma transferência registrada ainda.</p></div>`;
+        renderIcons(lista);
+        return;
+      }
+      const exibir = todosTx.slice(0, mostrarN);
+      const linhas = exibir.map(t => {
+        const dt = t.criadoEm?.toDate?.() || new Date(0);
+        const quando = dt.toLocaleString('pt-BR');
+        const quem = esc(t.usuarioNome || t.usuarioEmail || '—');
+        const papel = t.usuarioPapel ? ` (${esc(t.usuarioPapel)})` : '';
+        const motivo = t.motivo ? `<div class="hist-detalhe">${esc(t.motivo)}</div>` : '';
+        return `
+          <div class="hist-item">
+            <div class="hist-row">
+              <span class="hist-badge" style="background:var(--azul);">transfer</span>
+              <span class="hist-quando">${esc(quando)}</span>
+              <span class="hist-valor" style="color:var(--azul);">${fmtBRL(t.valor)}</span>
+            </div>
+            <div class="hist-detalhe">
+              <strong>${esc(t.origemId)}</strong>${t.origemNome ? ' (' + esc(t.origemNome) + ')' : ''}
+              → <strong>${esc(t.destinoId)}</strong>${t.destinoNome ? ' (' + esc(t.destinoNome) + ')' : ''}
+              · por ${quem}${papel}
+            </div>
+            ${motivo}
+          </div>
+        `;
+      }).join('');
+      const restantes = todosTx.length - mostrarN;
+      const verMais = restantes > 0
+        ? `<button type="button" id="btn-ver-mais" class="btn btn-secondary btn-ver-mais">
+             Mostrar mais ${Math.min(LOTE, restantes)} (${restantes} restantes)
+           </button>`
+        : '';
+      lista.innerHTML = linhas + verMais;
+      $('btn-ver-mais')?.addEventListener('click', () => {
+        mostrarN += LOTE;
+        renderHistorico();
+      });
+    }
+
     onSnapshot(
       query(collection(db, 'transferencias_saldo'), orderBy('criadoEm', 'desc')),
       (snap) => {
-        const lista = $('lista-tx');
-        if (snap.empty) {
-          lista.innerHTML = `<div class="empty-state">${icon('inbox', { size: 32 })}<p>Nenhuma transferência registrada ainda.</p></div>`;
-          renderIcons(lista);
-          return;
-        }
-        lista.innerHTML = '';
-        snap.docs.slice(0, 30).forEach(d => {
-          const t = d.data();
-          const dt = t.criadoEm?.toDate?.() || new Date(0);
-          const quando = dt.toLocaleString('pt-BR');
-          const quem = esc(t.usuarioNome || t.usuarioEmail || '—');
-          const papel = t.usuarioPapel ? ` (${esc(t.usuarioPapel)})` : '';
-          const motivo = t.motivo ? `<div class="hist-detalhe">${esc(t.motivo)}</div>` : '';
-          lista.innerHTML += `
-            <div class="hist-item">
-              <div class="hist-row">
-                <span class="hist-badge" style="background:var(--azul);">transfer</span>
-                <span class="hist-quando">${esc(quando)}</span>
-                <span class="hist-valor" style="color:var(--azul);">${fmtBRL(t.valor)}</span>
-              </div>
-              <div class="hist-detalhe">
-                <strong>${esc(t.origemId)}</strong>${t.origemNome ? ' (' + esc(t.origemNome) + ')' : ''}
-                → <strong>${esc(t.destinoId)}</strong>${t.destinoNome ? ' (' + esc(t.destinoNome) + ')' : ''}
-                · por ${quem}${papel}
-              </div>
-              ${motivo}
-            </div>
-          `;
-        });
+        todosTx = snap.docs.map(d => d.data());
+        renderHistorico();
       },
       (err) => {
         $('lista-tx').innerHTML = `<div class="alert alert-danger">Erro ao carregar histórico: ${err.message}</div>`;
