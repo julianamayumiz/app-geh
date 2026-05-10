@@ -43,6 +43,14 @@
       ]
     },
     {
+      "collectionGroup": "movimentacoes_saldo",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "eventoId", "order": "ASCENDING" },
+        { "fieldPath": "criadoEm", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "ajustes_saldo",
       "queryScope": "COLLECTION",
       "fields": [
@@ -55,6 +63,56 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "clienteId", "order": "ASCENDING" },
+        { "fieldPath": "eventoId", "order": "ASCENDING" },
+        { "fieldPath": "criadoEm", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "ajustes_saldo",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "eventoId", "order": "ASCENDING" },
+        { "fieldPath": "criadoEm", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "transferencias_saldo",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "eventoId", "order": "ASCENDING" },
+        { "fieldPath": "criadoEm", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "transferencias_saldo",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "origemId", "order": "ASCENDING" },
+        { "fieldPath": "criadoEm", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "transferencias_saldo",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "destinoId", "order": "ASCENDING" },
+        { "fieldPath": "criadoEm", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "transferencias_saldo",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "origemId", "order": "ASCENDING" },
+        { "fieldPath": "eventoId", "order": "ASCENDING" },
+        { "fieldPath": "criadoEm", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "transferencias_saldo",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "destinoId", "order": "ASCENDING" },
         { "fieldPath": "eventoId", "order": "ASCENDING" },
         { "fieldPath": "criadoEm", "order": "DESCENDING" }
       ]
