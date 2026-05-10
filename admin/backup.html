@@ -79,6 +79,47 @@
     .bk-log .err { color: var(--vermelho); }
     .bk-log-vazio { color: var(--cinza); font-style: italic; }
     .bk-toggle { display: flex; align-items: center; gap: 0.5rem; }
+    .bk-arquivos {
+      margin-top: 0.75rem;
+      border-top: 1px solid var(--cinza-claro);
+      padding-top: 0.75rem;
+    }
+    .bk-arq-titulo {
+      font-size: 0.78rem;
+      color: var(--cinza);
+      margin-bottom: 0.4rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .bk-arq {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 0.5rem;
+      padding: 0.3rem 0.4rem;
+      font-size: 0.8rem;
+    }
+    .bk-arq + .bk-arq { border-top: 1px dashed var(--cinza-claro); }
+    .bk-arq-nome {
+      font-family: ui-monospace, monospace;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--cinza-escuro);
+      min-width: 0;
+    }
+    .bk-arq-meta {
+      color: var(--cinza);
+      white-space: nowrap;
+      font-size: 0.72rem;
+      flex-shrink: 0;
+    }
+    .bk-arq-vazio {
+      font-size: 0.8rem;
+      color: var(--cinza);
+      font-style: italic;
+    }
   </style>
 </head>
 <body>
@@ -121,6 +162,7 @@
         os arquivos vão direto pra ela. Mantém os 30 mais recentes; os antigos
         são apagados automaticamente.
       </p>
+      <div id="bk-arquivos" class="bk-arquivos hidden"></div>
     </div>
 
     <div class="card">
@@ -233,6 +275,7 @@
         precisaPermissao = false;
         await idbSet(IDB_HANDLE_KEY, handle);
         atualizarUI();
+        atualizarListaArquivos();
         // Tenta auto-iniciar caso ja tenha evento rolando
         considerarAutoIniciar();
       } catch (e) {
@@ -256,11 +299,12 @@
       if (!dirHandle) return false;
       const opts = { mode: 'readwrite' };
       const perm = await dirHandle.queryPermission(opts);
-      if (perm === 'granted') { precisaPermissao = false; atualizarUI(); return true; }
+      if (perm === 'granted') { precisaPermissao = false; atualizarUI(); atualizarListaArquivos(); return true; }
       const req = await dirHandle.requestPermission(opts);
       const ok = req === 'granted';
       precisaPermissao = !ok;
       atualizarUI();
+      if (ok) atualizarListaArquivos();
       return ok;
     }
 
@@ -323,22 +367,72 @@
       return { nome, totalDocs: resumo.reduce((s, r) => s + r.documentos, 0) };
     }
 
-    async function podarAntigos() {
-      if (!MANTER_ULTIMOS || MANTER_ULTIMOS <= 0) return;
+    async function listarArquivosBackup() {
+      if (!dirHandle) return [];
       const arquivos = [];
-      for await (const [nome, h] of dirHandle.entries()) {
-        if (h.kind === 'file' && nome.startsWith('backup-') && nome.endsWith('.xlsx')) {
-          try {
-            const f = await h.getFile();
-            arquivos.push({ nome, mtime: f.lastModified });
-          } catch (e) { /* ignore */ }
+      try {
+        for await (const [nome, h] of dirHandle.entries()) {
+          if (h.kind === 'file' && nome.startsWith('backup-') && nome.endsWith('.xlsx')) {
+            try {
+              const f = await h.getFile();
+              arquivos.push({ nome, mtime: f.lastModified, tamanho: f.size });
+            } catch (e) { /* ignore */ }
+          }
         }
+      } catch (e) {
+        console.warn('[backup] listar arquivos falhou:', e);
+        return [];
       }
       arquivos.sort((a, b) => b.mtime - a.mtime);
+      return arquivos;
+    }
+
+    async function podarAntigos() {
+      if (!MANTER_ULTIMOS || MANTER_ULTIMOS <= 0) return;
+      const arquivos = await listarArquivosBackup();
       const remover = arquivos.slice(MANTER_ULTIMOS);
       for (const { nome } of remover) {
         try { await dirHandle.removeEntry(nome); } catch (e) { /* ignore */ }
       }
+    }
+
+    function fmtTamanho(bytes) {
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+      return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    }
+    function fmtData(ms) {
+      const d = new Date(ms);
+      const hoje = new Date();
+      const mesmoDia = d.toDateString() === hoje.toDateString();
+      return mesmoDia
+        ? `hoje ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+        : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    }
+    async function atualizarListaArquivos() {
+      const box = $('bk-arquivos');
+      if (!box) return;
+      if (!dirHandle || precisaPermissao) {
+        box.innerHTML = '';
+        box.classList.add('hidden');
+        return;
+      }
+      const todos = await listarArquivosBackup();
+      box.classList.remove('hidden');
+      if (todos.length === 0) {
+        box.innerHTML = '<div class="bk-arq-vazio">Pasta vazia — nenhum backup salvo ainda.</div>';
+        return;
+      }
+      const top = todos.slice(0, 5);
+      const sufixo = todos.length > 5 ? ` (5 mais recentes)` : '';
+      const titulo = `${todos.length} backup${todos.length > 1 ? 's' : ''} na pasta${sufixo}`;
+      const linhas = top.map(a => `
+        <div class="bk-arq">
+          <span class="bk-arq-nome" title="${a.nome}">${a.nome}</span>
+          <span class="bk-arq-meta">${fmtTamanho(a.tamanho)} · ${fmtData(a.mtime)}</span>
+        </div>
+      `).join('');
+      box.innerHTML = `<div class="bk-arq-titulo">${titulo}</div>${linhas}`;
     }
 
     // ---- loop ----
@@ -365,6 +459,7 @@
         rodando = false;
         proximoEm = Date.now() + INTERVALO_MS;
         atualizarUI();
+        atualizarListaArquivos();
       }
     }
 
@@ -481,6 +576,7 @@
         await restaurarPasta();
       } catch (e) { console.error(e); }
       atualizarUI();
+      atualizarListaArquivos();
     })();
 
     // Avisa antes de fechar a aba se o backup automatico estiver rodando
