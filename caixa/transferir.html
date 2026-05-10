@@ -94,6 +94,69 @@
     .preview-tx .seta { color: var(--azul); }
     .preview-tx .col.origem .saldos strong.depois { color: var(--vermelho); }
     .preview-tx .col.destino .saldos strong.depois { color: var(--verde); }
+
+    /* Modal de confirmacao */
+    .tx-modal {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.55);
+      display: flex; align-items: center; justify-content: center;
+      padding: 1rem; z-index: 1000;
+      animation: tx-modal-fade 0.18s ease-out;
+    }
+    .tx-modal.hidden { display: none; }
+    @keyframes tx-modal-fade { from { opacity: 0 } to { opacity: 1 } }
+    .tx-modal-card {
+      background: var(--branco);
+      border-radius: 14px;
+      padding: 1.25rem;
+      width: 100%; max-width: 380px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+      animation: tx-modal-pop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    @keyframes tx-modal-pop {
+      from { opacity: 0; transform: scale(0.92) translateY(8px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .tx-modal-card h3 {
+      margin: 0 0 0.25rem; color: var(--azul);
+      font-size: 1.1rem;
+      display: inline-flex; align-items: center; gap: 0.4rem;
+    }
+    .tx-modal-valor {
+      font-size: 1.8rem; font-weight: 700;
+      text-align: center; color: var(--azul);
+      margin: 0.6rem 0;
+    }
+    .tx-modal-fluxo {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 0.5rem; align-items: center;
+      background: var(--cinza-fundo);
+      border-radius: 10px;
+      padding: 0.75rem;
+      margin: 0.25rem 0 0.6rem;
+    }
+    .tx-modal-lado {
+      display: flex; flex-direction: column; align-items: center;
+      text-align: center; min-width: 0; gap: 0.15rem;
+    }
+    .tx-modal-label {
+      font-size: 0.68rem; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--cinza); font-weight: 700;
+    }
+    .tx-modal-lado.origem .tx-modal-label  { color: var(--vermelho); }
+    .tx-modal-lado.destino .tx-modal-label { color: var(--verde); }
+    .tx-modal-cli {
+      font-weight: 600; color: var(--cinza-escuro);
+      font-size: 0.82rem; word-break: break-word; line-height: 1.25;
+    }
+    .tx-modal-seta { color: var(--azul); display: inline-flex; }
+    .tx-modal-aviso {
+      font-size: 0.78rem; color: var(--cinza);
+      text-align: center; margin: 0 0 0.9rem;
+    }
+    .tx-modal-acoes { display: flex; gap: 0.5rem; }
+    .tx-modal-acoes .btn { flex: 1; width: auto; }
   </style>
 </head>
 <body>
@@ -192,6 +255,31 @@
     <div id="lista-tx" class="hist-list"><div class="empty-state"><p class="text-muted">Carregando…</p></div></div>
   </main>
 
+  <div id="modal-confirmar" class="tx-modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-titulo">
+    <div class="tx-modal-card">
+      <h3 id="modal-titulo">
+        <span data-icon="arrow-right-left" data-size="20"></span> Confirmar transferência?
+      </h3>
+      <div class="tx-modal-valor" id="modal-valor">R$ 0,00</div>
+      <div class="tx-modal-fluxo">
+        <div class="tx-modal-lado origem">
+          <span class="tx-modal-label">De</span>
+          <span class="tx-modal-cli" id="modal-origem">—</span>
+        </div>
+        <span class="tx-modal-seta" data-icon="arrow-right" data-size="20"></span>
+        <div class="tx-modal-lado destino">
+          <span class="tx-modal-label">Para</span>
+          <span class="tx-modal-cli" id="modal-destino">—</span>
+        </div>
+      </div>
+      <p class="tx-modal-aviso">Esta ação fica registrada pra auditoria.</p>
+      <div class="tx-modal-acoes">
+        <button type="button" id="modal-cancel" class="btn btn-secondary">Cancelar</button>
+        <button type="button" id="modal-ok" class="btn btn-primary">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
   <script type="module" src="../js/icons.js"></script>
   <script type="module">
     import {
@@ -206,6 +294,44 @@
     const fmtBRL = (v) => `R$ ${Number(v || 0).toFixed(2).replace('.', ',')}`;
     const $ = (id) => document.getElementById(id);
     const alerta = $('alerta');
+
+    // Escapa HTML pra evitar injecao via campos vindos do Firestore
+    // (nome de cliente, motivo, etc). Cadastro e interno mas a defesa
+    // e barata e elimina a classe inteira de bug.
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+
+    function abrirConfirmacao({ valor, origem, destino }) {
+      return new Promise((resolve) => {
+        const modal = $('modal-confirmar');
+        $('modal-valor').textContent = fmtBRL(valor);
+        $('modal-origem').textContent  = origem.nome ? `${origem.id} — ${origem.nome}`   : origem.id;
+        $('modal-destino').textContent = destino.nome ? `${destino.id} — ${destino.nome}` : destino.id;
+        modal.classList.remove('hidden');
+        renderIcons(modal);
+
+        const fechar = (ok) => {
+          modal.classList.add('hidden');
+          $('modal-ok').onclick = null;
+          $('modal-cancel').onclick = null;
+          modal.onclick = null;
+          document.removeEventListener('keydown', onKey);
+          resolve(ok);
+        };
+        const onKey = (e) => {
+          if (e.key === 'Escape') fechar(false);
+          else if (e.key === 'Enter') fechar(true);
+        };
+        document.addEventListener('keydown', onKey);
+        $('modal-ok').onclick     = () => fechar(true);
+        $('modal-cancel').onclick = () => fechar(false);
+        // Clique no backdrop (fora do card) cancela
+        modal.onclick = (e) => { if (e.target === modal) fechar(false); };
+        // Foco no botao primario pra teclado
+        setTimeout(() => $('modal-ok').focus(), 0);
+      });
+    }
 
     function showAlerta(msg, tipo = 'info') {
       alerta.textContent = msg;
@@ -380,13 +506,8 @@
 
       const motivo = $('motivo').value.trim();
 
-      if (!confirm(
-        `Confirmar transferência?\n\n` +
-        `${fmtBRL(valor)}\n` +
-        `De:   ${origem.id}${origem.nome ? ' — ' + origem.nome : ''}\n` +
-        `Para: ${destino.id}${destino.nome ? ' — ' + destino.nome : ''}\n\n` +
-        `Esta ação fica registrada pra auditoria.`
-      )) return;
+      const ok = await abrirConfirmacao({ valor, origem, destino });
+      if (!ok) return;
 
       $('btn-confirmar').disabled = true;
       $('btn-confirmar').innerHTML = '<div class="loader"></div> Processando…';
@@ -443,7 +564,7 @@
         clearTimeout(timerLento);
         try { navigator.vibrate?.([40, 60, 40, 60, 80]); } catch (_) {}
         const idCurto = (txIdGerado || '').slice(-6).toUpperCase();
-        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 18 })} Transferência #${idCurto} feita — ${fmtBRL(valor)} de ${origem.id} pra ${destino.id}.</span>`;
+        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 18 })} Transferência #${esc(idCurto)} feita — ${fmtBRL(valor)} de ${esc(origem.id)} pra ${esc(destino.id)}.</span>`;
         alerta.className = 'alert alert-success';
         alerta.classList.remove('hidden');
 
@@ -486,19 +607,19 @@
           const t = d.data();
           const dt = t.criadoEm?.toDate?.() || new Date(0);
           const quando = dt.toLocaleString('pt-BR');
-          const quem = t.usuarioNome || t.usuarioEmail || '—';
-          const papel = t.usuarioPapel ? ` (${t.usuarioPapel})` : '';
-          const motivo = t.motivo ? `<div class="hist-detalhe">${(t.motivo).replace(/[<>]/g, '')}</div>` : '';
+          const quem = esc(t.usuarioNome || t.usuarioEmail || '—');
+          const papel = t.usuarioPapel ? ` (${esc(t.usuarioPapel)})` : '';
+          const motivo = t.motivo ? `<div class="hist-detalhe">${esc(t.motivo)}</div>` : '';
           lista.innerHTML += `
             <div class="hist-item">
               <div class="hist-row">
                 <span class="hist-badge" style="background:var(--azul);">transfer</span>
-                <span class="hist-quando">${quando}</span>
+                <span class="hist-quando">${esc(quando)}</span>
                 <span class="hist-valor" style="color:var(--azul);">${fmtBRL(t.valor)}</span>
               </div>
               <div class="hist-detalhe">
-                <strong>${t.origemId}</strong>${t.origemNome ? ' (' + t.origemNome + ')' : ''}
-                → <strong>${t.destinoId}</strong>${t.destinoNome ? ' (' + t.destinoNome + ')' : ''}
+                <strong>${esc(t.origemId)}</strong>${t.origemNome ? ' (' + esc(t.origemNome) + ')' : ''}
+                → <strong>${esc(t.destinoId)}</strong>${t.destinoNome ? ' (' + esc(t.destinoNome) + ')' : ''}
                 · por ${quem}${papel}
               </div>
               ${motivo}
