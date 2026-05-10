@@ -30,7 +30,7 @@
     .lado-cliente.origem .lado-titulo { color: var(--vermelho); }
     .lado-cliente.destino .lado-titulo { color: var(--verde); }
     .selecionado {
-      background: white;
+      background: var(--branco);
       border-radius: 8px;
       padding: 0.5rem 0.75rem;
       display: flex;
@@ -40,7 +40,6 @@
       margin-top: 0.4rem;
       border: 1px solid var(--cinza-claro);
     }
-    :root[data-theme="dark"] .selecionado { background: var(--cinza-fundo-2, rgba(255,255,255,0.05)); }
     .selecionado .info { display: flex; flex-direction: column; min-width: 0; }
     .selecionado .nome-cli { font-weight: 700; color: var(--cinza-escuro); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .selecionado .saldo-cli { font-size: 0.85rem; color: var(--cinza); }
@@ -66,16 +65,18 @@
       margin-top: 0.4rem;
     }
     .chip-cliente {
-      background: white;
+      background: var(--branco);
       border: 1px solid var(--cinza-claro);
       color: var(--cinza-escuro);
       padding: 0.25rem 0.6rem;
       border-radius: 999px;
       cursor: pointer;
       font-size: 0.78rem;
+      transition: transform 0.08s ease, background 0.12s ease, border-color 0.12s ease;
+      -webkit-tap-highlight-color: transparent;
     }
-    :root[data-theme="dark"] .chip-cliente { background: rgba(255,255,255,0.05); }
     .chip-cliente:hover { background: var(--azul); color: white; border-color: var(--azul); }
+    .chip-cliente:active { transform: scale(0.94); background: var(--azul); color: white; border-color: var(--azul); }
     .preview-tx {
       display: grid;
       grid-template-columns: 1fr auto 1fr;
@@ -209,7 +210,7 @@
       <div class="form-group" style="margin-top:1rem;">
         <label>Valor a transferir (R$)</label>
         <div style="display:flex;gap:0.5rem;align-items:stretch;">
-          <input type="number" id="valor" step="0.01" min="0.01" placeholder="Ex: 15,00" inputmode="decimal" style="flex:1;">
+          <input type="text" id="valor" placeholder="Ex: 15,00" inputmode="decimal" autocomplete="off" style="flex:1;">
           <button type="button" id="btn-tudo" class="btn btn-secondary" style="width:auto;padding:0 1rem;font-size:0.85rem;white-space:nowrap;">
             Tudo
           </button>
@@ -292,6 +293,7 @@
     const { perfil } = await requireAuth({ papel: ['caixa', 'operador'] });
 
     const fmtBRL = (v) => `R$ ${Number(v || 0).toFixed(2).replace('.', ',')}`;
+    const fmtInput = (v) => Number(v || 0).toFixed(2).replace('.', ',');
     const $ = (id) => document.getElementById(id);
     const alerta = $('alerta');
 
@@ -301,6 +303,17 @@
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({
       '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
     }[c]));
+
+    // Aceita "15,00", "15.00", "1.234,56" — input type=number rejeita
+    // virgula em alguns Androids, entao usamos type=text + parser proprio.
+    function parseDecimal(s) {
+      if (s == null) return NaN;
+      const t = String(s).trim();
+      if (!t) return NaN;
+      // Se tem virgula, presumimos formato BR (ponto = milhar, virgula = decimal)
+      const norm = t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t;
+      return parseFloat(norm);
+    }
 
     function abrirConfirmacao({ valor, origem, destino }) {
       return new Promise((resolve) => {
@@ -447,7 +460,7 @@
     }
 
     function atualizarPreview() {
-      const valor = parseFloat($('valor').value);
+      const valor = parseDecimal($('valor').value);
       if (!origem || !destino || !Number.isFinite(valor) || valor <= 0) {
         $('preview').classList.add('hidden');
         return;
@@ -465,7 +478,7 @@
     }
 
     function atualizarBotao() {
-      const valor = parseFloat($('valor').value);
+      const valor = parseDecimal($('valor').value);
       const ok = origem && destino && Number.isFinite(valor) && valor > 0;
       $('btn-confirmar').disabled = !ok;
     }
@@ -478,7 +491,7 @@
     $('valor').addEventListener('input', () => { atualizarPreview(); atualizarBotao(); });
     $('btn-tudo').onclick = () => {
       if (!origem) return showAlerta('Selecione a origem primeiro.', 'warning');
-      $('valor').value = (origem.saldo || 0).toFixed(2);
+      $('valor').value = fmtInput(origem.saldo || 0);
       atualizarPreview();
       atualizarBotao();
     };
@@ -501,7 +514,7 @@
       if (!origem || !destino) return showAlerta('Selecione origem e destino.', 'warning');
       if (origem.id === destino.id) return showAlerta('Origem e destino não podem ser iguais.', 'warning');
 
-      const valor = parseFloat($('valor').value);
+      const valor = parseDecimal($('valor').value);
       if (!Number.isFinite(valor) || valor <= 0) return showAlerta('Digite um valor maior que zero.', 'warning');
 
       const motivo = $('motivo').value.trim();
