@@ -124,6 +124,16 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Transferencias de saldo entre clientes (ex: familia juntando
+    // QRs pra fazer uma compra). Caixa e operador podem criar pra
+    // agilizar no balcao; recepcao nao mexe em saldo. Imutavel pra
+    // preservar a trilha — correcao depois sai por ajuste-saldo.
+    match /transferencias_saldo/{doc} {
+      allow read: if isEquipe();
+      allow create: if isCaixa() || isOperador();
+      allow update, delete: if false;
+    }
+
     // Convites antecipados (lista de conferência da recepção):
     // importados em lote via Excel. Recepção lê, busca e marca check-in
     // (update do campo presente/checkInEm). Admin gerencia.

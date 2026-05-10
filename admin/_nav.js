@@ -39,6 +39,7 @@ const GRUPOS = [
       { href: 'estoque.html',     icone: 'package',      texto: 'Estoque'         },
       { href: 'despesas.html',    icone: 'dollar-sign',  texto: 'Despesas'        },
       { href: 'ajuste-saldo.html', icone: 'edit',         texto: 'Ajuste de saldo' },
+      { href: '../caixa/transferir.html', icone: 'arrow-right-left', texto: 'Transferir saldo' },
       { href: 'relatorio.html',   icone: 'trending-up',  texto: 'Relatório'       },
       { href: 'fechamento.html',  icone: 'file-text',    texto: 'Fechamento'      },
     ],

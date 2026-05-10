@@ -18,6 +18,10 @@ const PATHS = {
   'eye':           '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
   'arrow-left':    '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
   'arrow-right':   '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+  'arrow-right-left':'<path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/>',
+  'arrow-down-up': '<path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/>',
+  'arrow-up-right':'<path d="M7 7h10v10"/><path d="M7 17 17 7"/>',
+  'arrow-down-right':'<path d="m7 7 10 10"/><path d="M17 7v10H7"/>',
 
   // Admin nav
   'calendar':      '<rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/>',

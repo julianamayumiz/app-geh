@@ -149,11 +149,19 @@
         ? query(collection(db, col), where('clienteId', '==', id), where('eventoId', '==', eventoId), orderBy('criadoEm', 'desc'))
         : query(collection(db, col), where('clienteId', '==', id), orderBy('criadoEm', 'desc'));
 
-      // Buscar movimentações de saldo (recargas), vendas e ajustes manuais
-      const [movSnap, vendasSnap, ajustesSnap] = await Promise.all([
+      // Transferencias usam origemId/destinoId em vez de clienteId, entao
+      // duas queries separadas (Firestore nao tem OR cross-field facil).
+      const filtrarTransfer = (campo) => eventoId
+        ? query(collection(db, 'transferencias_saldo'), where(campo, '==', id), where('eventoId', '==', eventoId), orderBy('criadoEm', 'desc'))
+        : query(collection(db, 'transferencias_saldo'), where(campo, '==', id), orderBy('criadoEm', 'desc'));
+
+      // Buscar movimentações de saldo (recargas), vendas, ajustes manuais e transferencias
+      const [movSnap, vendasSnap, ajustesSnap, transfOrigemSnap, transfDestinoSnap] = await Promise.all([
         getDocs(filtrarPorEvento('movimentacoes_saldo')),
         getDocs(filtrarPorEvento('vendas')),
         getDocs(filtrarPorEvento('ajustes_saldo')),
+        getDocs(filtrarTransfer('origemId')),
+        getDocs(filtrarTransfer('destinoId')),
       ]);
 
       // Montar lista unificada
@@ -200,6 +208,36 @@
           valor: Math.abs(v),
           positivo: v >= 0,
           cor: '#B45309'
+        });
+      });
+
+      // Transferencias — duas pernas. Origem perde, destino ganha.
+      // Nao entram em totalRecarga/totalGasto porque nao movimentam dinheiro
+      // de fato — so realocam saldo entre clientes.
+      transfOrigemSnap.forEach(d => {
+        const t = d.data();
+        const para = t.destinoNome ? `${t.destinoId} (${t.destinoNome})` : t.destinoId;
+        const quem = t.usuarioNome || t.usuarioEmail || '—';
+        movimentos.push({
+          quando: t.criadoEm?.toDate?.() || new Date(0),
+          tipo: 'transfer ↗',
+          detalhe: `Enviado para ${para}${t.motivo ? ` · ${t.motivo}` : ''} · por ${quem}`,
+          valor: t.valor || 0,
+          positivo: false,
+          cor: 'var(--azul)'
+        });
+      });
+      transfDestinoSnap.forEach(d => {
+        const t = d.data();
+        const de = t.origemNome ? `${t.origemId} (${t.origemNome})` : t.origemId;
+        const quem = t.usuarioNome || t.usuarioEmail || '—';
+        movimentos.push({
+          quando: t.criadoEm?.toDate?.() || new Date(0),
+          tipo: 'transfer ↙',
+          detalhe: `Recebido de ${de}${t.motivo ? ` · ${t.motivo}` : ''} · por ${quem}`,
+          valor: t.valor || 0,
+          positivo: true,
+          cor: 'var(--azul)'
         });
       });
 

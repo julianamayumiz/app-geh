@@ -73,9 +73,11 @@
     const fmtBRL = (v) => `R$ ${Number(v || 0).toFixed(2).replace('.', ',')}`;
 
     async function carregarHistorico() {
-      const [movSnap, vendasSnap] = await Promise.all([
+      const [movSnap, vendasSnap, transfOrigemSnap, transfDestinoSnap] = await Promise.all([
         getDocs(query(collection(db, 'movimentacoes_saldo'), where('clienteId', '==', clienteId), orderBy('criadoEm', 'desc'))),
-        getDocs(query(collection(db, 'vendas'), where('clienteId', '==', clienteId), orderBy('criadoEm', 'desc')))
+        getDocs(query(collection(db, 'vendas'), where('clienteId', '==', clienteId), orderBy('criadoEm', 'desc'))),
+        getDocs(query(collection(db, 'transferencias_saldo'), where('origemId', '==', clienteId), orderBy('criadoEm', 'desc'))),
+        getDocs(query(collection(db, 'transferencias_saldo'), where('destinoId', '==', clienteId), orderBy('criadoEm', 'desc')))
       ]);
 
       const movs = [];
@@ -98,6 +100,28 @@
           detalhe: itens || '—',
           valor: v.total,
           positivo: false
+        });
+      });
+      transfOrigemSnap.forEach(d => {
+        const t = d.data();
+        const para = t.destinoNome ? `${t.destinoId} (${t.destinoNome})` : t.destinoId;
+        movs.push({
+          quando: t.criadoEm?.toDate?.() || new Date(0),
+          tipo: 'transfer ↗',
+          detalhe: `Enviado para ${para}`,
+          valor: t.valor,
+          positivo: false
+        });
+      });
+      transfDestinoSnap.forEach(d => {
+        const t = d.data();
+        const de = t.origemNome ? `${t.origemId} (${t.origemNome})` : t.origemId;
+        movs.push({
+          quando: t.criadoEm?.toDate?.() || new Date(0),
+          tipo: 'transfer ↙',
+          detalhe: `Recebido de ${de}`,
+          valor: t.valor,
+          positivo: true
         });
       });
       movs.sort((a, b) => b.quando - a.quando);

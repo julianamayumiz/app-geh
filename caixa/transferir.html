@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1E3A8A">
+  <meta name="theme-color" content="#0F172A" media="(prefers-color-scheme: dark)">
+  <title>Transferir saldo — App GEH</title>
+  <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="manifest" href="../manifest.json">
+  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+  <style>
+    .lado-cliente {
+      border: 1px solid var(--cinza-claro);
+      border-radius: 12px;
+      padding: 0.85rem;
+      background: var(--cinza-fundo);
+    }
+    .lado-cliente.origem { border-left: 4px solid var(--vermelho); }
+    .lado-cliente.destino { border-left: 4px solid var(--verde); }
+    .lado-titulo {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--cinza);
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+    }
+    .lado-cliente.origem .lado-titulo { color: var(--vermelho); }
+    .lado-cliente.destino .lado-titulo { color: var(--verde); }
+    .selecionado {
+      background: white;
+      border-radius: 8px;
+      padding: 0.5rem 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-top: 0.4rem;
+      border: 1px solid var(--cinza-claro);
+    }
+    :root[data-theme="dark"] .selecionado { background: var(--cinza-fundo-2, rgba(255,255,255,0.05)); }
+    .selecionado .info { display: flex; flex-direction: column; min-width: 0; }
+    .selecionado .nome-cli { font-weight: 700; color: var(--cinza-escuro); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .selecionado .saldo-cli { font-size: 0.85rem; color: var(--cinza); }
+    .selecionado .saldo-cli strong { color: var(--cinza-escuro); }
+    .selecionado button.trocar {
+      background: none;
+      border: none;
+      color: var(--azul);
+      font-size: 0.82rem;
+      cursor: pointer;
+      padding: 0.25rem 0.5rem;
+      border-radius: 6px;
+      flex-shrink: 0;
+    }
+    .selecionado button.trocar:hover { background: rgba(30,58,138,0.08); }
+    .chips-clientes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      max-height: 110px;
+      overflow-y: auto;
+      padding: 0.25rem;
+      margin-top: 0.4rem;
+    }
+    .chip-cliente {
+      background: white;
+      border: 1px solid var(--cinza-claro);
+      color: var(--cinza-escuro);
+      padding: 0.25rem 0.6rem;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 0.78rem;
+    }
+    :root[data-theme="dark"] .chip-cliente { background: rgba(255,255,255,0.05); }
+    .chip-cliente:hover { background: var(--azul); color: white; border-color: var(--azul); }
+    .preview-tx {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 0.5rem;
+      align-items: center;
+      padding: 0.75rem;
+      background: var(--cinza-fundo);
+      border-radius: 12px;
+      margin-top: 0.5rem;
+    }
+    .preview-tx .col { text-align: center; }
+    .preview-tx .label { font-size: 0.7rem; color: var(--cinza); text-transform: uppercase; letter-spacing: 0.05em; }
+    .preview-tx .id-cli { font-size: 0.78rem; color: var(--cinza-escuro); margin-top: 0.1rem; font-weight: 600; }
+    .preview-tx .saldos { font-size: 0.85rem; margin-top: 0.25rem; color: var(--cinza); }
+    .preview-tx .saldos strong { display: block; font-size: 1rem; color: var(--cinza-escuro); }
+    .preview-tx .seta { color: var(--azul); }
+    .preview-tx .col.origem .saldos strong.depois { color: var(--vermelho); }
+    .preview-tx .col.destino .saldos strong.depois { color: var(--verde); }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <a href="#" id="btn-voltar" class="back" aria-label="Voltar"><span data-icon="arrow-left" data-size="24"></span></a>
+    <h1 style="display:inline-flex;align-items:center;gap:0.5rem;"><span data-icon="arrow-right-left" data-size="22"></span> Transferir saldo</h1>
+  </header>
+
+  <main>
+    <div class="card" style="background:rgba(30,58,138,0.06);border:1px dashed rgba(30,58,138,0.25);">
+      <p style="margin:0;font-size:0.85rem;color:var(--cinza-escuro);">
+        Move saldo de um QR pra outro — útil pra família juntar crédito de 2 pulseiras numa compra só.
+        A operação é atômica (ou os dois mudam, ou nenhum) e fica registrada pra auditoria.
+      </p>
+    </div>
+
+    <div class="card">
+      <div class="lado-cliente origem">
+        <div class="lado-titulo"><span data-icon="arrow-up-right" data-size="14"></span> De (origem) — vai sair saldo</div>
+        <input type="text" id="busca-origem" placeholder="ID ou nome do cliente origem" autocomplete="off">
+        <div id="chips-origem" class="chips-clientes"></div>
+        <div id="sel-origem" class="selecionado hidden">
+          <div class="info">
+            <span class="nome-cli" id="origem-nome">—</span>
+            <span class="saldo-cli">Saldo: <strong id="origem-saldo">R$ 0,00</strong></span>
+          </div>
+          <button type="button" class="trocar" id="btn-trocar-origem">Trocar</button>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:center;margin:0.6rem 0;">
+        <button type="button" id="btn-inverter" class="btn btn-secondary" style="width:auto;padding:0.4rem 0.9rem;font-size:0.85rem;">
+          <span data-icon="arrow-down-up" data-size="16"></span> Inverter origem ↔ destino
+        </button>
+      </div>
+
+      <div class="lado-cliente destino">
+        <div class="lado-titulo"><span data-icon="arrow-down-right" data-size="14"></span> Para (destino) — vai receber saldo</div>
+        <input type="text" id="busca-destino" placeholder="ID ou nome do cliente destino" autocomplete="off">
+        <div id="chips-destino" class="chips-clientes"></div>
+        <div id="sel-destino" class="selecionado hidden">
+          <div class="info">
+            <span class="nome-cli" id="destino-nome">—</span>
+            <span class="saldo-cli">Saldo: <strong id="destino-saldo">R$ 0,00</strong></span>
+          </div>
+          <button type="button" class="trocar" id="btn-trocar-destino">Trocar</button>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-top:1rem;">
+        <label>Valor a transferir (R$)</label>
+        <div style="display:flex;gap:0.5rem;align-items:stretch;">
+          <input type="number" id="valor" step="0.01" min="0.01" placeholder="Ex: 15,00" inputmode="decimal" style="flex:1;">
+          <button type="button" id="btn-tudo" class="btn btn-secondary" style="width:auto;padding:0 1rem;font-size:0.85rem;white-space:nowrap;">
+            Tudo
+          </button>
+        </div>
+        <small style="color:var(--cinza);font-size:0.78rem;">Origem precisa ter esse valor disponível.</small>
+      </div>
+
+      <div class="form-group">
+        <label>Motivo / observação <span style="color:var(--cinza);font-weight:400;">(opcional)</span></label>
+        <input type="text" id="motivo" placeholder="Ex: família juntando saldo pra compra única" maxlength="200">
+      </div>
+
+      <div id="preview" class="preview-tx hidden">
+        <div class="col origem">
+          <div class="label">De</div>
+          <div class="id-cli" id="prev-origem-id">—</div>
+          <div class="saldos">
+            <span id="prev-origem-antes">R$ 0,00</span>
+            <strong class="depois" id="prev-origem-depois">R$ 0,00</strong>
+          </div>
+        </div>
+        <div class="seta" data-icon="arrow-right" data-size="22"></div>
+        <div class="col destino">
+          <div class="label">Para</div>
+          <div class="id-cli" id="prev-destino-id">—</div>
+          <div class="saldos">
+            <span id="prev-destino-antes">R$ 0,00</span>
+            <strong class="depois" id="prev-destino-depois">R$ 0,00</strong>
+          </div>
+        </div>
+      </div>
+
+      <div id="alerta" class="alert hidden" style="margin-top:0.75rem;"></div>
+
+      <button id="btn-confirmar" class="btn btn-primary" style="margin-top:0.75rem;" disabled>
+        <span data-icon="check" data-size="16"></span> Confirmar transferência
+      </button>
+    </div>
+
+    <h3 style="color:var(--azul);margin:1.5rem 0 0.75rem;display:inline-flex;align-items:center;gap:0.5rem;">
+      <span data-icon="clock" data-size="20"></span> Últimas transferências
+    </h3>
+    <div id="lista-tx" class="hist-list"><div class="empty-state"><p class="text-muted">Carregando…</p></div></div>
+  </main>
+
+  <script type="module" src="../js/icons.js"></script>
+  <script type="module">
+    import {
+      db, collection, doc, getDoc, getDocs, query, orderBy,
+      onSnapshot, runTransaction, serverTimestamp
+    } from "../js/firebase-config.js";
+    import { icon, renderIcons } from "../js/icons.js";
+    import { requireAuth } from "../js/auth-guard.js";
+
+    const { perfil } = await requireAuth({ papel: ['caixa', 'operador'] });
+
+    const fmtBRL = (v) => `R$ ${Number(v || 0).toFixed(2).replace('.', ',')}`;
+    const $ = (id) => document.getElementById(id);
+    const alerta = $('alerta');
+
+    function showAlerta(msg, tipo = 'info') {
+      alerta.textContent = msg;
+      alerta.className = `alert alert-${tipo}`;
+      alerta.classList.remove('hidden');
+    }
+
+    // Botão voltar — usa history.back() porque a página é alcançada
+    // de vários hubs (caixa, operador, recepção, admin).
+    $('btn-voltar').onclick = (e) => {
+      e.preventDefault();
+      if (window.history.length > 1) window.history.back();
+      else window.location.href = '../index.html';
+    };
+
+    let todosClientes = [];
+    let origem = null;
+    let destino = null;
+
+    async function carregarClientes() {
+      const snap = await getDocs(collection(db, 'clientes'));
+      todosClientes = [];
+      snap.forEach(d => todosClientes.push({ id: d.id, ...d.data() }));
+      todosClientes.sort((a, b) => a.id.localeCompare(b.id));
+      renderChips('origem', '');
+      renderChips('destino', '');
+    }
+
+    function renderChips(lado, filtro) {
+      const f = (filtro || '').toLowerCase();
+      const outroSelecionado = lado === 'origem' ? destino?.id : origem?.id;
+      const lista = (f
+        ? todosClientes.filter(c => c.id.toLowerCase().includes(f) || (c.nome || '').toLowerCase().includes(f))
+        : todosClientes
+      ).filter(c => c.id !== outroSelecionado);
+
+      const chips = $(`chips-${lado}`);
+      chips.innerHTML = '';
+      lista.slice(0, 24).forEach(c => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'chip-cliente';
+        const saldo = Number(c.saldo || 0);
+        btn.textContent = `${c.id}${c.nome ? ' — ' + c.nome : ''} · ${fmtBRL(saldo)}`;
+        btn.onclick = () => selecionar(lado, c.id);
+        chips.appendChild(btn);
+      });
+      if (lista.length > 24) {
+        chips.insertAdjacentHTML('beforeend',
+          `<span class="text-muted" style="font-size:0.75rem;align-self:center;">+${lista.length - 24}…</span>`);
+      }
+      if (lista.length === 0) {
+        chips.innerHTML = '<span class="text-muted" style="font-size:0.82rem;">Nenhum cliente.</span>';
+      }
+    }
+
+    async function selecionar(lado, id) {
+      // Recarrega o doc do cliente pra ter saldo atualizado.
+      const snap = await getDoc(doc(db, 'clientes', id));
+      if (!snap.exists()) return showAlerta('Cliente não encontrado.', 'danger');
+      const dados = { id, ...snap.data() };
+
+      if (lado === 'origem') {
+        if (destino?.id === id) return showAlerta('Origem e destino não podem ser o mesmo cliente.', 'warning');
+        origem = dados;
+        $('origem-nome').textContent = dados.nome ? `${id} — ${dados.nome}` : id;
+        $('origem-saldo').textContent = fmtBRL(dados.saldo || 0);
+        $('sel-origem').classList.remove('hidden');
+        $('busca-origem').value = '';
+        renderChips('origem', '');
+        renderChips('destino', $('busca-destino').value);
+      } else {
+        if (origem?.id === id) return showAlerta('Origem e destino não podem ser o mesmo cliente.', 'warning');
+        destino = dados;
+        $('destino-nome').textContent = dados.nome ? `${id} — ${dados.nome}` : id;
+        $('destino-saldo').textContent = fmtBRL(dados.saldo || 0);
+        $('sel-destino').classList.remove('hidden');
+        $('busca-destino').value = '';
+        renderChips('destino', '');
+        renderChips('origem', $('busca-origem').value);
+      }
+      atualizarPreview();
+      atualizarBotao();
+    }
+
+    function limpar(lado) {
+      if (lado === 'origem') { origem = null; $('sel-origem').classList.add('hidden'); }
+      else { destino = null; $('sel-destino').classList.add('hidden'); }
+      renderChips('origem', $('busca-origem').value);
+      renderChips('destino', $('busca-destino').value);
+      atualizarPreview();
+      atualizarBotao();
+    }
+
+    function inverter() {
+      if (!origem && !destino) return;
+      [origem, destino] = [destino, origem];
+      // Repintar ambos os lados.
+      if (origem) {
+        $('origem-nome').textContent = origem.nome ? `${origem.id} — ${origem.nome}` : origem.id;
+        $('origem-saldo').textContent = fmtBRL(origem.saldo || 0);
+        $('sel-origem').classList.remove('hidden');
+      } else $('sel-origem').classList.add('hidden');
+      if (destino) {
+        $('destino-nome').textContent = destino.nome ? `${destino.id} — ${destino.nome}` : destino.id;
+        $('destino-saldo').textContent = fmtBRL(destino.saldo || 0);
+        $('sel-destino').classList.remove('hidden');
+      } else $('sel-destino').classList.add('hidden');
+      renderChips('origem', $('busca-origem').value);
+      renderChips('destino', $('busca-destino').value);
+      atualizarPreview();
+      atualizarBotao();
+    }
+
+    function atualizarPreview() {
+      const valor = parseFloat($('valor').value);
+      if (!origem || !destino || !Number.isFinite(valor) || valor <= 0) {
+        $('preview').classList.add('hidden');
+        return;
+      }
+      const ao = origem.saldo || 0;
+      const ad = destino.saldo || 0;
+      $('prev-origem-id').textContent = origem.id;
+      $('prev-destino-id').textContent = destino.id;
+      $('prev-origem-antes').textContent = fmtBRL(ao);
+      $('prev-origem-depois').textContent = fmtBRL(ao - valor);
+      $('prev-destino-antes').textContent = fmtBRL(ad);
+      $('prev-destino-depois').textContent = fmtBRL(ad + valor);
+      $('preview').classList.remove('hidden');
+      renderIcons($('preview'));
+    }
+
+    function atualizarBotao() {
+      const valor = parseFloat($('valor').value);
+      const ok = origem && destino && Number.isFinite(valor) && valor > 0;
+      $('btn-confirmar').disabled = !ok;
+    }
+
+    $('busca-origem').oninput = () => renderChips('origem', $('busca-origem').value);
+    $('busca-destino').oninput = () => renderChips('destino', $('busca-destino').value);
+    $('btn-trocar-origem').onclick = () => limpar('origem');
+    $('btn-trocar-destino').onclick = () => limpar('destino');
+    $('btn-inverter').onclick = inverter;
+    $('valor').addEventListener('input', () => { atualizarPreview(); atualizarBotao(); });
+    $('btn-tudo').onclick = () => {
+      if (!origem) return showAlerta('Selecione a origem primeiro.', 'warning');
+      $('valor').value = (origem.saldo || 0).toFixed(2);
+      atualizarPreview();
+      atualizarBotao();
+    };
+
+    // Permite Enter no busca-origem/destino selecionar match único exato (por ID)
+    [['busca-origem', 'origem'], ['busca-destino', 'destino']].forEach(([elId, lado]) => {
+      $(elId).addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        const v = e.target.value.trim();
+        if (!v) return;
+        const exato = todosClientes.find(c => c.id.toLowerCase() === v.toLowerCase());
+        if (exato) selecionar(lado, exato.id);
+      });
+    });
+
+    let eventoAtivo = null;
+    getDoc(doc(db, 'config', 'eventoAtivo')).then(s => { if (s.exists()) eventoAtivo = s.data(); });
+
+    $('btn-confirmar').onclick = async () => {
+      if (!origem || !destino) return showAlerta('Selecione origem e destino.', 'warning');
+      if (origem.id === destino.id) return showAlerta('Origem e destino não podem ser iguais.', 'warning');
+
+      const valor = parseFloat($('valor').value);
+      if (!Number.isFinite(valor) || valor <= 0) return showAlerta('Digite um valor maior que zero.', 'warning');
+
+      const motivo = $('motivo').value.trim();
+
+      if (!confirm(
+        `Confirmar transferência?\n\n` +
+        `${fmtBRL(valor)}\n` +
+        `De:   ${origem.id}${origem.nome ? ' — ' + origem.nome : ''}\n` +
+        `Para: ${destino.id}${destino.nome ? ' — ' + destino.nome : ''}\n\n` +
+        `Esta ação fica registrada pra auditoria.`
+      )) return;
+
+      $('btn-confirmar').disabled = true;
+      $('btn-confirmar').innerHTML = '<div class="loader"></div> Processando…';
+      const timerLento = setTimeout(() => {
+        $('btn-confirmar').innerHTML = '<div class="loader"></div> Conexão lenta — aguardando servidor…';
+      }, 5000);
+
+      let txIdGerado = null;
+      let saldosFinal = null;
+
+      try {
+        await runTransaction(db, async (tx) => {
+          const refO = doc(db, 'clientes', origem.id);
+          const refD = doc(db, 'clientes', destino.id);
+          const [snapO, snapD] = await Promise.all([tx.get(refO), tx.get(refD)]);
+          if (!snapO.exists()) throw new Error('Cliente origem não existe.');
+          if (!snapD.exists()) throw new Error('Cliente destino não existe.');
+
+          const saldoO = snapO.data().saldo || 0;
+          const saldoD = snapD.data().saldo || 0;
+          if (saldoO < valor) {
+            throw new Error(`Saldo insuficiente na origem (tem ${fmtBRL(saldoO)}, precisa ${fmtBRL(valor)}).`);
+          }
+
+          const novoO = saldoO - valor;
+          const novoD = saldoD + valor;
+          tx.update(refO, { saldo: novoO });
+          tx.update(refD, { saldo: novoD });
+
+          const txRef = doc(collection(db, 'transferencias_saldo'));
+          txIdGerado = txRef.id;
+          tx.set(txRef, {
+            origemId: origem.id,
+            origemNome: origem.nome || null,
+            origemSaldoAntes: saldoO,
+            origemSaldoDepois: novoO,
+            destinoId: destino.id,
+            destinoNome: destino.nome || null,
+            destinoSaldoAntes: saldoD,
+            destinoSaldoDepois: novoD,
+            valor,
+            motivo: motivo || null,
+            eventoId: eventoAtivo?.id || null,
+            eventoNome: eventoAtivo?.nome || null,
+            usuarioId: perfil.uid,
+            usuarioEmail: perfil.email || null,
+            usuarioNome: perfil.nome || null,
+            usuarioPapel: perfil.papel || null,
+            criadoEm: serverTimestamp()
+          });
+          saldosFinal = { origem: novoO, destino: novoD };
+        });
+
+        clearTimeout(timerLento);
+        try { navigator.vibrate?.([40, 60, 40, 60, 80]); } catch (_) {}
+        const idCurto = (txIdGerado || '').slice(-6).toUpperCase();
+        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 18 })} Transferência #${idCurto} feita — ${fmtBRL(valor)} de ${origem.id} pra ${destino.id}.</span>`;
+        alerta.className = 'alert alert-success';
+        alerta.classList.remove('hidden');
+
+        // Atualiza saldos exibidos e zera valor/motivo pra próxima.
+        origem = { ...origem, saldo: saldosFinal.origem };
+        destino = { ...destino, saldo: saldosFinal.destino };
+        $('origem-saldo').textContent = fmtBRL(origem.saldo);
+        $('destino-saldo').textContent = fmtBRL(destino.saldo);
+        $('valor').value = '';
+        $('motivo').value = '';
+        $('preview').classList.add('hidden');
+      } catch (err) {
+        clearTimeout(timerLento);
+        try { navigator.vibrate?.([100, 50, 100]); } catch (_) {}
+        const eContencao = err.code === 'failed-precondition'
+                       || err.code === 'aborted'
+                       || /stored version/i.test(err.message || '');
+        const msg = eContencao
+          ? 'Conflito com outra operação simultânea. Nada foi transferido — tente de novo.'
+          : `Erro: ${err.message}`;
+        showAlerta(msg, 'danger');
+      } finally {
+        atualizarBotao();
+        $('btn-confirmar').innerHTML = `${icon('check', { size: 16 })} Confirmar transferência`;
+      }
+    };
+
+    // Últimas transferências (live, top 30)
+    onSnapshot(
+      query(collection(db, 'transferencias_saldo'), orderBy('criadoEm', 'desc')),
+      (snap) => {
+        const lista = $('lista-tx');
+        if (snap.empty) {
+          lista.innerHTML = `<div class="empty-state">${icon('inbox', { size: 32 })}<p>Nenhuma transferência registrada ainda.</p></div>`;
+          renderIcons(lista);
+          return;
+        }
+        lista.innerHTML = '';
+        snap.docs.slice(0, 30).forEach(d => {
+          const t = d.data();
+          const dt = t.criadoEm?.toDate?.() || new Date(0);
+          const quando = dt.toLocaleString('pt-BR');
+          const quem = t.usuarioNome || t.usuarioEmail || '—';
+          const papel = t.usuarioPapel ? ` (${t.usuarioPapel})` : '';
+          const motivo = t.motivo ? `<div class="hist-detalhe">${(t.motivo).replace(/[<>]/g, '')}</div>` : '';
+          lista.innerHTML += `
+            <div class="hist-item">
+              <div class="hist-row">
+                <span class="hist-badge" style="background:var(--azul);">transfer</span>
+                <span class="hist-quando">${quando}</span>
+                <span class="hist-valor" style="color:var(--azul);">${fmtBRL(t.valor)}</span>
+              </div>
+              <div class="hist-detalhe">
+                <strong>${t.origemId}</strong>${t.origemNome ? ' (' + t.origemNome + ')' : ''}
+                → <strong>${t.destinoId}</strong>${t.destinoNome ? ' (' + t.destinoNome + ')' : ''}
+                · por ${quem}${papel}
+              </div>
+              ${motivo}
+            </div>
+          `;
+        });
+      },
+      (err) => {
+        $('lista-tx').innerHTML = `<div class="alert alert-danger">Erro ao carregar histórico: ${err.message}</div>`;
+      }
+    );
+
+    carregarClientes();
+  </script>
+</body>
+</html>
