@@ -1146,8 +1146,68 @@ tr:hover td { background: var(--cinza-claro); }
 .skel-title  { height: 1.4em;  width: 60%; }
 .skel-pill   { height: 1.1em;  width: 70px; border-radius: 999px; }
 .skel-num    { height: 1.6em;  width: 80px; }
+.skel-block  { display: block; height: 1em; width: 100%; }
+/* Variante clara para usar sobre fundos escuros (ex: .cliente-info com gradiente azul). */
+.skel-on-dark {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.18) 0%,
+    rgba(255,255,255,0.35) 50%,
+    rgba(255,255,255,0.18) 100%
+  );
+  background-size: 200% 100%;
+}
+:root[data-theme="dark"] .skel-on-dark {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.10) 0%,
+    rgba(255,255,255,0.22) 50%,
+    rgba(255,255,255,0.10) 100%
+  );
+  background-size: 200% 100%;
+}
 @media (prefers-reduced-motion: reduce) {
   .skel { animation: none; }
+}
+
+/* Skeleton de card de produto — usado enquanto a grid em vender.html carrega. */
+.skel-prod-card {
+  background: var(--branco);
+  border-radius: var(--radius-sm);
+  padding: 0.875rem;
+  box-shadow: var(--sombra);
+  border: 2px solid transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 110px;
+}
+:root[data-theme="dark"] .skel-prod-card {
+  background: #1E293B;
+  box-shadow: none;
+}
+
+/* Skeleton de item de histórico — usado em hist-list enquanto carrega. */
+.skel-hist-item {
+  background: var(--branco);
+  border: 1px solid var(--cinza-claro);
+  border-radius: var(--radius, 10px);
+  padding: 0.7rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.skel-hist-item .row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.skel-hist-item .row .grow { flex: 1; }
+:root[data-theme="dark"] .skel-hist-item {
+  background: #1E293B;
+  border-color: #334155;
+  box-shadow: none;
 }
 
 /* Linha de skeleton dentro do tbody — o JS preenche colunas com .skel */

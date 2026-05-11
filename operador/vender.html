@@ -334,9 +334,9 @@
 
   <main style="padding-bottom: 6rem;">
     <div class="cliente-info">
-      <div class="nome" id="cliente-nome">Carregando...</div>
+      <div class="nome" id="cliente-nome"><span class="skel skel-on-dark skel-title" style="width:60%"></span></div>
       <div class="saldo-label">Saldo disponível</div>
-      <div class="saldo" id="cliente-saldo">R$ 0,00</div>
+      <div class="saldo" id="cliente-saldo"><span class="skel skel-on-dark skel-num" style="width:140px;height:1.8rem"></span></div>
     </div>
 
     <div id="alerta" class="alert hidden"></div>
@@ -349,7 +349,14 @@
     </div>
     <div id="cat-bar" class="cat-bar" role="tablist" aria-label="Filtro de categorias"></div>
     <div id="produtos-container">
-      <p class="text-muted text-center" id="produtos-loading">Carregando produtos...</p>
+      <div class="produtos-grid" id="produtos-loading" aria-hidden="true">
+        <div class="skel-prod-card"><span class="skel skel-text" style="width:80%"></span><span class="skel skel-text" style="width:50%"></span><span class="skel skel-text" style="width:35%"></span></div>
+        <div class="skel-prod-card"><span class="skel skel-text" style="width:70%"></span><span class="skel skel-text" style="width:55%"></span><span class="skel skel-text" style="width:40%"></span></div>
+        <div class="skel-prod-card"><span class="skel skel-text" style="width:85%"></span><span class="skel skel-text" style="width:45%"></span><span class="skel skel-text" style="width:30%"></span></div>
+        <div class="skel-prod-card"><span class="skel skel-text" style="width:75%"></span><span class="skel skel-text" style="width:60%"></span><span class="skel skel-text" style="width:38%"></span></div>
+        <div class="skel-prod-card"><span class="skel skel-text" style="width:65%"></span><span class="skel skel-text" style="width:50%"></span><span class="skel skel-text" style="width:42%"></span></div>
+        <div class="skel-prod-card"><span class="skel skel-text" style="width:78%"></span><span class="skel skel-text" style="width:55%"></span><span class="skel skel-text" style="width:36%"></span></div>
+      </div>
     </div>
   </main>
 

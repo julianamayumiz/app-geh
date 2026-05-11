@@ -423,6 +423,9 @@
       }
       $('aud-resumo').textContent = live ? 'Carregando ao vivo…' : 'Carregando…';
       $('btn-csv').disabled = true;
+      $('aud-feed').innerHTML = Array.from({ length: 5 }).map(() =>
+        `<div class="skel-hist-item"><div class="row"><span class="skel skel-pill"></span><span class="skel skel-text" style="width:28%"></span><span class="skel skel-num grow" style="margin-left:auto;width:80px"></span></div><span class="skel skel-text" style="width:70%"></span></div>`
+      ).join('');
 
       const cols = Object.keys(dados);
       cols.forEach(coll => abrirColecao(coll));

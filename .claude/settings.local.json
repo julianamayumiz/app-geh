@@ -11,7 +11,9 @@
       "PowerShell(git rm --cached .claude/worktrees/venda-porta-feedback)",
       "PowerShell(git rm --cached .firebase/hosting..cache)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "PowerShell(claude --version)",
+      "PowerShell(Get-ChildItem \"$env:USERPROFILE\\\\.claude\\\\plugins\" -ErrorAction SilentlyContinue | Select-Object Name, LastWriteTime)"
     ]
   }
 }
