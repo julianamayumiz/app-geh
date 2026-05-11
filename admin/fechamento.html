@@ -202,7 +202,8 @@
   </main>
 
   <script type="module">
-    import { montarNav, fmtBRL } from "./_nav.js";
+    import { montarNav } from "./_nav.js";
+    import { fmtBRL } from "../js/helpers.js";
     import { db, collection, getDocs, getDoc, doc, query, where, orderBy } from "../js/firebase-config.js";
     import { renderIcons } from "../js/icons.js";
 

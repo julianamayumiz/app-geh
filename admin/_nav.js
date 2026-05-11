@@ -150,8 +150,3 @@ function linkNav({ href, icone, texto }, ativa) {
   return `<a href="${href}" class="${classe}">${icon(icone, { size: 18 })} <span>${texto}</span></a>`;
 }
 
-// Re-export pra manter compatibilidade com os imports antigos.
-// Os 14 HTMLs admin que fazem `import { montarNav, fmtBRL } from "./_nav.js"`
-// continuam funcionando. Em uma 2ª passada, eles podem importar direto de
-// `../js/helpers.js` e esse re-export pode ser removido.
-export { fmtBRL } from '../js/helpers.js';

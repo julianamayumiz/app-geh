@@ -60,7 +60,8 @@
   </main>
 
   <script type="module">
-    import { montarNav, fmtBRL } from "./_nav.js";
+    import { montarNav } from "./_nav.js";
+    import { fmtBRL } from "../js/helpers.js";
     import {
       db, collection, doc, addDoc, onSnapshot,
       query, orderBy, limit, serverTimestamp, runTransaction

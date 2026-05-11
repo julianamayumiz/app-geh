@@ -57,7 +57,8 @@
   </main>
 
   <script type="module">
-    import { montarNav, fmtBRL } from "./_nav.js";
+    import { montarNav } from "./_nav.js";
+    import { fmtBRL } from "../js/helpers.js";
     import { db, collection, doc, setDoc, getDoc, getDocs, deleteDoc, onSnapshot, writeBatch } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
     import { confirmarAsync } from "../js/ui.js";

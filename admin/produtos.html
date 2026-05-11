@@ -81,7 +81,8 @@ Suco de Laranja, 5.00, 50, Bebidas
   </main>
 
   <script type="module">
-    import { montarNav, fmtBRL } from "./_nav.js";
+    import { montarNav } from "./_nav.js";
+    import { fmtBRL } from "../js/helpers.js";
     import { db, collection, doc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, writeBatch } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
     import { confirmarAsync } from "../js/ui.js";

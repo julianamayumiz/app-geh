@@ -116,7 +116,8 @@
 
   <script type="module" src="../js/icons.js"></script>
   <script type="module">
-    import { montarNav, fmtBRL } from "./_nav.js";
+    import { montarNav } from "./_nav.js";
+    import { fmtBRL } from "../js/helpers.js";
     import {
       db, collection, doc, getDoc, getDocs, addDoc, query, orderBy,
       onSnapshot, runTransaction, serverTimestamp
