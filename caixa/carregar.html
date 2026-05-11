@@ -73,12 +73,21 @@
 
 
     async function carregarHistorico() {
-      const [movSnap, vendasSnap, transfOrigemSnap, transfDestinoSnap] = await Promise.all([
-        getDocs(query(collection(db, 'movimentacoes_saldo'), where('clienteId', '==', clienteId), orderBy('criadoEm', 'desc'))),
-        getDocs(query(collection(db, 'vendas'), where('clienteId', '==', clienteId), orderBy('criadoEm', 'desc'))),
-        getDocs(query(collection(db, 'transferencias_saldo'), where('origemId', '==', clienteId), orderBy('criadoEm', 'desc'))),
-        getDocs(query(collection(db, 'transferencias_saldo'), where('destinoId', '==', clienteId), orderBy('criadoEm', 'desc')))
-      ]);
+      let movSnap, vendasSnap, transfOrigemSnap, transfDestinoSnap;
+      try {
+        [movSnap, vendasSnap, transfOrigemSnap, transfDestinoSnap] = await Promise.all([
+          getDocs(query(collection(db, 'movimentacoes_saldo'), where('clienteId', '==', clienteId), orderBy('criadoEm', 'desc'))),
+          getDocs(query(collection(db, 'vendas'), where('clienteId', '==', clienteId), orderBy('criadoEm', 'desc'))),
+          getDocs(query(collection(db, 'transferencias_saldo'), where('origemId', '==', clienteId), orderBy('criadoEm', 'desc'))),
+          getDocs(query(collection(db, 'transferencias_saldo'), where('destinoId', '==', clienteId), orderBy('criadoEm', 'desc')))
+        ]);
+      } catch (e) {
+        console.error('[carregar] falha ao carregar histórico:', e);
+        const lista = document.getElementById('lista-hist');
+        lista.innerHTML = `<div class="alert alert-danger">Erro ao carregar histórico: ${e.message}. Recarregue a página.</div>`;
+        document.getElementById('historico').classList.remove('hidden');
+        return;
+      }
 
       const movs = [];
       movSnap.forEach(d => {
@@ -150,7 +159,9 @@
     }
 
     let eventoAtivo = null;
-    getDoc(doc(db, 'config', 'eventoAtivo')).then(s => { if (s.exists()) eventoAtivo = s.data(); });
+    getDoc(doc(db, 'config', 'eventoAtivo'))
+      .then(s => { if (s.exists()) eventoAtivo = s.data(); })
+      .catch(e => console.warn('[carregar] falha ao ler eventoAtivo:', e));
 
     const $ = (id) => document.getElementById(id);
     const alerta = $('alerta');

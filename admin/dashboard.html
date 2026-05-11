@@ -384,6 +384,10 @@
           s.forEach(d => saldo += d.data().saldo || 0);
           $('saldo-circulacao').textContent = fmtBRL(saldo);
           $('num-clientes').textContent = s.size;
+        }, err => {
+          console.error('[dashboard] onSnapshot clientes (sem evento) erro:', err);
+          $('saldo-circulacao').textContent = '—';
+          $('num-clientes').textContent = '—';
         });
         return;
       }
@@ -438,6 +442,10 @@
           if (ticketEl) ticketEl.textContent = snap.size ? fmtBRL(total / snap.size) : fmtBRL(0);
 
           atualizarGraficos(snap.docs);
+        },
+        err => {
+          console.error('[dashboard] onSnapshot vendas erro:', err);
+          $('tbl-vendas').innerHTML = `<tr><td colspan="4"><div class="alert alert-danger">Erro carregando vendas: ${err.message}</div></td></tr>`;
         }
       );
 
@@ -470,6 +478,10 @@
           zerados.map(p => chip(p, corVerm, 'esgotado', 'x-circle')).join('') +
           baixos.sort((a,b) => (a.estoque||0) - (b.estoque||0))
                 .map(p => chip(p, corAmar, `restam ${p.estoque}`, 'alert-triangle')).join('');
+      }, err => {
+        console.error('[dashboard] onSnapshot produtos erro:', err);
+        // Não polui a UI pra alerta de estoque — só loga; o KPI principal
+        // ainda funciona mesmo sem o card de estoque baixo.
       });
 
       // Saldo + clientes (globais)
@@ -478,6 +490,10 @@
         s.forEach(d => saldo += d.data().saldo || 0);
         $('saldo-circulacao').textContent = fmtBRL(saldo);
         $('num-clientes').textContent = s.size;
+      }, err => {
+        console.error('[dashboard] onSnapshot clientes (globais) erro:', err);
+        $('saldo-circulacao').textContent = '—';
+        $('num-clientes').textContent = '—';
       });
     })();
   </script>

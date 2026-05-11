@@ -453,7 +453,9 @@
       const onErr = (err) => {
         if (minhaVersao !== versionFiltro) return;
         console.error(`[auditoria] erro lendo ${coll}:`, err);
-        $('aud-resumo').textContent = `Erro lendo ${coll}: ${err.message}`;
+        // Texto puro no aud-resumo passa despercebido em tela cheia —
+        // injeta um alert-danger visível pra admin não perder o erro.
+        $('aud-resumo').innerHTML = `<div class="alert alert-danger" style="margin:0;">Erro lendo ${coll}: ${err.message}</div>`;
       };
       if (live) {
         unsubs.push(onSnapshot(q, handler, onErr));

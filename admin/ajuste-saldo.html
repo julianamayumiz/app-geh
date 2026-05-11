@@ -245,7 +245,11 @@
       try {
         const evSnap = await getDoc(doc(db, 'config', 'eventoAtivo'));
         if (evSnap.exists()) eventoAtivo = evSnap.data();
-      } catch (_) {}
+      } catch (e) {
+        // Ajuste continua mesmo sem evento — só vincula null. Mas loga
+        // pra distinguir erro de leitura de "sem evento ativo" na auditoria.
+        console.warn('[ajuste-saldo] falha ao ler eventoAtivo:', e);
+      }
 
       try {
         await runTransaction(db, async (tx) => {

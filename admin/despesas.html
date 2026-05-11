@@ -296,7 +296,9 @@
           $('lote-vincular-evento').checked = false;
           $('lote-vincular-evento').disabled = true;
         }
-      } catch (_) {}
+      } catch (e) {
+        console.warn('[despesas] falha ao ler eventoAtivo:', e);
+      }
     })();
 
     // Tipo: troca label do "responsável" e cor do bloco

@@ -364,6 +364,10 @@
           checkInPor: perfil.nome || perfil.email || 'recepção',
         });
         fecharModal();
+      } catch (err) {
+        // Sem catch o operador veria o botão voltar ao normal sem mensagem
+        // — em evento de campo isso passa por "registrado" quando não foi.
+        alert(`Erro ao registrar entrada: ${err.message}. Tente de novo.`);
       } finally {
         $('btn-marcar').disabled = false;
       }
@@ -382,6 +386,8 @@
           checkInPor: null,
         });
         fecharModal();
+      } catch (err) {
+        alert(`Erro ao desfazer entrada: ${err.message}. Tente de novo.`);
       } finally {
         $('btn-desfazer').disabled = false;
       }
@@ -408,6 +414,13 @@
         atualizarResumo();
         renderFiltrosFamilia();
         render();
+      },
+      (err) => {
+        // Sem isso, se o Firestore falhar (rede, regra, índice faltando),
+        // a lista congela no último estado sem aviso — operador continua
+        // conferindo dados que podem estar desatualizados.
+        console.error('[conferencia] onSnapshot erro:', err);
+        $('lista').innerHTML = `<div class="alert alert-danger">Erro ao carregar a lista: ${err.message}. Recarregue a página.</div>`;
       }
     );
   </script>

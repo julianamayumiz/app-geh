@@ -522,12 +522,17 @@
     }
 
     async function carregarClientes() {
-      const snap = await getDocs(collection(db, 'clientes'));
-      todosClientes = [];
-      snap.forEach(d => todosClientes.push({ id: d.id, ...d.data() }));
-      todosClientes.sort((a, b) => a.id.localeCompare(b.id));
-      renderChips('origem', '');
-      renderChips('destino', '');
+      try {
+        const snap = await getDocs(collection(db, 'clientes'));
+        todosClientes = [];
+        snap.forEach(d => todosClientes.push({ id: d.id, ...d.data() }));
+        todosClientes.sort((a, b) => a.id.localeCompare(b.id));
+        renderChips('origem', '');
+        renderChips('destino', '');
+      } catch (e) {
+        console.error('[transferir] falha ao carregar clientes:', e);
+        showAlerta(`Erro ao carregar clientes: ${e.message}. Recarregue a página.`, 'danger');
+      }
     }
 
     function renderChips(lado, filtro) {
@@ -781,7 +786,9 @@
     });
 
     let eventoAtivo = null;
-    getDoc(doc(db, 'config', 'eventoAtivo')).then(s => { if (s.exists()) eventoAtivo = s.data(); });
+    getDoc(doc(db, 'config', 'eventoAtivo'))
+      .then(s => { if (s.exists()) eventoAtivo = s.data(); })
+      .catch(e => console.warn('[transferir] falha ao ler eventoAtivo:', e));
 
     $('btn-confirmar').onclick = async () => {
       if (!origem || !destino) return showAlerta('Selecione origem e destino.', 'warning');

@@ -91,7 +91,9 @@
 
     // Evento ativo
     let eventoAtivo = null;
-    getDoc(doc(db, 'config', 'eventoAtivo')).then(s => { if (s.exists()) eventoAtivo = s.data(); });
+    getDoc(doc(db, 'config', 'eventoAtivo'))
+      .then(s => { if (s.exists()) eventoAtivo = s.data(); })
+      .catch(e => console.warn('[vender] falha ao ler eventoAtivo:', e));
 
     const params = new URLSearchParams(window.location.search);
     const clienteId = params.get('cliente');
@@ -428,11 +430,21 @@
 
     // ── Finalizar ─────────────────────────────────────
     $('btn-finalizar').onclick = async () => {
-      if (!cliente) return;
-      if (carrinho.size === 0) return;
+      const alertaModal = $('alerta-modal');
+      if (!cliente) {
+        // Sem feedback aqui o operador clica e nada acontece — comum
+        // se a carga inicial do cliente falhou por rede ruim.
+        alertaModal.textContent = 'Dados do cliente não carregados. Recarregue a página (cliente=' + clienteId + ').';
+        alertaModal.className = 'alert alert-danger';
+        return;
+      }
+      if (carrinho.size === 0) {
+        alertaModal.textContent = 'Carrinho vazio.';
+        alertaModal.className = 'alert alert-warning';
+        return;
+      }
 
       const total = totalCarrinho();
-      const alertaModal = $('alerta-modal');
 
       if ((cliente.saldo || 0) < total) {
         alertaModal.textContent = `Saldo insuficiente. Falta ${fmtBRL(total - cliente.saldo)}`;
@@ -505,9 +517,10 @@
         const idCurto = (vendaIdGerado || '').slice(-6).toUpperCase();
         toast(`Venda #${idCurto} — ${fmtBRL(total)} · saldo final ${fmtBRL(saldoFinal)}`, {
           tipo: 'sucesso',
-          duracao: 2500,
+          duracao: 4000,
         });
-        setTimeout(() => window.location.href = 'index.html', 2500);
+        // 4s pra dar tempo do operador ler o saldo final em evento barulhento
+        setTimeout(() => window.location.href = 'index.html', 4000);
       } catch (err) {
         clearTimeout(timerLento);
         vibrar([100, 50, 100]); // padrão de erro
