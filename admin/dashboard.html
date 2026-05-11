@@ -120,8 +120,7 @@
     .kpi-small.accent-verde    { border-left-color: var(--verde); }
     .kpi-small.accent-verde    .valor { color: var(--verde); }
     .kpi-small.accent-amarelo  { border-left-color: var(--amarelo); }
-    .kpi-small.accent-amarelo  .valor { color: #B45309; }
-    :root[data-theme="dark"] .kpi-small.accent-amarelo .valor { color: var(--amarelo); }
+    .kpi-small.accent-amarelo  .valor { color: var(--amarelo-acento); }
     .kpi-small.accent-azul     { border-left-color: var(--azul); }
     .kpi-small.accent-azul     .valor { color: var(--azul); }
 
@@ -202,8 +201,7 @@
       text-align: center;
     }
     .ranking-row .nome { font-weight: 600; }
-    .ranking-row .total { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--azul); }
-    :root[data-theme="dark"] .ranking-row .total { color: #93C5FD; }
+    .ranking-row .total { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--azul-claro); }
 
     @media (max-width: 520px) {
       .podium { grid-template-columns: 1fr; }

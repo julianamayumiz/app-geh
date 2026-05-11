@@ -20,6 +20,10 @@
   --radius: 12px;
   --radius-sm: 8px;
 
+  /* Acentos dependentes de tema — escuros sobre fundo claro,
+     vibrantes sobre fundo escuro. */
+  --amarelo-acento: #B45309;
+
   --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-body:    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
@@ -366,10 +370,13 @@ a:focus-visible {
   box-shadow: var(--sombra);
   cursor: pointer;
   text-align: center;
-  transition: transform 0.1s;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
   border: 2px solid transparent;
 }
 
+@media (hover: hover) {
+  .produto-card:hover { transform: translateY(-2px); box-shadow: var(--sombra-forte); }
+}
 .produto-card:active { transform: scale(0.97); }
 .produto-card.selecionado { border-color: var(--azul); }
 
@@ -1018,6 +1025,9 @@ tr:hover td { background: var(--cinza-claro); }
 
   --sombra:       0 4px 12px rgba(0, 0, 0, 0.45);
   --sombra-forte: 0 8px 24px rgba(0, 0, 0, 0.65);
+
+  /* No dark, o amarelo-acento usa o tom vibrante (mais legível em fundo escuro) */
+  --amarelo-acento: var(--amarelo);
 
   color-scheme: dark;
   background: #0F172A;
