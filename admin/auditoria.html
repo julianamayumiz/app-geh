@@ -270,12 +270,12 @@
       onSnapshot
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
+    import { fmtBRL } from "../js/helpers.js";
 
     montarNav('auditoria.html');
     renderIcons();
 
     const $ = (id) => document.getElementById(id);
-    const fmtBRL = (v) => `R$ ${Number(v || 0).toFixed(2).replace('.', ',')}`;
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({
       '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
     }[c]));

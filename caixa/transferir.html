@@ -430,10 +430,10 @@
     import { icon, renderIcons } from "../js/icons.js";
     import { requireAuth } from "../js/auth-guard.js";
     import { iniciarScanner } from "../js/scanner.js";
+    import { fmtBRL } from "../js/helpers.js";
 
     const { perfil } = await requireAuth({ papel: ['caixa', 'operador'] });
 
-    const fmtBRL = (v) => `R$ ${Number(v || 0).toFixed(2).replace('.', ',')}`;
     const fmtInput = (v) => Number(v || 0).toFixed(2).replace('.', ',');
     const $ = (id) => document.getElementById(id);
     const alerta = $('alerta');

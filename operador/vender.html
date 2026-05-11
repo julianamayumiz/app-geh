@@ -402,6 +402,7 @@
 
     const { perfil } = await requireAuth({ papel: 'operador' });
     import { toast } from "../js/ui.js";
+    import { fmtBRL } from "../js/helpers.js";
 
     // Evento ativo
     let eventoAtivo = null;
@@ -683,10 +684,6 @@
 
     function qtdTotalCarrinho() {
       return Array.from(carrinho.values()).reduce((s, { qtd }) => s + qtd, 0);
-    }
-
-    function fmtBRL(v) {
-      return `R$ ${Number(v).toFixed(2).replace('.', ',')}`;
     }
 
     function atualizarFab() {

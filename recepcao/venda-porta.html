@@ -134,6 +134,7 @@
     import { renderIcons } from "../js/icons.js";
     import { requireAuth } from "../js/auth-guard.js";
     import { instalarBannerPWA } from "../js/install-banner.js";
+    import { fmtBRL } from "../js/helpers.js";
 
     const { perfil } = await requireAuth({ papel: 'recepcao' });
     renderIcons();
@@ -147,7 +148,6 @@
     const $ = id => document.getElementById(id);
     const aviso = $('aviso');
 
-    function fmtBRL(v) { return `R$ ${Number(v || 0).toFixed(2).replace('.', ',')}`; }
 
     let eventoAtivoId = null;
     let categorias = [];
