@@ -216,27 +216,6 @@ function aplicarSkeletonNoPlaceholder(tbody) {
   return true;
 }
 
-export function skeletonRows(tbody, cols, qtd = 5) {
-  if (!tbody) return;
-  const html = Array.from({ length: qtd }).map(() => {
-    const tds = Array.from({ length: cols }).map((_, i) => {
-      const cls = i === cols - 1 ? 'skel skel-pill' : 'skel skel-text';
-      return `<td><span class="${cls}" style="width:${50 + Math.random() * 40}%">—</span></td>`;
-    }).join('');
-    return `<tr class="skel-row">${tds}</tr>`;
-  }).join('');
-  tbody.setAttribute('aria-busy', 'true');
-  tbody.innerHTML = html;
-  const obsBusy = new MutationObserver(() => {
-    const ainda = Array.from(tbody.rows).some(r => r.classList.contains('skel-row'));
-    if (!ainda) {
-      tbody.removeAttribute('aria-busy');
-      obsBusy.disconnect();
-    }
-  });
-  obsBusy.observe(tbody, { childList: true });
-}
-
 // Auto-skeletoniza placeholders de "Carregando..." em todas as tabelas.
 // Chamado pelo _nav.js após enhanceAllTables.
 export function autoSkeleton(root = document) {
