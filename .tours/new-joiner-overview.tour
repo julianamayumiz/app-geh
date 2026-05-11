@@ -1,0 +1,72 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "Onboarding — App GEH (visão geral)",
+  "description": "Tour de boas-vindas pra alguém da diretoria do GEH (ou outro Claude) que precisa entender o App GEH antes de mexer. Cobre arquitetura, segurança e os 2 fluxos financeiros mais críticos (venda + ajuste de saldo). 11 paradas.",
+  "ref": "main",
+  "steps": [
+    {
+      "directory": "",
+      "title": "1. Raiz — quem você está olhando",
+      "description": "Web app vanilla HTML/JS + Firebase do Grupo Escoteiro Hokkaido. Substitui um AppSheet anterior, lida com dinheiro real em eventos (saldo de cliente, vendas, recargas, transferências, ajustes). Sem bundler, sem framework, sem testes. Comece pelo README.md pra entender o domínio; este tour foca em ARQUITETURA e onde estão os fluxos."
+    },
+    {
+      "file": "index.html",
+      "line": 29,
+      "title": "2. Landing — 4 perfis, 4 apps",
+      "description": "O `index.html` é só uma escolha de perfil. Cada papel (operador/caixa/recepção sem login, admin com login) tem seu próprio app numa pasta. Os 3 sem login são mobile-first (usados no celular, em campo). O admin é desktop-first com sidebar.\n\nGotcha: as URLs são paths reais (`operador/index.html`), não rotas de framework — qualquer um pode chegar direto, e a defesa está nas Firestore rules, não no auth-guard."
+    },
+    {
+      "file": "js/firebase-config.js",
+      "line": 21,
+      "title": "3. Init do Firebase — a apiKey é pública",
+      "description": "Aqui é onde o Firebase SDK é importado direto do CDN do Google (ES Modules, sem bundler) e inicializado com a config do projeto.\n\nMechanism: `firebaseConfig` (linhas 21-28) vai embed no client — isso é normal e seguro no Firebase web. A apiKey é só um identificador do projeto, não credencial secreta.\n\nGotcha: NÃO tente esconder isso em .env — quem te ensinou isso veio de outro stack. A defesa real está nas Firestore rules + App Check."
+    },
+    {
+      "file": "js/firebase-config.js",
+      "line": 58,
+      "title": "4. App Check com reCAPTCHA v3 — a primeira defesa",
+      "description": "Linha 58-61: o App Check exige que toda chamada ao Firestore/Auth venha de um navegador real registrado, validada por reCAPTCHA v3 invisível.\n\nImplication: mesmo que alguém pegue a apiKey e tente chamar o SDK fora do navegador (curl, script), o request é rejeitado. Sobe muito o custo de exploração de qualquer vulnerabilidade nas rules.\n\nGotcha: em dev local, descomente o `FIREBASE_APPCHECK_DEBUG_TOKEN` (linha 53) pra ele dar um token de debug no console — registre lá no Firebase console pra rodar local."
+    },
+    {
+      "file": "js/auth-guard.js",
+      "line": 61,
+      "title": "5. requireAuth — controle por papel",
+      "description": "Toda página admin chama `requireAuth({ papel: 'admin' })` no topo. Se não logado → redireciona pro login. Se logado mas sem doc em `/usuarios/{uid}` ou `ativo: false` → desloga e manda pro login com `?erro=sem-acesso`.\n\nMechanism: lê o doc do usuário a cada page load (linha 39-59) — NÃO confia em localStorage. Burlar significaria comprometer o token JWT do Firebase, não só editar local storage.\n\nGotcha: o `SUPER_ADMIN_EMAIL` (linha 22) é o bootstrap da Juliana — passa como admin mesmo sem doc em /usuarios. NÃO REMOVER, é como ela entra na primeira vez."
+    },
+    {
+      "file": "firestore.rules",
+      "line": 36,
+      "title": "6. Firestore rules — a única defesa real",
+      "description": "Aqui mora a segurança verdadeira do app. `auth-guard.js` é só conveniência de UX — quem importa é o Firestore rejeitar escrita não autorizada.\n\nMechanism: as funções `isAdmin()`, `isOperador()`, `isCaixa()`, `isRecepcao()` (linhas 36-52) consultam o doc `/usuarios/{uid}` pra validar papel + `ativo: true`. Cada `match /<colecao>` declara quem pode read/write.\n\nGotcha: mudar este arquivo NÃO tem efeito até rodar `firebase deploy --only firestore:rules`. O deploy de hosting normal não atualiza as rules — bug comum."
+    },
+    {
+      "file": "firestore.rules",
+      "line": 69,
+      "title": "7. /clientes — exemplo de rule restritiva",
+      "description": "Esta rule (linhas 69-84) é o melhor exemplo do padrão de segurança: admin pode tudo, caixa/operador só podem alterar `saldo` (não nome, qrCode, etc), e o saldo resultante precisa ser ≥ 0.\n\nMechanism: `affectedKeys().hasOnly(['saldo'])` + `saldo is number` + `saldo >= 0`. Bloqueia escrita direta via DevTools que tente mexer em outros campos.\n\nGotcha: a recepção NÃO pode mexer em saldo nenhum — só usa /convites_antecipados e /vendas_porta. Cada papel tem permissões específicas."
+    },
+    {
+      "file": "js/ui.js",
+      "line": 275,
+      "title": "8. confirmarAsync — sempre use isso, nunca confirm()",
+      "description": "`confirmarAsync` (linhas 275-313) é um modal acessível com role=dialog, foco no botão OK, ESC fecha, Enter confirma. Substitui o `confirm()` nativo que é feio e bloqueia tudo.\n\nUso: `if (!(await confirmarAsync('Aplicar ajuste?', { destrutivo: true, textoOk: 'Aplicar' }))) return;`\n\nGotcha: durante o `await`, o handler async pausa. Se o handler depois usa state de módulo (`clienteSelecionado`), capture EM CONST no início (`const idAlvo = clienteSelecionado.id`) — senão usuário pode mudar a seleção durante a confirmação e você aplica no cliente errado (stale closure)."
+    },
+    {
+      "file": "operador/vender.html",
+      "line": 468,
+      "title": "9. runTransaction — coração dos fluxos financeiros",
+      "description": "Toda operação que mexe em saldo OU estoque usa `runTransaction` (Firestore). Aqui na venda: read do cliente + read de todos os produtos do carrinho ANTES de qualquer write, então update no saldo + update no estoque + create da venda. Tudo atômico — ou tudo grava, ou nada.\n\nImplication: se 2 operadores vendem o mesmo produto com estoque=1 ao mesmo tempo, um dos 2 recebe erro de contenção (`failed-precondition` ou `aborted`) e o app mostra mensagem específica pedindo pra tentar de novo. Saldo nunca fica negativo, estoque nunca fica < 0.\n\nGotcha: o `saldoFinal` mostrado no toast é capturado DENTRO da TX (linha 491), não calculado fora — senão ficaria desatualizado se outro operador recarregou em paralelo."
+    },
+    {
+      "file": "admin/ajuste-saldo.html",
+      "line": 208,
+      "title": "10. Ajuste de saldo — auditoria imutável",
+      "description": "Ajustes manuais de saldo (correção de erro, compensação) só podem ser feitos por admin e ficam GRAVADOS PRA SEMPRE em `/ajustes_saldo` — as rules bloqueiam `update` e `delete` (linha 135-150 do firestore.rules), mesmo pra admin.\n\nMechanism: o handler captura `cliAlvo` no início (linha ~213), pede 2 confirmações via `confirmarAsync`, lê eventoAtivo, executa runTransaction que faz update no saldo + create do registro de auditoria com adminId/email/nome/motivo.\n\nGotcha: motivo é obrigatório (≥5 chars) e validado também NAS RULES (não só no client). Mesmo um admin que tente burlar via SDK direto vai falhar se mandar motivo curto."
+    },
+    {
+      "file": "CLAUDE.md",
+      "title": "11. Onde ir agora",
+      "description": "Você viu: landing → init/auth → rules → helpers UI → 2 fluxos financeiros. Próximos caminhos:\n\n- Quer entender outros papéis? Ler `recepcao/conferencia.html` (check-in) e `caixa/transferir.html` (transferência entre clientes).\n- Quer mexer? Ler `CLAUDE.md` pra convenções (PT-BR, `fmtBRL`/`esc` em helpers.js, `confirmarAsync` sempre, etc).\n- Quer entender o pipeline de deploy? README seção 'Como fazer deploy'.\n- Achou um bug em rule? Lembre: `firebase deploy --only firestore:rules`, não basta hosting.\n\nO app é pequeno, mas é financeiro. Toda mudança em fluxo de dinheiro merece teste local com `firebase serve` antes do deploy."
+    }
+  ]
+}
