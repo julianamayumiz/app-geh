@@ -767,6 +767,7 @@
       }, 5000);
 
       let vendaIdGerado = null;
+      let saldoFinal = null;
 
       try {
         await runTransaction(db, async (tx) => {
@@ -787,7 +788,10 @@
             tx.update(prodRefs[i], { estoque: estAtual - qtd });
           });
 
-          tx.update(clienteRef, { saldo: saldoAtual - total });
+          // Captura o saldo final DA TX — o `cliente.saldo` em memória pode
+          // estar stale se alguma recarga aconteceu em paralelo.
+          saldoFinal = saldoAtual - total;
+          tx.update(clienteRef, { saldo: saldoFinal });
 
           const vendaRef = doc(collection(db, 'vendas'));
           vendaIdGerado = vendaRef.id;
@@ -813,7 +817,6 @@
 
         clearTimeout(timerLento);
         fecharModal();
-        const saldoFinal = (cliente.saldo || 0) - total;
         cliente.saldo = saldoFinal;
         atualizarSaldoExibido();
         const idCurto = (vendaIdGerado || '').slice(-6).toUpperCase();

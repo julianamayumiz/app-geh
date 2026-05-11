@@ -352,9 +352,12 @@
 
     $('btn-marcar').onclick = async () => {
       if (!conviteAberto) return;
+      // Captura o id no início — o onSnapshot reescreve `convites` quando o
+      // doc atualiza, e queremos garantir o id do convite que o usuário viu.
+      const conviteId = conviteAberto.id;
       $('btn-marcar').disabled = true;
       try {
-        await updateDoc(doc(db, 'convites_antecipados', conviteAberto.id), {
+        await updateDoc(doc(db, 'convites_antecipados', conviteId), {
           presente: true,
           checkInEm: serverTimestamp(),
           checkInPor: perfil.nome || perfil.email || 'recepção',
@@ -367,10 +370,12 @@
 
     $('btn-desfazer').onclick = async () => {
       if (!conviteAberto) return;
-      if (!(await confirmarAsync(`Desfazer entrada de ${conviteAberto.nome}?`, { destrutivo: true, textoOk: 'Desfazer' }))) return;
+      const conviteId = conviteAberto.id;
+      const conviteNome = conviteAberto.nome;
+      if (!(await confirmarAsync(`Desfazer entrada de ${conviteNome}?`, { destrutivo: true, textoOk: 'Desfazer' }))) return;
       $('btn-desfazer').disabled = true;
       try {
-        await updateDoc(doc(db, 'convites_antecipados', conviteAberto.id), {
+        await updateDoc(doc(db, 'convites_antecipados', conviteId), {
           presente: false,
           checkInEm: null,
           checkInPor: null,

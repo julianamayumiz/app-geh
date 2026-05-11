@@ -208,13 +208,17 @@
       if (!perfilAtual) return showAlerta('Aguardando autenticação…', 'warning');
       if (!clienteSelecionado) return showAlerta('Selecione um cliente primeiro.', 'warning');
 
+      // Captura o cliente-alvo no início — evita aplicar ajuste em outro cliente
+      // caso o usuário troque a seleção durante as confirmações async.
+      const cliAlvo = { id: clienteSelecionado.id, nome: clienteSelecionado.nome || null };
+      const saldoAtual = clienteSelecionado.saldo || 0;
+
       const valor = parseFloat($('valor').value);
       const motivo = $('motivo').value.trim();
 
       if (!Number.isFinite(valor) || valor === 0) return showAlerta('Digite um valor diferente de zero.', 'warning');
       if (motivo.length < 5) return showAlerta('Motivo é obrigatório (mínimo 5 caracteres).', 'warning');
 
-      const saldoAtual = clienteSelecionado.saldo || 0;
       const saldoNovo = saldoAtual + valor;
       if (saldoNovo < 0) {
         if (!(await confirmarAsync(
@@ -225,7 +229,7 @@
 
       const sinal = valor >= 0 ? '+' : '';
       if (!(await confirmarAsync(
-        `Confirmar ajuste em ${clienteSelecionado.id}? ` +
+        `Confirmar ajuste em ${cliAlvo.id}? ` +
         `Saldo: ${fmtBRL(saldoAtual)} → ${fmtBRL(saldoNovo)}. ` +
         `Variação: ${sinal}${fmtBRL(valor)}. ` +
         `Motivo: ${motivo}. ` +
@@ -244,7 +248,7 @@
 
       try {
         await runTransaction(db, async (tx) => {
-          const ref = doc(db, 'clientes', clienteSelecionado.id);
+          const ref = doc(db, 'clientes', cliAlvo.id);
           const snap = await tx.get(ref);
           if (!snap.exists()) throw new Error('Cliente não existe mais.');
           const saldo = snap.data().saldo || 0;
@@ -252,8 +256,8 @@
 
           const ajusteRef = doc(collection(db, 'ajustes_saldo'));
           tx.set(ajusteRef, {
-            clienteId: clienteSelecionado.id,
-            clienteNome: clienteSelecionado.nome || null,
+            clienteId: cliAlvo.id,
+            clienteNome: cliAlvo.nome,
             valor,
             saldoAntes: saldo,
             saldoDepois: saldo + valor,
@@ -268,14 +272,16 @@
           });
         });
 
-        showAlerta(`Ajuste aplicado: ${sinal}${fmtBRL(valor)} em ${clienteSelecionado.id}.`, 'success');
+        showAlerta(`Ajuste aplicado: ${sinal}${fmtBRL(valor)} em ${cliAlvo.id}.`, 'success');
         $('valor').value = '';
         $('motivo').value = '';
         $('preview').classList.add('hidden');
-        // Recarregar saldo exibido
-        const re = await getDoc(doc(db, 'clientes', clienteSelecionado.id));
-        clienteSelecionado = { id: clienteSelecionado.id, ...re.data() };
-        $('cli-saldo').textContent = fmtBRL(clienteSelecionado.saldo || 0);
+        // Recarregar saldo exibido — só se o cliente exibido ainda é o do ajuste
+        if (clienteSelecionado && clienteSelecionado.id === cliAlvo.id) {
+          const re = await getDoc(doc(db, 'clientes', cliAlvo.id));
+          clienteSelecionado = { id: cliAlvo.id, ...re.data() };
+          $('cli-saldo').textContent = fmtBRL(clienteSelecionado.saldo || 0);
+        }
       } catch (err) {
         showAlerta(`Erro: ${err.message}`, 'danger');
       } finally {

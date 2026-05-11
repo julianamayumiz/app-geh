@@ -296,6 +296,8 @@
     let mostrarN = LOTE_FEED;
     let eventoAtual = null;
     let live = localStorage.getItem(LS_LIVE_KEY) === '1';
+    // Versão do filtro — listeners obsoletos checam contra isso e se descartam.
+    let versionFiltro = 0;
 
     // ---- normalizadores ----
     function nVenda(id, v) {
@@ -414,6 +416,7 @@
       Object.keys(dados).forEach(k => dados[k] = []);
       mostrarN = LOTE_FEED;
       eventoAtual = $('sel-evento').value;
+      versionFiltro++;
       if (!eventoAtual) {
         $('aud-resumo').textContent = 'Selecione um evento.';
         $('aud-feed').innerHTML = '';
@@ -439,11 +442,16 @@
         orderBy('criadoEm', 'desc'),
         limit(LIMITE_POR_COLECAO)
       );
+      // Captura a versão atual do filtro — se o filtro mudar antes do snapshot
+      // chegar, o handler se descarta em vez de pintar dados obsoletos.
+      const minhaVersao = versionFiltro;
       const handler = (snap) => {
+        if (minhaVersao !== versionFiltro) return;
         dados[coll] = snap.docs.map(d => normalizar(coll, d.id, d.data()));
         renderTudo();
       };
       const onErr = (err) => {
+        if (minhaVersao !== versionFiltro) return;
         console.error(`[auditoria] erro lendo ${coll}:`, err);
         $('aud-resumo').textContent = `Erro lendo ${coll}: ${err.message}`;
       };
