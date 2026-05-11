@@ -1,0 +1,204 @@
+/* ===== Dashboard ===== */
+/* Estilos específicos da Visão Geral do evento (admin/dashboard.html).
+   Tokens globais (cores, sombras, radius) vêm de css/style.css. */
+
+.kpis {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+@media (min-width: 860px) {
+  .kpis {
+    grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  }
+}
+
+/* ---- KPI hero (azul gradient com spark) ---- */
+.kpi-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 1.5rem 1.4rem 1.25rem;
+  border-radius: var(--radius);
+  color: #fff;
+  background:
+    radial-gradient(ellipse at 90% 120%, rgba(251,191,36,0.22) 0%, transparent 55%),
+    linear-gradient(135deg, var(--azul) 0%, var(--azul-escuro) 100%);
+  box-shadow: var(--sombra-forte);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  isolation: isolate;
+}
+.kpi-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.08;
+  background-image: radial-gradient(circle at 1px 1px, #fff 1px, transparent 0);
+  background-size: 22px 22px;
+}
+.kpi-hero .etiqueta {
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: rgba(255,255,255,0.65);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.kpi-hero .valor {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(2.5rem, 6.5vw, 3.4rem);
+  line-height: 1.02;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+  margin-top: 0.35rem;
+}
+.kpi-hero .valor small {
+  font-family: var(--font-body);
+  font-size: 0.48em;
+  font-weight: 500;
+  opacity: 0.65;
+  margin-right: 0.2em;
+}
+.kpi-hero .meta {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.82rem;
+  color: rgba(255,255,255,0.75);
+  margin-top: 0.3rem;
+}
+.kpi-hero .meta strong { color: var(--amarelo); font-variant-numeric: tabular-nums; }
+.kpi-hero .spark {
+  position: relative;
+  height: 56px;
+  margin-top: 0.9rem;
+}
+
+/* ---- KPIs secundários (cards brancos com border-left colorido) ---- */
+.kpi-small {
+  background: var(--branco);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+  box-shadow: var(--sombra);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  border-left: 3px solid transparent;
+}
+.kpi-small .etiqueta {
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--cinza);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.kpi-small .valor {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 2rem;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.kpi-small.accent-verde    { border-left-color: var(--verde); }
+.kpi-small.accent-verde    .valor { color: var(--verde); }
+.kpi-small.accent-amarelo  { border-left-color: var(--amarelo); }
+.kpi-small.accent-amarelo  .valor { color: var(--amarelo-acento); }
+.kpi-small.accent-azul     { border-left-color: var(--azul); }
+.kpi-small.accent-azul     .valor { color: var(--azul); }
+
+/* ---- Ranking de vendedores (pódio + resto) ---- */
+.podium {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+.podium-card {
+  position: relative;
+  border-radius: var(--radius);
+  padding: 1rem 0.75rem 1.1rem;
+  text-align: center;
+  color: #fff;
+  box-shadow: var(--sombra);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: center;
+  isolation: isolate;
+  overflow: hidden;
+}
+.podium-card .medalha {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.25);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+.podium-card .nome {
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1.15;
+  word-break: break-word;
+}
+.podium-card .total {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+}
+.podium-card .meta {
+  font-size: 0.72rem;
+  opacity: 0.85;
+  letter-spacing: 0.04em;
+}
+.podium-1 { background: linear-gradient(135deg, #F59E0B 0%, #B45309 100%); padding-top: 1.4rem; padding-bottom: 1.5rem; }
+.podium-2 { background: linear-gradient(135deg, #94A3B8 0%, #475569 100%); }
+.podium-3 { background: linear-gradient(135deg, #B87333 0%, #7C3F1D 100%); }
+.podium-1 .medalha { background: rgba(255,255,255,0.35); }
+
+.ranking-resto {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.ranking-row {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  background: var(--cinza-claro, #F3F4F6);
+  font-size: 0.9rem;
+}
+:root[data-theme="dark"] .ranking-row { background: rgba(255,255,255,0.04); }
+.ranking-row .pos {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--cinza);
+  text-align: center;
+}
+.ranking-row .nome { font-weight: 600; }
+.ranking-row .total { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--azul-claro); }
+
+@media (max-width: 520px) {
+  .podium { grid-template-columns: 1fr; }
+  .podium-1 { order: 1; }
+  .podium-2 { order: 2; }
+  .podium-3 { order: 3; }
+}
