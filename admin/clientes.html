@@ -19,7 +19,7 @@
         O <strong>ID</strong> é o código que está no QR impresso do cliente (ex: GEH001, GEH002...).
       </p>
       <div class="form-group">
-        <label>ID do QR code</label>
+        <label for="cli-id">ID do QR code</label>
         <input type="text" id="cli-id" placeholder="GEH001" style="max-width:200px;">
       </div>
       <div id="alerta" class="alert hidden"></div>
@@ -32,7 +32,7 @@
         Cole uma lista de IDs, um por linha (ex: GEH001, GEH002...). IDs já cadastrados serão ignorados.
       </p>
       <div class="form-group">
-        <label>Lista de IDs</label>
+        <label for="lote-ids">Lista de IDs</label>
         <textarea id="lote-ids" rows="6" placeholder="GEH001&#10;GEH002&#10;GEH003&#10;..." style="font-family:monospace;font-size:0.9rem;"></textarea>
       </div>
       <div id="alerta-lote" class="alert hidden"></div>
@@ -41,7 +41,7 @@
 
     <div class="card">
       <div class="form-group" style="margin-bottom:0;">
-        <label style="display:inline-flex;align-items:center;gap:0.35rem;"><span data-icon="search" data-size="16"></span> Buscar cliente</label>
+        <label for="busca" style="display:inline-flex;align-items:center;gap:0.35rem;"><span data-icon="search" data-size="16"></span> Buscar cliente</label>
         <input type="text" id="busca" placeholder="Digite o ID...">
       </div>
     </div>

@@ -348,6 +348,7 @@ a:focus-visible {
 .form-group textarea:focus {
   outline: none;
   border-color: var(--azul);
+  box-shadow: 0 0 0 3px rgba(251,191,36,0.45);
 }
 
 /* ===== Produto (grid) ===== */
@@ -598,7 +599,7 @@ a:focus-visible {
 .table-search:focus {
   outline: none;
   border-color: var(--azul);
-  box-shadow: 0 0 0 3px rgba(30,58,138,0.15);
+  box-shadow: 0 0 0 3px rgba(30,58,138,0.55);
 }
 :root[data-theme="dark"] .table-search {
   background: #0F172A;

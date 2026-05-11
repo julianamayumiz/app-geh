@@ -42,19 +42,19 @@
       <input type="hidden" id="cat-id">
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.75rem;">
         <div class="form-group">
-          <label>Nome</label>
+          <label for="cat-nome">Nome</label>
           <input type="text" id="cat-nome" placeholder="Adulto">
         </div>
         <div class="form-group">
-          <label>Preço antecipado (R$)</label>
+          <label for="cat-preco-ant">Preço antecipado (R$)</label>
           <input type="number" id="cat-preco-ant" step="0.50" min="0" placeholder="30.00">
         </div>
         <div class="form-group">
-          <label>Preço na porta (R$)</label>
+          <label for="cat-preco-porta">Preço na porta (R$)</label>
           <input type="number" id="cat-preco-porta" step="0.50" min="0" placeholder="50.00">
         </div>
         <div class="form-group">
-          <label>Estoque porta</label>
+          <label for="cat-qtd-porta">Estoque porta</label>
           <input type="number" id="cat-qtd-porta" min="0" step="1" placeholder="20">
         </div>
       </div>
@@ -69,11 +69,11 @@
       <h3 class="card-title">Criar novo evento</h3>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;">
         <div class="form-group">
-          <label>Nome do evento</label>
+          <label for="ev-nome">Nome do evento</label>
           <input type="text" id="ev-nome" placeholder="Ex: Festa Junina 2025">
         </div>
         <div class="form-group">
-          <label>Data</label>
+          <label for="ev-data">Data</label>
           <input type="date" id="ev-data">
         </div>
       </div>

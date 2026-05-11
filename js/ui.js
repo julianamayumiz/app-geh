@@ -202,7 +202,17 @@ function aplicarSkeletonNoPlaceholder(tbody) {
     }).join('');
     return `<tr class="skel-row">${tds}</tr>`;
   }).join('');
+  tbody.setAttribute('aria-busy', 'true');
   tbody.innerHTML = html;
+  // Quando o snapshot real chegar (linhas não-skel), retira o aria-busy.
+  const obsBusy = new MutationObserver(() => {
+    const ainda = Array.from(tbody.rows).some(r => r.classList.contains('skel-row'));
+    if (!ainda) {
+      tbody.removeAttribute('aria-busy');
+      obsBusy.disconnect();
+    }
+  });
+  obsBusy.observe(tbody, { childList: true });
   return true;
 }
 
@@ -215,7 +225,16 @@ export function skeletonRows(tbody, cols, qtd = 5) {
     }).join('');
     return `<tr class="skel-row">${tds}</tr>`;
   }).join('');
+  tbody.setAttribute('aria-busy', 'true');
   tbody.innerHTML = html;
+  const obsBusy = new MutationObserver(() => {
+    const ainda = Array.from(tbody.rows).some(r => r.classList.contains('skel-row'));
+    if (!ainda) {
+      tbody.removeAttribute('aria-busy');
+      obsBusy.disconnect();
+    }
+  });
+  obsBusy.observe(tbody, { childList: true });
 }
 
 // Auto-skeletoniza placeholders de "Carregando..." em todas as tabelas.

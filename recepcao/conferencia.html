@@ -211,6 +211,7 @@
     import { renderIcons } from "../js/icons.js";
     import { requireAuth } from "../js/auth-guard.js";
     import { instalarBannerPWA } from "../js/install-banner.js";
+    import { confirmarAsync } from "../js/ui.js";
 
     const { perfil } = await requireAuth({ papel: 'recepcao' });
     renderIcons();
@@ -366,7 +367,7 @@
 
     $('btn-desfazer').onclick = async () => {
       if (!conviteAberto) return;
-      if (!confirm(`Desfazer entrada de ${conviteAberto.nome}?`)) return;
+      if (!(await confirmarAsync(`Desfazer entrada de ${conviteAberto.nome}?`, { destrutivo: true, textoOk: 'Desfazer' }))) return;
       $('btn-desfazer').disabled = true;
       try {
         await updateDoc(doc(db, 'convites_antecipados', conviteAberto.id), {

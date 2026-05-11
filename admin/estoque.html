@@ -18,15 +18,15 @@
       <h3 class="card-title">Nova entrada</h3>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;">
         <div class="form-group">
-          <label>Produto</label>
+          <label for="compra-produto">Produto</label>
           <select id="compra-produto"><option value="">Selecione...</option></select>
         </div>
         <div class="form-group">
-          <label>Quantidade</label>
+          <label for="compra-qtd">Quantidade</label>
           <input type="number" id="compra-qtd" min="1" step="1">
         </div>
         <div class="form-group">
-          <label>Valor unitário (R$)</label>
+          <label for="compra-valor-unit">Valor unitário (R$)</label>
           <input type="number" id="compra-valor-unit" step="0.01" min="0" placeholder="Opcional">
         </div>
       </div>
@@ -46,7 +46,7 @@
 
     <h3 style="color:var(--azul);margin:1.5rem 0 0.75rem;">Histórico de entradas</h3>
     <div class="form-group" style="max-width:240px;">
-      <label>Filtrar por categoria</label>
+      <label for="filtro-categoria">Filtrar por categoria</label>
       <select id="filtro-categoria"><option value="">Todas</option></select>
     </div>
     <div class="table-wrapper">

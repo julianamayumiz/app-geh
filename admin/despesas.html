@@ -79,15 +79,15 @@
       <input type="hidden" id="dp-id">
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;">
         <div class="form-group">
-          <label>Data</label>
+          <label for="dp-data">Data</label>
           <input type="date" id="dp-data">
         </div>
         <div class="form-group">
-          <label>Valor (R$)</label>
+          <label for="dp-valor">Valor (R$)</label>
           <input type="number" id="dp-valor" step="0.01" min="0" inputmode="decimal">
         </div>
         <div class="form-group">
-          <label>Forma de pagamento</label>
+          <label for="dp-forma">Forma de pagamento</label>
           <select id="dp-forma">
             <option value="pix">PIX</option>
             <option value="dinheiro">Dinheiro</option>
@@ -100,12 +100,12 @@
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;">
         <div class="form-group">
-          <label>Categoria</label>
+          <label for="dp-categoria">Categoria</label>
           <input type="text" id="dp-categoria" list="lista-categorias" placeholder="Ex: Matéria-prima" autocomplete="off">
           <datalist id="lista-categorias"></datalist>
         </div>
         <div class="form-group">
-          <label>Insumo <span style="color:var(--cinza);font-weight:400;">(opcional)</span></label>
+          <label for="dp-insumo">Insumo <span style="color:var(--cinza);font-weight:400;">(opcional)</span></label>
           <div style="display:flex;gap:0.4rem;">
             <select id="dp-insumo" style="flex:1;">
               <option value="">— nenhum —</option>
@@ -115,18 +115,18 @@
         </div>
       </div>
       <div class="form-group">
-        <label>Tipo</label>
-        <div class="dp-radio-group">
+        <span class="form-label" id="dp-tipo-label" style="display:block;font-weight:600;margin-bottom:0.35rem;">Tipo</span>
+        <div class="dp-radio-group" role="radiogroup" aria-labelledby="dp-tipo-label">
           <label><input type="radio" name="dp-tipo" value="compra" checked><span data-icon="shopping-cart" data-size="14"></span> Compra</label>
           <label><input type="radio" name="dp-tipo" value="doacao"><span data-icon="heart" data-size="14"></span> Doação</label>
         </div>
       </div>
       <div class="form-group">
-        <label id="dp-resp-label">Pago por</label>
+        <label id="dp-resp-label" for="dp-responsavel">Pago por</label>
         <input type="text" id="dp-responsavel" placeholder="Nome de quem realizou a compra" autocomplete="off">
       </div>
       <div class="form-group">
-        <label>Descrição</label>
+        <label for="dp-descricao">Descrição</label>
         <input type="text" id="dp-descricao" placeholder="Ex: Compra de chocolate granulado para brigadeiro">
       </div>
       <div class="form-group" style="display:flex;align-items:center;gap:0.5rem;">
@@ -147,19 +147,19 @@
       <h3 class="card-title" style="display:inline-flex;align-items:center;gap:0.4rem;"><span data-icon="filter" data-size="18"></span> Filtros</h3>
       <div class="dp-filtros-grid">
         <div class="form-group" style="margin-bottom:0;">
-          <label>Categoria</label>
+          <label for="f-categoria">Categoria</label>
           <select id="f-categoria"><option value="">Todas</option></select>
         </div>
         <div class="form-group" style="margin-bottom:0;">
-          <label>De</label>
+          <label for="f-de">De</label>
           <input type="date" id="f-de">
         </div>
         <div class="form-group" style="margin-bottom:0;">
-          <label>Até</label>
+          <label for="f-ate">Até</label>
           <input type="date" id="f-ate">
         </div>
         <div class="form-group" style="margin-bottom:0;">
-          <label>Forma pgto</label>
+          <label for="f-forma">Forma pgto</label>
           <select id="f-forma">
             <option value="">Todas</option>
             <option value="pix">PIX</option>
@@ -171,7 +171,7 @@
           </select>
         </div>
         <div class="form-group" style="margin-bottom:0;">
-          <label>Tipo</label>
+          <label for="f-tipo">Tipo</label>
           <select id="f-tipo">
             <option value="">Todos</option>
             <option value="compra">Compras</option>
@@ -208,7 +208,7 @@
 16/04/2026, Caixinhas de papel, 30,00, Embalagem, dinheiro, doacao, João,
 2026-04-17, "Aluguel de barraca, evento abril", 200, Serviços, pix, compra, Diretoria,</pre>
       <div class="form-group">
-        <label>Cole o CSV aqui</label>
+        <label for="lote-despesas">Cole o CSV aqui</label>
         <textarea id="lote-despesas" rows="8" style="font-family:monospace;font-size:0.875rem;" placeholder="Data, Descrição, Valor, Categoria, Forma, Tipo, Responsável, Insumo"></textarea>
       </div>
       <div class="form-group" style="display:flex;align-items:center;gap:0.5rem;">

@@ -65,19 +65,19 @@
       </p>
       <div class="form-grid">
         <div class="form-group">
-          <label>Nome</label>
+          <label for="novo-nome">Nome</label>
           <input type="text" id="novo-nome" placeholder="Maria da Silva">
         </div>
         <div class="form-group">
-          <label>E-mail</label>
+          <label for="novo-email">E-mail</label>
           <input type="email" id="novo-email" placeholder="maria@grupohokkaido.org">
         </div>
         <div class="form-group">
-          <label>Senha provisória (mín. 6 caracteres)</label>
+          <label for="novo-senha">Senha provisória (mín. 6 caracteres)</label>
           <input type="text" id="novo-senha" placeholder="ex: geh2026">
         </div>
         <div class="form-group">
-          <label>Papel</label>
+          <label for="novo-papel">Papel</label>
           <select id="novo-papel">
             <option value="operador">Operador (vende em eventos)</option>
             <option value="caixa">Caixa (recarrega saldo dos clientes)</option>
@@ -122,6 +122,7 @@
       createUserWithEmailAndPassword, signOut, sendPasswordResetEmail
     } from "../js/firebase-config.js";
     import { SUPER_ADMIN_EMAIL, requireAuth } from "../js/auth-guard.js";
+    import { confirmarAsync } from "../js/ui.js";
 
     montarNav('usuarios.html');
     let perfilAtual = null;
@@ -218,12 +219,18 @@
           }
           await updateDoc(doc(db, 'usuarios', id), { papel: novo });
         } else if (acao === 'desativar') {
-          if (!confirm('Desativar este usuário? Ele perde acesso imediatamente.')) return;
+          if (!(await confirmarAsync(
+            'Desativar este usuário? Ele perde acesso imediatamente.',
+            { destrutivo: true, textoOk: 'Desativar' }
+          ))) return;
           await updateDoc(doc(db, 'usuarios', id), { ativo: false });
         } else if (acao === 'ativar') {
           await updateDoc(doc(db, 'usuarios', id), { ativo: true });
         } else if (acao === 'excluir') {
-          if (!confirm('Excluir este registro? A pessoa perde acesso, mas o login dela continua existindo no Firebase Auth (apague lá no console se quiser remover de vez).')) return;
+          if (!(await confirmarAsync(
+            'Excluir este registro? A pessoa perde acesso, mas o login dela continua existindo no Firebase Auth (apague lá no console se quiser remover de vez).',
+            { destrutivo: true, textoOk: 'Excluir' }
+          ))) return;
           await deleteDoc(doc(db, 'usuarios', id));
         } else if (acao === 'reset') {
           const email = btn.dataset.email;

@@ -14,7 +14,8 @@
       background: var(--cinza-fundo);
       border: 1px solid var(--cinza-claro);
       color: var(--cinza-escuro);
-      padding: 0.3rem 0.7rem;
+      padding: 0.5rem 0.85rem;
+      min-height: 28px;
       border-radius: 999px;
       cursor: pointer;
       font-size: 0.82rem;
@@ -63,7 +64,7 @@
 
     <div class="card">
       <div class="form-group">
-        <label>Buscar cliente (ID ou nome)</label>
+        <label for="busca">Buscar cliente (ID ou nome)</label>
         <input type="text" id="busca" placeholder="Ex: GEH001 ou Maria" autocomplete="off">
         <div id="chips" class="chips-clientes" style="margin-top:0.5rem;"></div>
       </div>
@@ -76,12 +77,12 @@
         </div>
 
         <div class="form-group">
-          <label>Valor do ajuste (R$) — use sinal negativo para retirar</label>
+          <label for="valor">Valor do ajuste (R$) — use sinal negativo para retirar</label>
           <input type="number" id="valor" step="0.01" placeholder="Ex: 10,00 ou -5,00" inputmode="decimal">
         </div>
 
         <div class="form-group">
-          <label>Motivo / justificativa <span style="color:var(--vermelho)">*</span></label>
+          <label for="motivo">Motivo / justificativa <span style="color:var(--vermelho)">*</span></label>
           <textarea id="motivo" rows="3" placeholder="Ex: falha na submissão do caixa João em 25/04 — recarga de R$ 20 não foi registrada"></textarea>
           <small style="color:var(--cinza);font-size:0.78rem;">Mínimo 5 caracteres. Esse texto vai pro log de auditoria.</small>
         </div>
@@ -122,6 +123,7 @@
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
     import { requireAuth } from "../js/auth-guard.js";
+    import { confirmarAsync } from "../js/ui.js";
 
     montarNav('ajuste-saldo.html');
     let perfilAtual = null;
@@ -215,17 +217,21 @@
       const saldoAtual = clienteSelecionado.saldo || 0;
       const saldoNovo = saldoAtual + valor;
       if (saldoNovo < 0) {
-        if (!confirm(`Atenção: o saldo do cliente ficará NEGATIVO (${fmtBRL(saldoNovo)}). Continuar mesmo assim?`)) return;
+        if (!(await confirmarAsync(
+          `Atenção: o saldo do cliente ficará NEGATIVO (${fmtBRL(saldoNovo)}). Continuar mesmo assim?`,
+          { destrutivo: true, textoOk: 'Continuar' }
+        ))) return;
       }
 
       const sinal = valor >= 0 ? '+' : '';
-      if (!confirm(
-        `Confirmar ajuste em ${clienteSelecionado.id}?\n\n` +
-        `Saldo: ${fmtBRL(saldoAtual)} → ${fmtBRL(saldoNovo)}\n` +
-        `Variação: ${sinal}${fmtBRL(valor)}\n\n` +
-        `Motivo: ${motivo}\n\n` +
-        `Esta ação fica registrada para auditoria.`
-      )) return;
+      if (!(await confirmarAsync(
+        `Confirmar ajuste em ${clienteSelecionado.id}? ` +
+        `Saldo: ${fmtBRL(saldoAtual)} → ${fmtBRL(saldoNovo)}. ` +
+        `Variação: ${sinal}${fmtBRL(valor)}. ` +
+        `Motivo: ${motivo}. ` +
+        `Esta ação fica registrada para auditoria.`,
+        { textoOk: 'Aplicar ajuste' }
+      ))) return;
 
       $('btn-confirmar').disabled = true;
       $('btn-confirmar').innerHTML = '<div class="loader"></div> Processando…';
