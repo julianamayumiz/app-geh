@@ -7,3 +7,13 @@
 export function fmtBRL(v) {
   return `R$ ${Number(v || 0).toFixed(2).replace('.', ',')}`;
 }
+
+// Escapa caracteres HTML em uma string pra usar em interpolação de `innerHTML`.
+// Sempre use isso quando interpolar valores vindos do Firestore (nome de
+// produto/cliente/evento, motivo, etc) em template literals. Sem isso, um
+// nome contendo `<img src=x onerror=...>` executaria script no browser.
+export function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}

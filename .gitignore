@@ -5,3 +5,9 @@
 dev-tools/backup/service-account.json
 dev-tools/backup/backups/
 dev-tools/backup/node_modules/
+
+# Defesa adicional: qualquer arquivo .env, chave privada ou service account
+# que acabe em dev-tools/ (fora do /backup ja coberto acima) tambem nao vai.
+dev-tools/**/*.env
+dev-tools/**/*service-account*.json
+dev-tools/**/*-key.json

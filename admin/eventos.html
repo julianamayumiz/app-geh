@@ -92,7 +92,7 @@
 
   <script type="module">
     import { montarNav } from "./_nav.js";
-    import { fmtBRL } from "../js/helpers.js";
+    import { fmtBRL, esc } from "../js/helpers.js";
     import {
       db, collection, doc, setDoc, getDoc, updateDoc, getDocs, deleteDoc,
       addDoc, onSnapshot, query, orderBy, where, serverTimestamp
@@ -250,7 +250,7 @@
         });
         await setDoc(doc(db, 'config', 'eventoAtivo'), { id: ref.id, nome, data });
         $('ev-nome').value = '';
-        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} Evento "${nome}" criado e ativado!</span>`;
+        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} Evento "${esc(nome)}" criado e ativado!</span>`;
         alerta.className = 'alert alert-success';
         $('evento-ativo-box').classList.add('hidden');
       $('categorias-box').classList.add('hidden');

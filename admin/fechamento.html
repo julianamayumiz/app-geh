@@ -203,7 +203,7 @@
 
   <script type="module">
     import { montarNav } from "./_nav.js";
-    import { fmtBRL } from "../js/helpers.js";
+    import { fmtBRL, esc } from "../js/helpers.js";
     import { db, collection, getDocs, getDoc, doc, query, where, orderBy } from "../js/firebase-config.js";
     import { renderIcons } from "../js/icons.js";
 
@@ -342,7 +342,7 @@
         tblMais.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Sem vendas registradas.</td></tr>';
       } else {
         ordenados.forEach(([nome, v]) => {
-          tblMais.innerHTML += `<tr><td>${nome}</td><td style="text-align:right;">${v.qtd}</td><td style="text-align:right;">${fmtBRL(v.total)}</td></tr>`;
+          tblMais.innerHTML += `<tr><td>${esc(nome)}</td><td style="text-align:right;">${v.qtd}</td><td style="text-align:right;">${fmtBRL(v.total)}</td></tr>`;
         });
       }
       $('tot-vendas-qtd').textContent = totalVendasQtd;

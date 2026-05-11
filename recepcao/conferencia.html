@@ -212,6 +212,7 @@
     import { requireAuth } from "../js/auth-guard.js";
     import { instalarBannerPWA } from "../js/install-banner.js";
     import { confirmarAsync } from "../js/ui.js";
+    import { esc } from "../js/helpers.js";
 
     const { perfil } = await requireAuth({ papel: 'recepcao' });
     renderIcons();
@@ -300,11 +301,11 @@
         return;
       }
       cont.innerHTML = lista.map(c => `
-        <div class="convite-card ${c.presente ? 'presente' : ''}" data-id="${c.id}">
-          <div class="numero">${c.numero}</div>
+        <div class="convite-card ${c.presente ? 'presente' : ''}" data-id="${esc(c.id)}">
+          <div class="numero">${esc(c.numero)}</div>
           <div class="info">
-            <div class="nome">${c.nome}${c.categoria ? `<span class="badge-cat">${c.categoria}</span>` : ''}${c.pago === false ? '<span class="badge-aberto-conv">$ ABERTO</span>' : ''}</div>
-            <div class="meta">${c.familia || 'Sem família'}</div>
+            <div class="nome">${esc(c.nome)}${c.categoria ? `<span class="badge-cat">${esc(c.categoria)}</span>` : ''}${c.pago === false ? '<span class="badge-aberto-conv">$ ABERTO</span>' : ''}</div>
+            <div class="meta">${esc(c.familia || 'Sem família')}</div>
           </div>
           <div class="status ${c.presente ? 'ok' : 'pend'}">${c.presente ? 'Presente' : 'Pendente'}</div>
         </div>

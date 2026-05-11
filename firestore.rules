@@ -68,7 +68,16 @@ service cloud.firestore {
 
     match /clientes/{doc} {
       allow read: if isEquipe();
-      allow update: if isEquipe();
+      // Admin pode tudo. Caixa/operador só podem alterar saldo (via TX no app)
+      // e o saldo resultante precisa ser >=0. Recepcao não toca em saldo.
+      // Bloqueia escrita direta via SDK que tentasse mexer em outros campos.
+      allow update: if isAdmin()
+        || (
+          (isCaixa() || isOperador())
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['saldo'])
+          && request.resource.data.saldo is number
+          && request.resource.data.saldo >= 0
+        );
       allow create, delete: if isAdmin();
     }
 
@@ -81,7 +90,11 @@ service cloud.firestore {
       // Read aberto a toda equipe (operador consulta histórico do cliente).
       allow read: if isEquipe();
       // Create só pelo Caixa — recargas no fluxo normal.
-      allow create: if isCaixa();
+      // Valida tipo e que o valor é positivo pra evitar lixo na auditoria.
+      allow create: if isCaixa()
+        && request.resource.data.valor is number
+        && request.resource.data.valor > 0
+        && request.resource.data.clienteId is string;
       allow update, delete: if isAdmin();
     }
 
@@ -120,7 +133,14 @@ service cloud.firestore {
     // separada das recargas do Caixa. Imutavel: nao permite update
     // nem delete (nem para admin) pra preservar a trilha.
     match /ajustes_saldo/{doc} {
-      allow read, create: if isAdmin();
+      allow read: if isAdmin();
+      // Valor pode ser negativo (correção pra menos), mas precisa ser número
+      // e motivo precisa existir (>=5 chars conforme regra do app).
+      allow create: if isAdmin()
+        && request.resource.data.valor is number
+        && request.resource.data.motivo is string
+        && request.resource.data.motivo.size() >= 5
+        && request.resource.data.clienteId is string;
       allow update, delete: if false;
     }
 
@@ -130,7 +150,12 @@ service cloud.firestore {
     // preservar a trilha — correcao depois sai por ajuste-saldo.
     match /transferencias_saldo/{doc} {
       allow read: if isEquipe();
-      allow create: if isCaixa() || isOperador();
+      allow create: if (isCaixa() || isOperador())
+        && request.resource.data.valor is number
+        && request.resource.data.valor > 0
+        && request.resource.data.origemId is string
+        && request.resource.data.destinoId is string
+        && request.resource.data.origemId != request.resource.data.destinoId;
       allow update, delete: if false;
     }
 
@@ -139,7 +164,14 @@ service cloud.firestore {
     // (update do campo presente/checkInEm). Admin gerencia.
     match /convites_antecipados/{doc} {
       allow read: if isRecepcao();
-      allow update: if isRecepcao();
+      // Recepção só pode marcar/desfazer presença — não pode alterar
+      // dados do convite (nome, familia, categoria, pago).
+      allow update: if isAdmin()
+        || (
+          isRecepcao()
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['presente', 'checkInEm', 'checkInPor'])
+        );
       allow create, delete: if isAdmin();
     }
 

@@ -114,7 +114,7 @@
 
   <script type="module">
     import { montarNav } from "./_nav.js";
-    import { fmtBRL } from "../js/helpers.js";
+    import { fmtBRL, esc } from "../js/helpers.js";
     import { db, collection, getDocs, query, where, orderBy } from "../js/firebase-config.js";
     import { renderIcons } from "../js/icons.js";
 
@@ -200,14 +200,14 @@
       const ordenados = Array.from(porProduto.entries()).sort((a, b) => b[1].qtd - a[1].qtd);
       if (ordenados.length === 0) tblMais.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Sem vendas.</td></tr>';
       ordenados.forEach(([nome, { qtd, total }]) => {
-        tblMais.innerHTML += `<tr><td>${nome}</td><td>${qtd}</td><td>${fmtBRL(total)}</td></tr>`;
+        tblMais.innerHTML += `<tr><td>${esc(nome)}</td><td>${qtd}</td><td>${fmtBRL(total)}</td></tr>`;
       });
 
       const tblPagto = $('tbl-pagto');
       tblPagto.innerHTML = '';
       if (porForma.size === 0) tblPagto.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Sem recargas.</td></tr>';
       porForma.forEach((v, forma) => {
-        tblPagto.innerHTML += `<tr><td>${forma}</td><td>${v.qtd}</td><td>${fmtBRL(v.total)}</td></tr>`;
+        tblPagto.innerHTML += `<tr><td>${esc(forma)}</td><td>${v.qtd}</td><td>${fmtBRL(v.total)}</td></tr>`;
       });
 
       // Ajustes manuais
