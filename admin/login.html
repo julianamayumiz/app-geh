@@ -118,6 +118,15 @@
     const alerta = document.getElementById('alerta');
     const alertaOk = document.getElementById('alerta-ok');
 
+    // Permite digitar so o usuario (ex: "operador07") no lugar do e-mail
+    // completo: sem "@", apenda o dominio de teste. E-mail real (ja com
+    // "@") e login Google passam intactos.
+    function normalizarEmail(valor) {
+      const v = (valor || '').trim();
+      if (!v) return '';
+      return v.includes('@') ? v : v + '@teste.com';
+    }
+
     const params = new URLSearchParams(location.search);
     if (params.get('erro') === 'sem-acesso') {
       alerta.textContent = 'Sua conta não tem acesso. Fale com a diretoria para ser cadastrada.';
@@ -149,7 +158,7 @@
     });
 
     document.getElementById('btn-login').onclick = async () => {
-      const email = document.getElementById('email').value.trim();
+      const email = normalizarEmail(document.getElementById('email').value);
       const senha = document.getElementById('senha').value;
       alerta.classList.add('hidden');
       try {
@@ -162,7 +171,7 @@
     };
 
     document.getElementById('btn-esqueci').onclick = async () => {
-      const email = document.getElementById('email').value.trim();
+      const email = normalizarEmail(document.getElementById('email').value);
       alerta.classList.add('hidden');
       alertaOk.classList.add('hidden');
       if (!email) {

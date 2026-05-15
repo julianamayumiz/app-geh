@@ -5,7 +5,8 @@
   "description": "Backup automatizado do Firestore do App GEH para Excel local.",
   "main": "backup.js",
   "scripts": {
-    "backup": "node backup.js"
+    "backup": "node backup.js",
+    "seed-usuarios": "node seed-usuarios.js"
   },
   "dependencies": {
     "firebase-admin": "^12.7.0",
