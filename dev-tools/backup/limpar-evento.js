@@ -11,7 +11,8 @@
 //
 // Como rodar:
 //   cd dev-tools/backup
-//   npm run limpar-evento -- <eventoId>
+//   npm run limpar-evento              -> lista os eventos (id + nome)
+//   npm run limpar-evento -- <eventoId> -> limpa o evento escolhido
 //
 // Pede confirmacao digitando o id do evento antes de apagar,
 // pra evitar limpar um evento de producao sem querer.
@@ -42,15 +43,29 @@ const COLECOES = [
 
 const eventoId = process.argv[2];
 
-if (!eventoId) {
-  console.error('ERRO: informe o eventoId.');
-  console.error('  Uso: npm run limpar-evento -- <eventoId>');
-  process.exit(1);
-}
-
 const serviceAccount = require(KEY_PATH);
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const db = admin.firestore();
+
+// Sem argumento: lista os eventos pra a Juliana achar o id e sai.
+async function listarEventos() {
+  console.log('Eventos cadastrados (projeto ' + serviceAccount.project_id + '):\n');
+
+  const cfg = await db.collection('config').doc('eventoAtivo').get();
+  const ativoId = cfg.exists ? cfg.data().id : null;
+
+  const snap = await db.collection('eventos').get();
+  if (snap.empty) {
+    console.log('  (nenhum evento cadastrado)');
+  } else {
+    for (const d of snap.docs) {
+      const ev = d.data();
+      const marca = d.id === ativoId ? '  <- ativo' : '';
+      console.log('  ' + d.id.padEnd(24) + (ev.nome || '(sem nome)') + marca);
+    }
+  }
+  console.log('\nPra limpar: npm run limpar-evento -- <eventoId>');
+}
 
 function perguntar(texto) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -73,6 +88,11 @@ async function apagarColecao(nome, idEvento) {
 }
 
 (async () => {
+  if (!eventoId) {
+    await listarEventos();
+    process.exit(0);
+  }
+
   console.log('Limpeza de transacoes de evento');
   console.log('Projeto: ' + serviceAccount.project_id);
   console.log('Evento:  ' + eventoId + '\n');
