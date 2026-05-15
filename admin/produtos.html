@@ -121,7 +121,8 @@ Suco de Laranja, 5.00, 50, Bebidas
         estoque: parseInt($('prod-estoque').value) || 0,
         categoria: $('prod-categoria').value.trim() || 'Geral'
       };
-      if (!dados.nome || dados.preco <= 0) {
+      // preco 0 e permitido: itens servidos a vontade, registrados so pra contar quantidade
+      if (!dados.nome || dados.preco < 0) {
         alerta.textContent = 'Preencha nome e preço válido.';
         alerta.className = 'alert alert-warning';
         return;
@@ -169,7 +170,7 @@ Suco de Laranja, 5.00, 50, Bebidas
         const preco = parseFloat((partes[1] || '').replace(',', '.'));
         const estoque = parseInt(partes[2]) || 0;
         const categoria = partes[3] || 'Geral';
-        if (!nome || isNaN(preco) || preco <= 0) {
+        if (!nome || isNaN(preco) || preco < 0) {
           erros.push(`Linha ${i + 1}: "${linha}" — nome ou preço inválido`);
         } else {
           produtos.push({ nome, preco, estoque, categoria });

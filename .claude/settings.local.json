@@ -18,7 +18,11 @@
       "Bash(Select-Object -ExpandProperty FullName)",
       "Bash(Head -50)",
       "Bash(dir \"C:\\\\Users\\\\julia\\\\Desktop\\\\App GEH\\\\.claude\\\\worktrees\" -Directory)",
-      "PowerShell(git worktree remove --force \".claude/worktrees/cranky-hopper-970ece\")"
+      "PowerShell(git worktree remove --force \".claude/worktrees/cranky-hopper-970ece\")",
+      "Bash(python -c \"import openpyxl; wb=openpyxl.load_workbook\\(r'C:\\\\Users\\\\julia\\\\Downloads\\\\teste app.xlsx', data_only=True\\); print\\('SHEETS:', wb.sheetnames\\)\")",
+      "PowerShell(python -c \"import openpyxl; wb=openpyxl.load_workbook\\(r'C:\\\\Users\\\\julia\\\\Downloads\\\\teste app.xlsx', data_only=True\\); print\\('SHEETS:', wb.sheetnames\\)\")",
+      "PowerShell($env:PYTHONIOENCODING=\"utf-8\"; python -c \"import openpyxl; wb=openpyxl.load_workbook\\(r'C:\\\\Users\\\\julia\\\\Downloads\\\\teste app.xlsx', data_only=True\\); ws=wb['Produtos']; rows=[r for r in ws.iter_rows\\(values_only=True\\)]; print\\('PRODUTOS rows:', len\\(rows\\)\\); [print\\(repr\\(r\\)\\) for r in rows]\")",
+      "PowerShell($ids = @\\(\\); 1001..1200 | %{ $ids += $_ }; 5001..5350 | %{ $ids += $_ }; $ids -join \"`n\" | Out-File -FilePath \"dev-tools\\\\csv-exemplo\\\\clientes-teste.txt\" -Encoding utf8 -NoNewline; \\(Get-Content \"dev-tools\\\\csv-exemplo\\\\clientes-teste.txt\"\\).Count)"
     ]
   }
 }
