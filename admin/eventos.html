@@ -81,6 +81,16 @@
       <button id="btn-criar" class="btn btn-primary" style="max-width:220px;">Criar e ativar evento</button>
     </div>
 
+    <div class="card" style="border-left:4px solid var(--laranja,#f97316);">
+      <h3 class="card-title" style="display:inline-flex;align-items:center;gap:0.5rem;"><span data-icon="refresh-cw" data-size="18"></span> Preparar para novo evento</h3>
+      <p style="font-size:0.85rem;color:var(--cinza);margin-bottom:0.75rem;">
+        Zera os saldos de todos os clientes, apaga todos os produtos e limpa convites antecipados e vendas na porta.<br>
+        <strong>O histórico de vendas e movimentações fica preservado.</strong>
+      </p>
+      <div id="alerta-preparar" class="alert hidden"></div>
+      <button id="btn-preparar" class="btn btn-danger" style="max-width:260px;">Zerar dados para novo evento</button>
+    </div>
+
     <h3 style="color:var(--azul);margin:1.5rem 0 0.75rem;">Histórico de eventos</h3>
     <div class="table-wrapper">
       <table>
@@ -392,6 +402,50 @@
       window._editar = editarEvento;
       window._excluir = excluirEvento;
     });
+
+    $('btn-preparar').onclick = async () => {
+      const ok = await confirmarAsync(
+        'Isso vai zerar os saldos de todos os clientes, apagar todos os produtos, limpar convites antecipados e vendas na porta. O histórico de vendas fica preservado. Confirmar?',
+        { destrutivo: true, textoOk: 'Zerar dados' }
+      );
+      if (!ok) return;
+
+      const btn = $('btn-preparar');
+      const alerta = $('alerta-preparar');
+      btn.disabled = true;
+      alerta.textContent = 'Preparando...';
+      alerta.className = 'alert alert-warning';
+
+      try {
+        async function deletarColecao(nome) {
+          const snap = await getDocs(collection(db, nome));
+          for (let i = 0; i < snap.docs.length; i += 499) {
+            const batch = writeBatch(db);
+            snap.docs.slice(i, i + 499).forEach(d => batch.delete(d.ref));
+            await batch.commit();
+          }
+          return snap.docs.length;
+        }
+
+        const clientesSnap = await getDocs(collection(db, 'clientes'));
+        for (let i = 0; i < clientesSnap.docs.length; i += 499) {
+          const batch = writeBatch(db);
+          clientesSnap.docs.slice(i, i + 499).forEach(d => batch.update(d.ref, { saldo: 0 }));
+          await batch.commit();
+        }
+
+        const qtdProdutos  = await deletarColecao('produtos');
+        const qtdConvites  = await deletarColecao('convites_antecipados');
+        const qtdPorta     = await deletarColecao('vendas_porta');
+
+        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} Pronto! ${clientesSnap.docs.length} saldo(s) zerado(s), ${qtdProdutos} produto(s) removido(s), ${qtdConvites} convite(s) removido(s), ${qtdPorta} venda(s) na porta removida(s).</span>`;
+        alerta.className = 'alert alert-success';
+      } catch (err) {
+        alerta.textContent = `Erro: ${err.message}`;
+        alerta.className = 'alert alert-danger';
+      }
+      btn.disabled = false;
+    };
 
     carregarAtivo();
   </script>
