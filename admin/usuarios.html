@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="../css/style.css">
   <link rel="manifest" href="../manifest.json">
   <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     .user-row .badge {
       display: inline-block;
@@ -93,6 +94,41 @@
       </button>
     </div>
 
+    <div class="card" style="margin-top:1rem;">
+      <h3 class="card-title" style="display:inline-flex;align-items:center;gap:0.5rem;">
+        <span data-icon="upload" data-size="18"></span> Importar usuários em lote
+      </h3>
+      <p style="font-size:0.85rem;color:var(--cinza);margin-bottom:0.5rem;">
+        Sobe um arquivo <code style="background:var(--cinza-claro);padding:2px 6px;border-radius:4px;">.xlsx</code> ou
+        <code style="background:var(--cinza-claro);padding:2px 6px;border-radius:4px;">.csv</code> com colunas
+        <code style="background:var(--cinza-claro);padding:2px 6px;border-radius:4px;">nome | email | senha | papel</code>.
+        Papel aceita: <code>admin</code>, <code>caixa</code>, <code>operador</code>, <code>recepcao</code>.
+      </p>
+      <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:0.75rem;">
+        <label for="arquivo-lote" style="font-weight:500;font-size:0.88rem;">Arquivo:</label>
+        <input type="file" id="arquivo-lote" accept=".xlsx,.xls,.csv">
+        <button id="btn-modelo-usuarios" class="btn btn-secondary" style="width:auto;padding:0.4rem 0.85rem;font-size:0.85rem;margin-left:auto;">Baixar modelo</button>
+      </div>
+      <div id="alerta-lote" class="alert hidden"></div>
+      <div id="preview-lote" class="hidden">
+        <div class="table-wrapper" style="margin-bottom:0.75rem;max-height:320px;overflow-y:auto;">
+          <table id="tbl-preview">
+            <thead><tr><th>Nome</th><th>E-mail</th><th>Senha</th><th>Papel</th><th>Status</th></tr></thead>
+            <tbody id="tbl-preview-body"></tbody>
+          </table>
+        </div>
+        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+          <button id="btn-importar" class="btn btn-primary" style="width:auto;padding:0.6rem 1.25rem;">Importar</button>
+          <span id="label-erros" style="font-size:0.85rem;color:#B91C1C;"></span>
+        </div>
+      </div>
+      <div id="progresso-lote" class="hidden" style="margin-top:0.5rem;">
+        <p id="txt-progresso" style="font-size:0.88rem;color:var(--cinza-escuro);margin-bottom:0.35rem;">Preparando...</p>
+        <progress id="barra-progresso" style="width:100%;height:8px;" max="1" value="0"></progress>
+      </div>
+      <div id="resultado-lote" class="hidden" style="margin-top:0.5rem;"></div>
+    </div>
+
     <h3 style="color:var(--azul);margin:1.5rem 0 0.75rem;">Usuários cadastrados</h3>
     <div class="table-wrapper">
       <table>
@@ -123,6 +159,7 @@
     } from "../js/firebase-config.js";
     import { SUPER_ADMIN_EMAIL, requireAuth } from "../js/auth-guard.js";
     import { confirmarAsync } from "../js/ui.js";
+    import { esc } from "../js/helpers.js";
 
     montarNav('usuarios.html');
     let perfilAtual = null;
@@ -288,6 +325,192 @@
         btn.disabled = false;
         btn.innerHTML = `${icon('user-plus', { size: 16 })} Cadastrar`;
       }
+    };
+
+    // === importacao em lote ===
+    const PAPEIS_VALIDOS = ['admin', 'caixa', 'operador', 'recepcao'];
+    let linhasParaImportar = [];
+
+    function normHeader(h) {
+      return (h || '').toString().trim().toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '');
+    }
+
+    function detectarColIdx(headers, candidatos) {
+      return headers.findIndex(h => candidatos.includes(normHeader(h)));
+    }
+
+    function validarLinha(l) {
+      const erros = [];
+      if (!l.nome) erros.push('nome vazio');
+      if (!l.email || !/.+@.+\..+/.test(l.email)) erros.push('e-mail invalido');
+      if (!l.senha || l.senha.length < 6) erros.push('senha < 6 chars');
+      if (!PAPEIS_VALIDOS.includes(l.papel)) erros.push('papel invalido');
+      return erros;
+    }
+
+    $('arquivo-lote').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      const alertaL = $('alerta-lote');
+      const previewL = $('preview-lote');
+
+      alertaL.classList.add('hidden');
+      previewL.classList.add('hidden');
+      $('resultado-lote').classList.add('hidden');
+      linhasParaImportar = [];
+
+      if (!file) return;
+
+      if (typeof XLSX === 'undefined') {
+        alertaL.textContent = 'Biblioteca de leitura nao carregou. Verifique sua conexao e recarregue a pagina.';
+        alertaL.className = 'alert alert-danger';
+        alertaL.classList.remove('hidden');
+        return;
+      }
+
+      try {
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+        if (rows.length < 2) throw new Error('Arquivo sem dados alem do cabecalho.');
+
+        const headers = rows[0].map(h => (h || '').toString());
+        const iNome  = detectarColIdx(headers, ['nome', 'name']);
+        const iEmail = detectarColIdx(headers, ['email', 'e-mail']);
+        const iSenha = detectarColIdx(headers, ['senha', 'password', 'pass']);
+        const iPapel = detectarColIdx(headers, ['papel', 'role', 'perfil', 'funcao', 'funcao']);
+
+        if ([iNome, iEmail, iSenha, iPapel].includes(-1)) {
+          throw new Error('Colunas nao encontradas. O arquivo precisa ter: nome, email, senha e papel (em qualquer ordem).');
+        }
+
+        const dados = rows.slice(1).filter(r => r.some(c => c !== ''));
+        if (!dados.length) throw new Error('Nenhuma linha de dados no arquivo.');
+
+        linhasParaImportar = [];
+        const tbody = $('tbl-preview-body');
+        tbody.innerHTML = '';
+
+        dados.forEach(row => {
+          const l = {
+            nome:  (row[iNome]  || '').toString().trim(),
+            email: (row[iEmail] || '').toString().trim().toLowerCase(),
+            senha: (row[iSenha] || '').toString().trim(),
+            papel: (row[iPapel] || '').toString().trim().toLowerCase(),
+          };
+          const erros = validarLinha(l);
+          const ok = erros.length === 0;
+          if (ok) linhasParaImportar.push(l);
+
+          const tr = document.createElement('tr');
+          tr.style.background = ok ? '' : 'rgba(220,38,38,0.06)';
+          tr.innerHTML = `
+            <td>${esc(l.nome) || '—'}</td>
+            <td>${esc(l.email) || '—'}</td>
+            <td>${l.senha ? '••••••' : '—'}</td>
+            <td>${esc(l.papel) || '—'}</td>
+            <td style="font-size:0.8rem;">${ok
+              ? '<span style="color:var(--verde);">✓ OK</span>'
+              : `<span style="color:#B91C1C;" title="${esc(erros.join(', '))}">✗ ${esc(erros.join(', '))}</span>`
+            }</td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        const nErros = dados.length - linhasParaImportar.length;
+        $('btn-importar').textContent = `Importar ${linhasParaImportar.length} usuário${linhasParaImportar.length !== 1 ? 's' : ''}`;
+        $('btn-importar').disabled = linhasParaImportar.length === 0;
+        $('label-erros').textContent = nErros > 0
+          ? `${nErros} linha${nErros !== 1 ? 's' : ''} com erro ser${nErros !== 1 ? 'ao' : 'a'} ignorada${nErros !== 1 ? 's' : ''}`
+          : '';
+
+        previewL.classList.remove('hidden');
+      } catch (err) {
+        alertaL.textContent = err.message;
+        alertaL.className = 'alert alert-danger';
+        alertaL.classList.remove('hidden');
+      }
+    });
+
+    $('btn-importar').onclick = async () => {
+      if (!linhasParaImportar.length) return;
+      const n = linhasParaImportar.length;
+      if (!(await confirmarAsync(
+        `Criar ${n} usuário${n !== 1 ? 's' : ''}? As senhas provisorias estao na planilha — guarde-as antes de continuar.`,
+        { textoOk: 'Importar' }
+      ))) return;
+
+      $('preview-lote').classList.add('hidden');
+      const progL  = $('progresso-lote');
+      const txtProg = $('txt-progresso');
+      const barra  = $('barra-progresso');
+      progL.classList.remove('hidden');
+      barra.max   = n;
+      barra.value = 0;
+
+      const criados = [];
+      const falhas  = [];
+
+      for (let i = 0; i < linhasParaImportar.length; i++) {
+        const u = linhasParaImportar[i];
+        txtProg.textContent = `Criando ${i + 1} de ${n}: ${u.email}…`;
+        barra.value = i;
+
+        let sec = null;
+        try {
+          sec = criarAppSecundario();
+          const cred = await createUserWithEmailAndPassword(sec.auth, u.email, u.senha);
+          await setDoc(doc(db, 'usuarios', cred.user.uid), {
+            nome: u.nome, email: u.email, papel: u.papel,
+            ativo: true, criadoEm: new Date(),
+          });
+          await signOut(sec.auth);
+          criados.push(u.email);
+        } catch (err) {
+          if (sec) { try { await signOut(sec.auth); } catch (_) {} }
+          const motivo = err.code === 'auth/email-already-in-use' ? 'e-mail ja existe'
+            : err.code === 'auth/invalid-email' ? 'e-mail invalido'
+            : err.message;
+          falhas.push({ email: u.email, motivo });
+        }
+        barra.value = i + 1;
+      }
+
+      progL.classList.add('hidden');
+      $('arquivo-lote').value = '';
+      linhasParaImportar = [];
+
+      const res = $('resultado-lote');
+      res.innerHTML = `
+        <div class="alert ${falhas.length === 0 ? 'alert-success' : 'alert-info'}">
+          <strong>${criados.length} usuário${criados.length !== 1 ? 's' : ''} criado${criados.length !== 1 ? 's' : ''}!</strong>
+          ${falhas.length > 0 ? ` ${falhas.length} falha${falhas.length !== 1 ? 's' : ''}.` : ' Tudo certo.'}
+        </div>
+        ${falhas.length > 0 ? `
+          <div style="font-size:0.85rem;margin-top:0.35rem;">
+            <strong>Falhas:</strong>
+            <ul style="margin:0.25rem 0 0 1rem;padding:0;">
+              ${falhas.map(f => `<li>${esc(f.email)} — ${esc(f.motivo)}</li>`).join('')}
+            </ul>
+          </div>
+        ` : ''}
+      `;
+      res.classList.remove('hidden');
+    };
+
+    $('btn-modelo-usuarios').onclick = () => {
+      const dados = [
+        ['nome', 'email', 'senha', 'papel'],
+        ['Maria da Silva', 'maria@grupohokkaido.org', 'geh2026', 'operador'],
+        ['Joao Santos', 'joao@grupohokkaido.org', 'geh2026', 'caixa'],
+        ['Ana Lima', 'ana@grupohokkaido.org', 'geh2026', 'recepcao'],
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(dados);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Usuarios');
+      XLSX.writeFile(wb, 'modelo-usuarios.xlsx');
     };
   </script>
 </body>

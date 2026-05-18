@@ -25,7 +25,8 @@
       "PowerShell($ids = @\\(\\); 1001..1200 | %{ $ids += $_ }; 5001..5350 | %{ $ids += $_ }; $ids -join \"`n\" | Out-File -FilePath \"dev-tools\\\\csv-exemplo\\\\clientes-teste.txt\" -Encoding utf8 -NoNewline; \\(Get-Content \"dev-tools\\\\csv-exemplo\\\\clientes-teste.txt\"\\).Count)",
       "Bash(git check-ignore *)",
       "PowerShell(cd \"C:\\\\Users\\\\julia\\\\Desktop\\\\App GEH\"; \"--- diff HEAD ---\"; git --no-pager diff HEAD -- admin/produtos.html | Select-Object -First 8; \"--- HEAD tem a mudanca? ---\"; git show HEAD:admin/produtos.html | Select-String \"servidos a vontade\" -SimpleMatch; \"--- git dir ---\"; git rev-parse --git-dir; \"--- worktree list ---\"; git worktree list; \"--- mtime real do arquivo ---\"; \\(Get-Item admin\\\\produtos.html\\).LastWriteTime)",
-      "PowerShell(\"---\")"
+      "PowerShell(\"---\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\073712631\\\\Desktop\\\\app-geh\\\\dev-tools\\\\csv-exemplo\" -Force)"
     ]
   }
 }
