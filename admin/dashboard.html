@@ -56,6 +56,22 @@
       </div>
     </div>
 
+    <!-- KPIs de estoque -->
+    <div class="kpis-estoque">
+      <div class="kpi-small accent-azul">
+        <span class="etiqueta"><span data-icon="layers" data-size="13"></span> Itens vendidos</span>
+        <div class="valor" id="kpi-itens-vendidos">—</div>
+      </div>
+      <div class="kpi-small accent-vermelho">
+        <span class="etiqueta"><span data-icon="x-circle" data-size="13"></span> Sem estoque</span>
+        <div class="valor" id="kpi-sem-estoque">0</div>
+      </div>
+      <div class="kpi-small accent-verde">
+        <span class="etiqueta"><span data-icon="package" data-size="13"></span> Valor em estoque</span>
+        <div class="valor" id="kpi-valor-estoque">R$ 0,00</div>
+      </div>
+    </div>
+
     <!-- Alerta de estoque — só aparece quando há produtos baixos/esgotados -->
     <div id="card-estoque" class="card hidden" style="margin-top:1rem;border-left:4px solid var(--vermelho);">
       <h3 class="card-title" style="display:inline-flex;align-items:center;gap:0.5rem;">
@@ -373,93 +389,25 @@
       const snap = await getDoc(doc(db, 'config', 'eventoAtivo'));
       const eventoAtivo = snap.exists() && snap.data().id ? snap.data() : null;
 
-      if (!eventoAtivo) {
-        $('evento-label').textContent = 'Sem evento ativo';
-        $('sem-evento').classList.remove('hidden');
-        $('total-vendido').textContent = 'R$ 0,00';
-        $('num-vendas').textContent = '0';
-        $('tbl-vendas').innerHTML = '<tr><td colspan="4" class="text-center text-muted">Nenhum evento ativo.</td></tr>';
-        onSnapshot(collection(db, 'clientes'), s => {
-          let saldo = 0;
-          s.forEach(d => saldo += d.data().saldo || 0);
-          $('saldo-circulacao').textContent = fmtBRL(saldo);
-          $('num-clientes').textContent = s.size;
-        }, err => {
-          console.error('[dashboard] onSnapshot clientes (sem evento) erro:', err);
-          $('saldo-circulacao').textContent = '—';
-          $('num-clientes').textContent = '—';
-        });
-        return;
-      }
-
-      $('evento-label').innerHTML = `
-        <strong style="color:var(--verde);display:inline-flex;align-items:center;gap:0.4rem;">
-          <span style="width:8px;height:8px;background:var(--verde);border-radius:50%;display:inline-block;"></span>
-          ${eventoAtivo.nome}
-        </strong>
-        <span style="color:var(--cinza);"> — números deste evento</span>`;
-
-      // Mostrar seção de gráficos e inicializar
-      $('graficos').classList.remove('hidden');
-      criarGraficos();
-      criarSparkline();
-
-      // Vendas em tempo real
-      onSnapshot(
-        query(collection(db, 'vendas'), where('eventoId', '==', eventoAtivo.id), orderBy('criadoEm', 'desc')),
-        snap => {
-          let total = 0;
-          const tbody = $('tbl-vendas');
-          tbody.innerHTML = '';
-
-          snap.docs.forEach(d => total += d.data().total || 0);
-
-          snap.docs.slice(0, 50).forEach(d => {
-            const v = d.data();
-            const qtd    = (v.itens || []).reduce((s, i) => s + (i.qtd || 0), 0);
-            const quando = v.criadoEm?.toDate?.()?.toLocaleTimeString('pt-BR') || '—';
-            tbody.innerHTML += `
-              <tr>
-                <td>${quando}</td>
-                <td>${v.clienteNome || v.clienteId}</td>
-                <td>${qtd}</td>
-                <td>${fmtBRL(v.total)}</td>
-              </tr>`;
-          });
-
-          if (snap.empty) {
-            tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state">${icon('shopping-cart', { size: 32 })}<p>Sem vendas ainda neste evento.</p></div></td></tr>`;
-          }
-
-          $('total-vendido').textContent = fmtBRL(total);
-          // Hero: só o número (o "R$" já está estilizado em <small>)
-          const numHero = document.getElementById('total-vendido-num');
-          if (numHero) numHero.textContent = total.toFixed(2).replace('.', ',');
-          $('num-vendas').textContent = snap.size;
-
-          // Ticket médio
-          const ticketEl = document.getElementById('kpi-ticket');
-          if (ticketEl) ticketEl.textContent = snap.size ? fmtBRL(total / snap.size) : fmtBRL(0);
-
-          atualizarGraficos(snap.docs);
-        },
-        err => {
-          console.error('[dashboard] onSnapshot vendas erro:', err);
-          $('tbl-vendas').innerHTML = `<tr><td colspan="4"><div class="alert alert-danger">Erro carregando vendas: ${err.message}</div></td></tr>`;
-        }
-      );
-
-      // Alerta de estoque (real time)
       const ESTOQUE_BAIXO = 10;
+
+      // Listener de produtos (global — independente do evento ativo)
       onSnapshot(collection(db, 'produtos'), s => {
-        const baixos = [];
-        const zerados = [];
+        const baixos = [], zerados = [];
+        let valorEstoque = 0;
         s.forEach(d => {
           const p = { id: d.id, ...d.data() };
           const est = p.estoque ?? 0;
+          valorEstoque += est > 0 ? est * (p.preco || 0) : 0;
           if (est <= 0) zerados.push(p);
           else if (est <= ESTOQUE_BAIXO) baixos.push(p);
         });
+
+        const kpiSem = $('kpi-sem-estoque');
+        if (kpiSem) kpiSem.textContent = zerados.length;
+        const kpiValor = $('kpi-valor-estoque');
+        if (kpiValor) kpiValor.textContent = fmtBRL(valorEstoque);
+
         const card = $('card-estoque');
         const lista = $('lista-estoque');
         if (zerados.length === 0 && baixos.length === 0) {
@@ -480,21 +428,92 @@
                 .map(p => chip(p, corAmar, `restam ${p.estoque}`, 'alert-triangle')).join('');
       }, err => {
         console.error('[dashboard] onSnapshot produtos erro:', err);
-        // Não polui a UI pra alerta de estoque — só loga; o KPI principal
-        // ainda funciona mesmo sem o card de estoque baixo.
       });
 
-      // Saldo + clientes (globais)
+      // Listener de clientes (global)
       onSnapshot(collection(db, 'clientes'), s => {
         let saldo = 0;
         s.forEach(d => saldo += d.data().saldo || 0);
         $('saldo-circulacao').textContent = fmtBRL(saldo);
         $('num-clientes').textContent = s.size;
       }, err => {
-        console.error('[dashboard] onSnapshot clientes (globais) erro:', err);
+        console.error('[dashboard] onSnapshot clientes erro:', err);
         $('saldo-circulacao').textContent = '—';
         $('num-clientes').textContent = '—';
       });
+
+      if (!eventoAtivo) {
+        $('evento-label').textContent = 'Sem evento ativo';
+        $('sem-evento').classList.remove('hidden');
+        $('total-vendido').textContent = 'R$ 0,00';
+        $('num-vendas').textContent = '0';
+        $('tbl-vendas').innerHTML = '<tr><td colspan="4" class="text-center text-muted">Nenhum evento ativo.</td></tr>';
+        return;
+      }
+
+      $('evento-label').innerHTML = `
+        <strong style="color:var(--verde);display:inline-flex;align-items:center;gap:0.4rem;">
+          <span style="width:8px;height:8px;background:var(--verde);border-radius:50%;display:inline-block;"></span>
+          ${eventoAtivo.nome}
+        </strong>
+        <span style="color:var(--cinza);"> — números deste evento</span>`;
+
+      // Mostrar secao de graficos e inicializar
+      $('graficos').classList.remove('hidden');
+      criarGraficos();
+      criarSparkline();
+
+      // Vendas em tempo real
+      onSnapshot(
+        query(collection(db, 'vendas'), where('eventoId', '==', eventoAtivo.id), orderBy('criadoEm', 'desc')),
+        snap => {
+          let total = 0;
+          let totalItens = 0;
+          const tbody = $('tbl-vendas');
+          tbody.innerHTML = '';
+
+          snap.docs.forEach(d => {
+            total += d.data().total || 0;
+            totalItens += (d.data().itens || []).reduce((s, i) => s + (i.qtd || 0), 0);
+          });
+
+          const kpiItens = $('kpi-itens-vendidos');
+          if (kpiItens) kpiItens.textContent = totalItens;
+
+          snap.docs.slice(0, 50).forEach(d => {
+            const v = d.data();
+            const qtd    = (v.itens || []).reduce((s, i) => s + (i.qtd || 0), 0);
+            const quando = v.criadoEm?.toDate?.()?.toLocaleTimeString('pt-BR') || '—';
+            tbody.innerHTML += `
+              <tr>
+                <td>${quando}</td>
+                <td>${v.clienteNome || v.clienteId}</td>
+                <td>${qtd}</td>
+                <td>${fmtBRL(v.total)}</td>
+              </tr>`;
+          });
+
+          if (snap.empty) {
+            tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state">${icon('shopping-cart', { size: 32 })}<p>Sem vendas ainda neste evento.</p></div></td></tr>`;
+          }
+
+          $('total-vendido').textContent = fmtBRL(total);
+          // Hero: so o numero (o "R$" ja esta estilizado em <small>)
+          const numHero = document.getElementById('total-vendido-num');
+          if (numHero) numHero.textContent = total.toFixed(2).replace('.', ',');
+          $('num-vendas').textContent = snap.size;
+
+          // Ticket medio
+          const ticketEl = document.getElementById('kpi-ticket');
+          if (ticketEl) ticketEl.textContent = snap.size ? fmtBRL(total / snap.size) : fmtBRL(0);
+
+          atualizarGraficos(snap.docs);
+        },
+        err => {
+          console.error('[dashboard] onSnapshot vendas erro:', err);
+          $('tbl-vendas').innerHTML = `<tr><td colspan="4"><div class="alert alert-danger">Erro carregando vendas: ${err.message}</div></td></tr>`;
+        }
+      );
     })();
   </script>
 </body>
