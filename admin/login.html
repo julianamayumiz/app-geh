@@ -109,8 +109,9 @@
 
   <script type="module">
     import {
-      auth, signInWithEmailAndPassword, onAuthStateChanged,
-      GoogleAuthProvider, signInWithPopup, signOut, sendPasswordResetEmail
+      auth, db, signInWithEmailAndPassword, onAuthStateChanged,
+      GoogleAuthProvider, signInWithPopup, signOut, sendPasswordResetEmail,
+      doc, getDoc, setDoc, deleteDoc
     } from "../js/firebase-config.js";
     import { carregarPerfil } from "../js/auth-guard.js";
     import { icon } from "../js/icons.js";
@@ -141,7 +142,31 @@
     }
 
     async function dispatch(user) {
-      const perfil = await carregarPerfil(user);
+      let perfil = await carregarPerfil(user);
+
+      // Auto-provisionamento: usuario sem perfil que tem convite em /pendentes
+      // (tipico do primeiro login com Google apos admin ter adicionado o e-mail)
+      if (!perfil && user.email) {
+        try {
+          const emailKey = user.email.toLowerCase();
+          const conviteSnap = await getDoc(doc(db, 'pendentes', emailKey));
+          if (conviteSnap.exists()) {
+            const c = conviteSnap.data();
+            await setDoc(doc(db, 'usuarios', user.uid), {
+              nome: c.nome,
+              email: emailKey,
+              papel: c.papel,
+              ativo: true,
+              criadoEm: new Date(),
+            });
+            await deleteDoc(doc(db, 'pendentes', emailKey));
+            perfil = await carregarPerfil(user);
+          }
+        } catch (e) {
+          console.warn('[login] erro no auto-provisionamento:', e);
+        }
+      }
+
       if (!perfil || perfil.ativo === false) {
         await signOut(auth);
         alerta.textContent = perfil?.ativo === false

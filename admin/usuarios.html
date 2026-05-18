@@ -129,6 +129,83 @@
       <div id="resultado-lote" class="hidden" style="margin-top:0.5rem;"></div>
     </div>
 
+    <div class="card" style="margin-top:1rem;">
+      <h3 class="card-title" style="display:inline-flex;align-items:center;gap:0.5rem;">
+        <span data-icon="mail-plus" data-size="18"></span> Convidar usuário via Google
+      </h3>
+      <p style="font-size:0.85rem;color:var(--cinza);margin-bottom:0.75rem;">
+        Adicione o e-mail da conta Google da pessoa. Na primeira vez que ela clicar em
+        "Entrar com Google", o acesso é liberado automaticamente com o papel definido aqui.
+        Sem senha provisória.
+      </p>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="google-nome">Nome</label>
+          <input type="text" id="google-nome" placeholder="Maria da Silva">
+        </div>
+        <div class="form-group">
+          <label for="google-email">E-mail Google</label>
+          <input type="email" id="google-email" placeholder="maria@gmail.com">
+        </div>
+        <div class="form-group">
+          <label for="google-papel">Papel</label>
+          <select id="google-papel">
+            <option value="operador">Operador (vende em eventos)</option>
+            <option value="caixa">Caixa (recarrega saldo dos clientes)</option>
+            <option value="recepcao">Recepção (confere convites e venda na porta)</option>
+            <option value="admin">Admin (acesso total)</option>
+          </select>
+        </div>
+      </div>
+      <div id="alerta-google" class="alert alert-danger hidden"></div>
+      <div id="alerta-google-ok" class="alert alert-success hidden"></div>
+      <button id="btn-convidar-google" class="btn btn-primary" style="width:auto;padding:0.6rem 1.25rem;">
+        <span data-icon="mail-plus" data-size="16"></span> Adicionar convite
+      </button>
+
+      <div style="border-top:1px solid var(--cinza-claro);padding-top:0.75rem;margin-top:1rem;">
+        <p style="font-size:0.85rem;color:var(--cinza);margin-bottom:0.5rem;">
+          Ou importe vários de uma vez — arquivo
+          <code style="background:var(--cinza-claro);padding:2px 6px;border-radius:4px;">.xlsx</code> ou
+          <code style="background:var(--cinza-claro);padding:2px 6px;border-radius:4px;">.csv</code>
+          com colunas <code style="background:var(--cinza-claro);padding:2px 6px;border-radius:4px;">nome | email | papel</code>
+          (sem coluna de senha):
+        </p>
+        <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:0.5rem;">
+          <label for="arquivo-google" style="font-weight:500;font-size:0.88rem;">Arquivo:</label>
+          <input type="file" id="arquivo-google" accept=".xlsx,.xls,.csv">
+          <button id="btn-modelo-google" class="btn btn-secondary" style="width:auto;padding:0.4rem 0.85rem;font-size:0.85rem;margin-left:auto;">Baixar modelo</button>
+        </div>
+        <div id="alerta-google-lote" class="alert hidden"></div>
+        <div id="preview-google-lote" class="hidden">
+          <div class="table-wrapper" style="margin-bottom:0.5rem;max-height:240px;overflow-y:auto;">
+            <table>
+              <thead><tr><th>Nome</th><th>E-mail</th><th>Papel</th><th>Status</th></tr></thead>
+              <tbody id="tbl-google-preview"></tbody>
+            </table>
+          </div>
+          <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+            <button id="btn-google-importar" class="btn btn-primary" style="width:auto;padding:0.6rem 1.25rem;">Importar</button>
+            <span id="label-erros-google" style="font-size:0.85rem;color:#B91C1C;"></span>
+          </div>
+        </div>
+        <div id="resultado-google-lote" class="hidden" style="margin-top:0.5rem;"></div>
+      </div>
+
+      <div style="border-top:1px solid var(--cinza-claro);padding-top:0.75rem;margin-top:0.75rem;">
+        <h4 style="font-size:0.92rem;font-weight:600;color:var(--azul);margin-bottom:0.5rem;">Aguardando primeiro login</h4>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Nome</th><th>E-mail</th><th>Papel</th><th>Ação</th></tr></thead>
+            <tbody id="tbl-pendentes">
+              <tr><td colspan="4" class="text-center text-muted">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <h3 style="color:var(--azul);margin:1.5rem 0 0.75rem;">Usuários cadastrados</h3>
     <div class="table-wrapper">
       <table>
@@ -498,6 +575,232 @@
         ` : ''}
       `;
       res.classList.remove('hidden');
+    };
+
+    // === convites Google ===
+    let googleLinhasParaImportar = [];
+
+    $('btn-convidar-google').onclick = async () => {
+      const alertaG   = $('alerta-google');
+      const alertaGOk = $('alerta-google-ok');
+      alertaG.classList.add('hidden');
+      alertaGOk.classList.add('hidden');
+
+      const nome  = $('google-nome').value.trim();
+      const email = $('google-email').value.trim().toLowerCase();
+      const papel = $('google-papel').value;
+
+      if (!nome || !email) {
+        alertaG.textContent = 'Preencha nome e e-mail.';
+        alertaG.classList.remove('hidden');
+        return;
+      }
+
+      const btn = $('btn-convidar-google');
+      btn.disabled = true;
+      try {
+        await setDoc(doc(db, 'pendentes', email), { nome, email, papel, criadoEm: new Date() });
+        alertaGOk.textContent = `Convite salvo para ${nome}. Na primeira vez que ela logar com Google, o acesso sera liberado automaticamente.`;
+        alertaGOk.classList.remove('hidden');
+        $('google-nome').value = '';
+        $('google-email').value = '';
+      } catch (err) {
+        alertaG.textContent = `Erro: ${err.message}`;
+        alertaG.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+      }
+    };
+
+    onSnapshot(
+      query(collection(db, 'pendentes'), orderBy('criadoEm', 'desc')),
+      (snap) => {
+        const tbl = $('tbl-pendentes');
+        if (snap.empty) {
+          tbl.innerHTML = `<tr><td colspan="4" class="text-center text-muted">Nenhum convite aguardando.</td></tr>`;
+          return;
+        }
+        tbl.innerHTML = '';
+        snap.docs.forEach(d => {
+          const p = d.data();
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${esc(p.nome || '—')}</td>
+            <td>${esc(d.id)}</td>
+            <td>${esc(p.papel || '—')}</td>
+            <td>
+              <button data-revogar="${esc(d.id)}"
+                style="padding:0.3rem 0.65rem;font-size:0.78rem;border:1px solid var(--cinza-claro);
+                       background:var(--branco);color:#B91C1C;border-radius:8px;cursor:pointer;">
+                Revogar
+              </button>
+            </td>
+          `;
+          tbl.appendChild(tr);
+        });
+      }
+    );
+
+    $('tbl-pendentes').addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-revogar]');
+      if (!btn) return;
+      const email = btn.dataset.revogar;
+      if (!(await confirmarAsync(`Revogar convite de ${email}?`, { destrutivo: true, textoOk: 'Revogar' }))) return;
+      try {
+        await deleteDoc(doc(db, 'pendentes', email));
+      } catch (err) {
+        showErr(`Erro: ${err.message}`);
+      }
+    });
+
+    function validarLinhaGoogle(l) {
+      const erros = [];
+      if (!l.nome) erros.push('nome vazio');
+      if (!l.email || !/.+@.+\..+/.test(l.email)) erros.push('e-mail invalido');
+      if (!PAPEIS_VALIDOS.includes(l.papel)) erros.push('papel invalido');
+      return erros;
+    }
+
+    $('arquivo-google').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      const alertaGL  = $('alerta-google-lote');
+      const previewGL = $('preview-google-lote');
+
+      alertaGL.classList.add('hidden');
+      previewGL.classList.add('hidden');
+      $('resultado-google-lote').classList.add('hidden');
+      googleLinhasParaImportar = [];
+      if (!file) return;
+
+      if (typeof XLSX === 'undefined') {
+        alertaGL.textContent = 'Biblioteca nao carregou. Recarregue a pagina.';
+        alertaGL.className = 'alert alert-danger';
+        alertaGL.classList.remove('hidden');
+        return;
+      }
+
+      try {
+        const buf = await file.arrayBuffer();
+        const wb  = XLSX.read(buf, { type: 'array' });
+        const ws  = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+        if (rows.length < 2) throw new Error('Arquivo sem dados alem do cabecalho.');
+
+        const headers = rows[0].map(h => (h || '').toString());
+        const iNome  = detectarColIdx(headers, ['nome', 'name']);
+        const iEmail = detectarColIdx(headers, ['email', 'e-mail']);
+        const iPapel = detectarColIdx(headers, ['papel', 'role', 'perfil', 'funcao']);
+
+        if ([iNome, iEmail, iPapel].includes(-1)) {
+          throw new Error('Colunas nao encontradas. O arquivo precisa ter: nome, email e papel.');
+        }
+
+        const dados = rows.slice(1).filter(r => r.some(c => c !== ''));
+        if (!dados.length) throw new Error('Nenhuma linha de dados no arquivo.');
+
+        googleLinhasParaImportar = [];
+        const tbody = $('tbl-google-preview');
+        tbody.innerHTML = '';
+
+        dados.forEach(row => {
+          const l = {
+            nome:  (row[iNome]  || '').toString().trim(),
+            email: (row[iEmail] || '').toString().trim().toLowerCase(),
+            papel: (row[iPapel] || '').toString().trim().toLowerCase(),
+          };
+          const erros = validarLinhaGoogle(l);
+          const ok = erros.length === 0;
+          if (ok) googleLinhasParaImportar.push(l);
+
+          const tr = document.createElement('tr');
+          tr.style.background = ok ? '' : 'rgba(220,38,38,0.06)';
+          tr.innerHTML = `
+            <td>${esc(l.nome) || '—'}</td>
+            <td>${esc(l.email) || '—'}</td>
+            <td>${esc(l.papel) || '—'}</td>
+            <td style="font-size:0.8rem;">${ok
+              ? '<span style="color:var(--verde);">✓ OK</span>'
+              : `<span style="color:#B91C1C;" title="${esc(erros.join(', '))}">✗ ${esc(erros.join(', '))}</span>`
+            }</td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        const nErros = dados.length - googleLinhasParaImportar.length;
+        $('btn-google-importar').textContent = `Adicionar ${googleLinhasParaImportar.length} convite${googleLinhasParaImportar.length !== 1 ? 's' : ''}`;
+        $('btn-google-importar').disabled = googleLinhasParaImportar.length === 0;
+        $('label-erros-google').textContent = nErros > 0
+          ? `${nErros} linha${nErros !== 1 ? 's' : ''} com erro ser${nErros !== 1 ? 'ao' : 'a'} ignorada${nErros !== 1 ? 's' : ''}`
+          : '';
+        previewGL.classList.remove('hidden');
+      } catch (err) {
+        alertaGL.textContent = err.message;
+        alertaGL.className = 'alert alert-danger';
+        alertaGL.classList.remove('hidden');
+      }
+    });
+
+    $('btn-google-importar').onclick = async () => {
+      if (!googleLinhasParaImportar.length) return;
+      const n = googleLinhasParaImportar.length;
+      if (!(await confirmarAsync(
+        `Adicionar ${n} convite${n !== 1 ? 's' : ''} Google?`,
+        { textoOk: 'Adicionar' }
+      ))) return;
+
+      const btn = $('btn-google-importar');
+      btn.disabled = true;
+      btn.textContent = 'Salvando...';
+
+      let criados = 0;
+      const falhas = [];
+      for (const l of googleLinhasParaImportar) {
+        try {
+          await setDoc(doc(db, 'pendentes', l.email), {
+            nome: l.nome, email: l.email, papel: l.papel, criadoEm: new Date(),
+          });
+          criados++;
+        } catch (err) {
+          falhas.push({ email: l.email, motivo: err.message });
+        }
+      }
+
+      $('arquivo-google').value = '';
+      $('preview-google-lote').classList.add('hidden');
+      googleLinhasParaImportar = [];
+      btn.disabled = false;
+      btn.textContent = 'Importar';
+
+      const res = $('resultado-google-lote');
+      res.innerHTML = `
+        <div class="alert ${falhas.length === 0 ? 'alert-success' : 'alert-info'}">
+          <strong>${criados} convite${criados !== 1 ? 's' : ''} adicionado${criados !== 1 ? 's' : ''}!</strong>
+          ${falhas.length > 0 ? ` ${falhas.length} falha${falhas.length !== 1 ? 's' : ''}.` : ' Tudo certo.'}
+        </div>
+        ${falhas.length > 0 ? `
+          <div style="font-size:0.85rem;margin-top:0.35rem;">
+            <strong>Falhas:</strong>
+            <ul style="margin:0.25rem 0 0 1rem;padding:0;">
+              ${falhas.map(f => `<li>${esc(f.email)} — ${esc(f.motivo)}</li>`).join('')}
+            </ul>
+          </div>
+        ` : ''}
+      `;
+      res.classList.remove('hidden');
+    };
+
+    $('btn-modelo-google').onclick = () => {
+      const dados = [
+        ['nome', 'email', 'papel'],
+        ['Maria da Silva', 'maria@gmail.com', 'operador'],
+        ['Joao Santos', 'joao@grupohokkaido.org', 'caixa'],
+        ['Ana Lima', 'ana@gmail.com', 'recepcao'],
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(dados);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Convites Google');
+      XLSX.writeFile(wb, 'modelo-convites-google.xlsx');
     };
 
     $('btn-modelo-usuarios').onclick = () => {
