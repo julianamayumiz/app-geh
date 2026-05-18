@@ -110,6 +110,28 @@
       <p id="ranking-vazio" class="text-muted text-center hidden" style="margin:0.5rem 0;">Ainda ninguém pontuou neste evento.</p>
     </div>
 
+    <!-- Situacao do estoque por produto (sempre visivel) -->
+    <div class="card" style="margin-top:1.5rem;">
+      <h3 class="card-title" style="display:inline-flex;align-items:center;gap:0.5rem;">
+        <span data-icon="package" data-size="18"></span> Situação do estoque
+      </h3>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Produto</th>
+              <th>Estoque</th>
+              <th>Vendidos</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-estoque-produtos">
+            <tr><td colspan="4" class="text-center text-muted">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <h3 style="color:var(--azul);margin:1.5rem 0 0.75rem;">Últimas vendas</h3>
     <div class="table-wrapper">
       <table>
@@ -123,7 +145,7 @@
 
   <script type="module">
     import { montarNav } from "./_nav.js";
-    import { fmtBRL } from "../js/helpers.js";
+    import { fmtBRL, esc } from "../js/helpers.js";
     import { icon } from "../js/icons.js";
     import {
       db, doc, getDoc, collection,
@@ -384,6 +406,42 @@
         </div>`).join('');
     }
 
+    // ── Estado compartilhado entre listeners ─────────────────────────
+    let _produtosCache = [];   // [{id, nome, estoque, preco, ...}]
+    let _vendasProdMap = {};   // produtoId -> qtd vendida no evento
+    let _temEvento     = false;
+
+    function renderEstoqueProdutos() {
+      const tbody = $('tbody-estoque-produtos');
+      if (!tbody) return;
+      if (_produtosCache.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Nenhum produto cadastrado.</td></tr>';
+        return;
+      }
+      const sorted = [..._produtosCache].sort((a, b) => (a.estoque ?? 0) - (b.estoque ?? 0));
+      tbody.innerHTML = sorted.map(p => {
+        const est = p.estoque ?? 0;
+        const vendidos = _temEvento ? (_vendasProdMap[p.id] || 0) : '—';
+        let corEst, badge;
+        if (est <= 0) {
+          corEst = 'var(--vermelho)';
+          badge  = '<span style="background:var(--vermelho);color:#fff;padding:2px 8px;border-radius:999px;font-size:0.75rem;font-weight:600;">Esgotado</span>';
+        } else if (est <= 10) {
+          corEst = 'var(--amarelo-acento)';
+          badge  = '<span style="background:var(--amarelo);color:#1F2937;padding:2px 8px;border-radius:999px;font-size:0.75rem;font-weight:600;">Baixo</span>';
+        } else {
+          corEst = 'var(--verde)';
+          badge  = '<span style="background:var(--verde);color:#fff;padding:2px 8px;border-radius:999px;font-size:0.75rem;font-weight:600;">OK</span>';
+        }
+        return `<tr>
+          <td>${esc(p.nome)}</td>
+          <td style="font-variant-numeric:tabular-nums;font-weight:700;color:${corEst};">${est}</td>
+          <td style="font-variant-numeric:tabular-nums;">${vendidos}</td>
+          <td>${badge}</td>
+        </tr>`;
+      }).join('');
+    }
+
     // ── Init ──────────────────────────────────────────────────────────
     (async function init() {
       const snap = await getDoc(doc(db, 'config', 'eventoAtivo'));
@@ -395,8 +453,10 @@
       onSnapshot(collection(db, 'produtos'), s => {
         const baixos = [], zerados = [];
         let valorEstoque = 0;
+        _produtosCache = [];
         s.forEach(d => {
           const p = { id: d.id, ...d.data() };
+          _produtosCache.push(p);
           const est = p.estoque ?? 0;
           valorEstoque += est > 0 ? est * (p.preco || 0) : 0;
           if (est <= 0) zerados.push(p);
@@ -412,20 +472,22 @@
         const lista = $('lista-estoque');
         if (zerados.length === 0 && baixos.length === 0) {
           card.classList.add('hidden');
-          return;
+        } else {
+          card.classList.remove('hidden');
+          card.style.borderLeftColor = zerados.length > 0 ? 'var(--vermelho)' : 'var(--amarelo)';
+          const chip = (p, cor, txt, icone) => `
+            <span style="display:inline-flex;align-items:center;gap:0.4rem;background:${cor.bg};color:${cor.fg};padding:6px 12px;border-radius:999px;font-size:0.85rem;font-weight:600;">
+              ${icon(icone, { size: 14 })} ${p.nome} <span style="opacity:0.85;font-weight:500;">— ${txt}</span>
+            </span>`;
+          const corVerm = { bg: 'var(--vermelho)', fg: '#fff' };
+          const corAmar = { bg: 'var(--amarelo)', fg: '#1F2937' };
+          lista.innerHTML =
+            zerados.map(p => chip(p, corVerm, 'esgotado', 'x-circle')).join('') +
+            baixos.sort((a,b) => (a.estoque||0) - (b.estoque||0))
+                  .map(p => chip(p, corAmar, `restam ${p.estoque}`, 'alert-triangle')).join('');
         }
-        card.classList.remove('hidden');
-        card.style.borderLeftColor = zerados.length > 0 ? 'var(--vermelho)' : 'var(--amarelo)';
-        const chip = (p, cor, txt, icone) => `
-          <span style="display:inline-flex;align-items:center;gap:0.4rem;background:${cor.bg};color:${cor.fg};padding:6px 12px;border-radius:999px;font-size:0.85rem;font-weight:600;">
-            ${icon(icone, { size: 14 })} ${p.nome} <span style="opacity:0.85;font-weight:500;">— ${txt}</span>
-          </span>`;
-        const corVerm = { bg: 'var(--vermelho)', fg: '#fff' };
-        const corAmar = { bg: 'var(--amarelo)', fg: '#1F2937' };
-        lista.innerHTML =
-          zerados.map(p => chip(p, corVerm, 'esgotado', 'x-circle')).join('') +
-          baixos.sort((a,b) => (a.estoque||0) - (b.estoque||0))
-                .map(p => chip(p, corAmar, `restam ${p.estoque}`, 'alert-triangle')).join('');
+
+        renderEstoqueProdutos();
       }, err => {
         console.error('[dashboard] onSnapshot produtos erro:', err);
       });
@@ -464,18 +526,25 @@
       criarSparkline();
 
       // Vendas em tempo real
+      _temEvento = true;
       onSnapshot(
         query(collection(db, 'vendas'), where('eventoId', '==', eventoAtivo.id), orderBy('criadoEm', 'desc')),
         snap => {
           let total = 0;
           let totalItens = 0;
+          _vendasProdMap = {};
           const tbody = $('tbl-vendas');
           tbody.innerHTML = '';
 
           snap.docs.forEach(d => {
             total += d.data().total || 0;
-            totalItens += (d.data().itens || []).reduce((s, i) => s + (i.qtd || 0), 0);
+            (d.data().itens || []).forEach(item => {
+              totalItens += item.qtd || 0;
+              if (item.id) _vendasProdMap[item.id] = (_vendasProdMap[item.id] || 0) + (item.qtd || 0);
+            });
           });
+
+          renderEstoqueProdutos();
 
           const kpiItens = $('kpi-itens-vendidos');
           if (kpiItens) kpiItens.textContent = totalItens;
