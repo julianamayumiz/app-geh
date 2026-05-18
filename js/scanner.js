@@ -216,19 +216,52 @@ export async function iniciarScanner({
   }
 
   async function startCom(config) {
+    // Tentativa 1: configuracao solicitada (deviceId exact ou facingMode exact)
     try {
       await scanner.start(config, scanConfig, onDecoded, onFrameErr);
-    } catch (e) {
-      console.warn('[scanner] start falhou, tentando facingMode solto:', e);
+      ajustarTrack(elementId);
+      const facing = lerFacingModeAtual();
+      console.info('[scanner] facingMode real apos start:', facing);
+      return facing;
+    } catch (e1) {
+      console.warn('[scanner] start falhou, tentando facingMode solto:', e1);
+    }
+
+    // Tentativa 2: facingMode sem exact (browser escolhe a traseira)
+    try {
       await scanner.start(
         { facingMode: 'environment' },
         scanConfig, onDecoded, onFrameErr
       );
+      ajustarTrack(elementId);
+      const facing = lerFacingModeAtual();
+      console.info('[scanner] facingMode real apos start (fallback 2):', facing);
+      return facing;
+    } catch (e2) {
+      console.warn('[scanner] facingMode solto falhou, tentando cameras por deviceId:', e2);
     }
-    ajustarTrack(elementId);
-    const facing = lerFacingModeAtual();
-    console.info('[scanner] facingMode real após start:', facing);
-    return facing;
+
+    // Tentativa 3: itera pelas cameras detectadas em ordem — ignora as frontais
+    const candidatas = cameras.filter(c => !/(front|user|frontal|frente)/i.test(c.label || ''));
+    const ordem = candidatas.length > 0 ? candidatas : cameras;
+    for (const cam of ordem) {
+      try {
+        await scanner.start(
+          { deviceId: { exact: cam.id } },
+          scanConfig, onDecoded, onFrameErr
+        );
+        deviceIdAtual = cam.id;
+        ajustarTrack(elementId);
+        const facing = lerFacingModeAtual();
+        console.info('[scanner] abriu via deviceId fallback:', cam.label, '| facing:', facing);
+        return facing;
+      } catch (e3) {
+        console.warn('[scanner] deviceId fallback falhou para', cam.label, ':', e3);
+      }
+    }
+
+    // Todas as tentativas esgotadas
+    throw new Error('Nenhuma camera disponivel respondeu');
   }
 
   let cameraConfig = decidirConfigInicial();
