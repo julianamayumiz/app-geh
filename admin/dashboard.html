@@ -34,6 +34,7 @@
         <div class="meta">
           <span><strong id="kpi-ticket">R$ 0,00</strong> ticket médio</span>
           <span><strong id="kpi-pico">—</strong> hora de pico</span>
+          <span><strong id="kpi-ultima-hora">—</strong> na última hora</span>
         </div>
         <div class="spark">
           <canvas id="chart-spark"></canvas>
@@ -53,6 +54,9 @@
       <div class="kpi-small accent-verde">
         <span class="etiqueta"><span data-icon="users" data-size="13"></span> Clientes ativos</span>
         <div class="valor" id="num-clientes">0</div>
+        <div id="kpi-sem-saldo-wrap" class="hidden" style="font-size:0.78rem;color:var(--vermelho);font-weight:600;margin-top:0.25rem;">
+          <span data-icon="alert-circle" data-size="12"></span> <span id="kpi-sem-saldo">0</span> sem saldo
+        </div>
       </div>
     </div>
 
@@ -69,6 +73,22 @@
       <div class="kpi-small accent-amarelo">
         <span class="etiqueta"><span data-icon="receipt" data-size="13"></span> Ticket médio recarga</span>
         <div class="valor" id="kpi-ticket-recarga">R$ 0,00</div>
+      </div>
+    </div>
+
+    <!-- KPIs de presença — só aparecem quando há evento ativo -->
+    <div id="kpis-presenca" class="kpis-estoque hidden" style="margin-top:0.75rem;">
+      <div class="kpi-small accent-verde">
+        <span class="etiqueta"><span data-icon="door-open" data-size="13"></span> Presentes</span>
+        <div class="valor" id="kpi-presentes">0</div>
+      </div>
+      <div class="kpi-small accent-azul">
+        <span class="etiqueta"><span data-icon="ticket" data-size="13"></span> Total convites</span>
+        <div class="valor" id="kpi-total-convites">0</div>
+      </div>
+      <div class="kpi-small accent-amarelo">
+        <span class="etiqueta"><span data-icon="clock" data-size="13"></span> Pendentes</span>
+        <div class="valor" id="kpi-pendentes">0</div>
       </div>
     </div>
 
@@ -511,9 +531,19 @@
       // Listener de clientes (global)
       onSnapshot(collection(db, 'clientes'), s => {
         let saldo = 0;
-        s.forEach(d => saldo += d.data().saldo || 0);
+        let semSaldo = 0;
+        s.forEach(d => {
+          const sl = d.data().saldo || 0;
+          saldo += sl;
+          if (sl <= 0) semSaldo++;
+        });
         $('saldo-circulacao').textContent = fmtBRL(saldo);
         $('num-clientes').textContent = s.size;
+        const wrap = $('kpi-sem-saldo-wrap');
+        if (wrap) {
+          $('kpi-sem-saldo').textContent = semSaldo;
+          wrap.classList.toggle('hidden', semSaldo === 0);
+        }
       }, err => {
         console.error('[dashboard] onSnapshot clientes erro:', err);
         $('saldo-circulacao').textContent = '—';
@@ -554,6 +584,20 @@
           $('kpi-ticket-recarga').textContent = nRec ? fmtBRL(totalRecarga / nRec) : fmtBRL(0);
         },
         err => console.error('[dashboard] onSnapshot recargas erro:', err)
+      );
+
+      // Check-ins em tempo real
+      $('kpis-presenca').classList.remove('hidden');
+      onSnapshot(
+        query(collection(db, 'convites_antecipados'), where('eventoId', '==', eventoAtivo.id)),
+        snap => {
+          const total = snap.size;
+          const presentes = snap.docs.filter(d => d.data().presente).length;
+          $('kpi-presentes').textContent     = presentes;
+          $('kpi-total-convites').textContent = total;
+          $('kpi-pendentes').textContent     = total - presentes;
+        },
+        err => console.error('[dashboard] onSnapshot convites erro:', err)
       );
 
       // Vendas em tempo real
@@ -606,6 +650,15 @@
           // Ticket medio
           const ticketEl = document.getElementById('kpi-ticket');
           if (ticketEl) ticketEl.textContent = snap.size ? fmtBRL(total / snap.size) : fmtBRL(0);
+
+          // Vendas na ultima hora
+          const umHoraAtras = Date.now() - 60 * 60 * 1000;
+          const ultimaHora = snap.docs.filter(d => {
+            const t = d.data().criadoEm?.toDate?.()?.getTime?.();
+            return t && t >= umHoraAtras;
+          }).length;
+          const ultimaHoraEl = $('kpi-ultima-hora');
+          if (ultimaHoraEl) ultimaHoraEl.textContent = ultimaHora;
 
           atualizarGraficos(snap.docs);
         },
