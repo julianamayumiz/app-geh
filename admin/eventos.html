@@ -110,11 +110,53 @@
       addDoc, onSnapshot, query, orderBy, where, serverTimestamp
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
-    import { confirmarAsync } from "../js/ui.js";
+    import { confirmarAsync, toast } from "../js/ui.js";
 
     montarNav('eventos.html');
     renderIcons();
     const $ = id => document.getElementById(id);
+
+    function pedirTextoAsync(mensagem, valorInicial = '') {
+      return new Promise(resolve => {
+        const backdrop = document.createElement('div');
+        backdrop.className = 'confirm-backdrop';
+        backdrop.innerHTML = `
+          <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="pedirtexto-msg">
+            <p id="pedirtexto-msg" class="confirm-msg"></p>
+            <div class="form-group" style="margin-bottom:0.75rem;">
+              <input type="text" id="pedirtexto-input" style="width:100%;padding:0.6rem;border:1px solid var(--cinza-claro);border-radius:8px;font-size:0.95rem;">
+            </div>
+            <div class="confirm-acoes">
+              <button type="button" class="btn btn-secondary" data-acao="cancelar">Cancelar</button>
+              <button type="button" class="btn btn-primary" data-acao="ok">Salvar</button>
+            </div>
+          </div>
+        `;
+        backdrop.querySelector('#pedirtexto-msg').textContent = mensagem;
+        const input = backdrop.querySelector('#pedirtexto-input');
+        input.value = valorInicial;
+        document.body.appendChild(backdrop);
+        input.focus();
+        input.select();
+        const fechar = (valor) => {
+          document.removeEventListener('keydown', onKey);
+          backdrop.remove();
+          resolve(valor);
+        };
+        const onKey = (e) => {
+          if (e.key === 'Escape') fechar(null);
+          if (e.key === 'Enter') { e.preventDefault(); fechar(input.value); }
+        };
+        document.addEventListener('keydown', onKey);
+        backdrop.addEventListener('click', (e) => {
+          if (e.target === backdrop) fechar(null);
+          const acao = e.target.closest('[data-acao]')?.dataset.acao;
+          if (acao === 'ok') fechar(input.value);
+          if (acao === 'cancelar') fechar(null);
+        });
+      });
+    }
+
     const alerta = $('alerta');
 
     // Data padrão = hoje
@@ -281,7 +323,7 @@
       const evSnap = await getDoc(doc(db, 'eventos', id));
       if (!evSnap.exists()) return;
       const atual = evSnap.data();
-      const novoNome = prompt('Novo nome do evento:', atual.nome);
+      const novoNome = await pedirTextoAsync('Novo nome do evento:', atual.nome);
       if (novoNome === null) return;
       const nome = novoNome.trim();
       if (!nome) return;
@@ -303,7 +345,7 @@
 
     // Editar nome de evento do histórico
     async function editarEvento(id, nomeAtual) {
-      const novo = prompt('Novo nome do evento:', nomeAtual);
+      const novo = await pedirTextoAsync('Novo nome do evento:', nomeAtual);
       if (novo === null) return;
       const nome = novo.trim();
       if (!nome || nome === nomeAtual) return;
@@ -319,7 +361,7 @@
     // Excluir evento
     async function excluirEvento(id, nome, totalVendas) {
       if (totalVendas > 0) {
-        alert(`Não é possível excluir "${nome}": existem ${totalVendas} venda(s) vinculadas. Apague as vendas primeiro ou mantenha o evento como histórico.`);
+        toast(`Não é possível excluir "${nome}": existem ${totalVendas} venda(s) vinculadas. Mantenha como histórico.`, { tipo: 'erro', duracao: 5000 });
         return;
       }
       if (!(await confirmarAsync(`Excluir definitivamente "${nome}"? Esta ação não pode ser desfeita.`, { destrutivo: true, textoOk: 'Excluir' }))) return;
@@ -381,28 +423,33 @@
         const badge = ev.status === 'ativo'
           ? `<span style="background:var(--verde);color:white;padding:2px 8px;border-radius:999px;font-size:0.8rem;">Ativo</span>`
           : `<span style="background:var(--cinza);color:white;padding:2px 8px;border-radius:999px;font-size:0.8rem;">Encerrado</span>`;
-        const nomeEsc = ev.nome.replace(/'/g, "\\'");
         linhas.push(`
           <tr>
-            <td><strong>${ev.nome}</strong></td>
+            <td><strong>${esc(ev.nome)}</strong></td>
             <td>${dataFmt}</td>
             <td>${badge}</td>
             <td>${vendasSnap.size}</td>
             <td>${fmtBRL(receita)}</td>
             <td>
               <div style="display:flex;gap:0.35rem;justify-content:flex-end;flex-wrap:wrap;">
-                ${ev.status !== 'ativo' ? `<button class="btn btn-secondary" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" onclick="window._ativar('${ev.id}','${nomeEsc}','${ev.data||''}')">Reativar</button>` : ''}
-                <button class="btn btn-secondary" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" onclick="window._editar('${ev.id}','${nomeEsc}')">Editar</button>
-                <button class="btn btn-danger" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" onclick="window._excluir('${ev.id}','${nomeEsc}',${vendasSnap.size})">Excluir</button>
+                ${ev.status !== 'ativo' ? `<button class="btn btn-secondary" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" data-acao="ativar" data-id="${esc(ev.id)}" data-nome="${esc(ev.nome)}" data-data="${ev.data||''}">Reativar</button>` : ''}
+                <button class="btn btn-secondary" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" data-acao="editar" data-id="${esc(ev.id)}" data-nome="${esc(ev.nome)}">Editar</button>
+                <button class="btn btn-danger" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" data-acao="excluir" data-id="${esc(ev.id)}" data-nome="${esc(ev.nome)}" data-vendas="${vendasSnap.size}">Excluir</button>
               </div>
             </td>
           </tr>`);
       }
       if (myGen !== renderGen) return;
       tbody.innerHTML = linhas.join('');
-      window._ativar = ativarEvento;
-      window._editar = editarEvento;
-      window._excluir = excluirEvento;
+    });
+
+    $('tbl').addEventListener('click', async (e) => {
+      const btn = e.target.closest('button[data-acao]');
+      if (!btn) return;
+      const { acao, id, nome, data: evData, vendas } = btn.dataset;
+      if (acao === 'ativar') await ativarEvento(id, nome, evData);
+      if (acao === 'editar') await editarEvento(id, nome);
+      if (acao === 'excluir') await excluirEvento(id, nome, parseInt(vendas, 10));
     });
 
     $('btn-preparar').onclick = async () => {

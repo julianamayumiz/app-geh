@@ -243,6 +243,48 @@
     requireAuth({ papel: 'admin' }).then(({ perfil }) => { perfilAtual = perfil; });
 
     const $ = id => document.getElementById(id);
+
+    function pedirPapelAsync(papelAtual) {
+      return new Promise(resolve => {
+        const backdrop = document.createElement('div');
+        backdrop.className = 'confirm-backdrop';
+        backdrop.innerHTML = `
+          <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="pedirpapel-msg">
+            <p id="pedirpapel-msg" class="confirm-msg">Escolha o novo papel:</p>
+            <div class="form-group" style="margin-bottom:0.75rem;">
+              <select id="pedirpapel-select" style="width:100%;padding:0.6rem;border:1px solid var(--cinza-claro);border-radius:8px;font-size:0.95rem;">
+                <option value="operador">Operador (vende em eventos)</option>
+                <option value="caixa">Caixa (recarrega saldo dos clientes)</option>
+                <option value="recepcao">Recepção (confere convites e venda na porta)</option>
+                <option value="admin">Admin (acesso total)</option>
+              </select>
+            </div>
+            <div class="confirm-acoes">
+              <button type="button" class="btn btn-secondary" data-acao="cancelar">Cancelar</button>
+              <button type="button" class="btn btn-primary" data-acao="ok">Salvar</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(backdrop);
+        const sel = backdrop.querySelector('#pedirpapel-select');
+        sel.value = papelAtual;
+        sel.focus();
+        const fechar = (valor) => {
+          document.removeEventListener('keydown', onKey);
+          backdrop.remove();
+          resolve(valor);
+        };
+        const onKey = (e) => { if (e.key === 'Escape') fechar(null); };
+        document.addEventListener('keydown', onKey);
+        backdrop.addEventListener('click', (e) => {
+          if (e.target === backdrop) fechar(null);
+          const acao = e.target.closest('[data-acao]')?.dataset.acao;
+          if (acao === 'ok') fechar(sel.value);
+          if (acao === 'cancelar') fechar(null);
+        });
+      });
+    }
+
     const tbl = $('tbl-usuarios');
     const alertaNovo = $('alerta-novo');
     const alertaOk = $('alerta-ok');
@@ -323,14 +365,8 @@
       try {
         if (acao === 'papel') {
           const atual = btn.dataset.papel;
-          const novo = (prompt(
-            `Papel atual: ${atual}\n\nDigite o novo papel:\n  • admin\n  • caixa\n  • operador\n  • recepcao`,
-            atual
-          ) || '').trim().toLowerCase();
+          const novo = await pedirPapelAsync(atual);
           if (!novo || novo === atual) return;
-          if (!['admin', 'caixa', 'operador', 'recepcao'].includes(novo)) {
-            return showErr('Papel inválido. Use admin, caixa, operador ou recepcao.');
-          }
           await updateDoc(doc(db, 'usuarios', id), { papel: novo });
         } else if (acao === 'desativar') {
           if (!(await confirmarAsync(
