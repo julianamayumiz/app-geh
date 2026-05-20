@@ -93,6 +93,18 @@
       </div>
     </div>
 
+    <div class="card" style="border-left:4px solid var(--vermelho,#ef4444);">
+      <h3 class="card-title" style="display:inline-flex;align-items:center;gap:0.5rem;"><span data-icon="users-x" data-size="18"></span> Excluir todos os clientes</h3>
+      <p style="font-size:0.85rem;color:var(--cinza);margin-bottom:0.75rem;">
+        Remove permanentemente todos os cadastros de clientes.<br>
+        <strong>Ação irreversível. Use só quando quiser começar do zero.</strong>
+      </p>
+      <div id="alerta-excluir-clientes" class="alert hidden"></div>
+      <div style="display:flex;justify-content:flex-end;">
+        <button id="btn-excluir-clientes" class="btn btn-danger" style="max-width:260px;">Excluir todos os clientes</button>
+      </div>
+    </div>
+
     <h3 style="color:var(--azul);margin:1.5rem 0 0.75rem;">Histórico de eventos</h3>
     <div class="table-wrapper">
       <table>
@@ -491,6 +503,35 @@
         alerta.className = 'alert alert-success';
       } catch (err) {
         alerta.textContent = `Erro: ${err.message}`;
+        alerta.className = 'alert alert-danger';
+      }
+      btn.disabled = false;
+    };
+
+    $('btn-excluir-clientes').onclick = async () => {
+      const ok = await confirmarAsync(
+        'Isso vai EXCLUIR permanentemente todos os cadastros de clientes. Essa ação não pode ser desfeita. Confirmar?',
+        { destrutivo: true, textoOk: 'Excluir tudo' }
+      );
+      if (!ok) return;
+
+      const btn = $('btn-excluir-clientes');
+      const alerta = $('alerta-excluir-clientes');
+      btn.disabled = true;
+      alerta.textContent = 'Excluindo...';
+      alerta.className = 'alert alert-warning';
+
+      try {
+        const snap = await getDocs(collection(db, 'clientes'));
+        for (let i = 0; i < snap.docs.length; i += 499) {
+          const batch = writeBatch(db);
+          snap.docs.slice(i, i + 499).forEach(d => batch.delete(d.ref));
+          await batch.commit();
+        }
+        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} Pronto! ${snap.docs.length} cliente(s) excluído(s).</span>`;
+        alerta.className = 'alert alert-success';
+      } catch (err) {
+        alerta.textContent = `Erro: ${esc(err.message)}`;
         alerta.className = 'alert alert-danger';
       }
       btn.disabled = false;
