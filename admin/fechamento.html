@@ -143,12 +143,12 @@
             <div class="val" style="color:var(--verde);" id="receita">R$ 0,00</div>
           </div>
           <div class="fc-kpi">
-            <div class="lbl">Custo (estoque)</div>
-            <div class="val" style="color:var(--vermelho);" id="custo">R$ 0,00</div>
+            <div class="lbl">Ticket médio</div>
+            <div class="val" style="color:var(--azul);" id="ticket-medio">R$ 0,00</div>
           </div>
           <div class="fc-kpi">
-            <div class="lbl">Lucro bruto</div>
-            <div class="val" style="color:var(--azul);" id="lucro">R$ 0,00</div>
+            <div class="lbl">Clientes compraram</div>
+            <div class="val" style="color:var(--azul);" id="clientes-compraram">0</div>
           </div>
           <div class="fc-kpi">
             <div class="lbl">Saldo em circulação</div>
@@ -156,8 +156,9 @@
           </div>
         </div>
         <p style="font-size:0.78rem;color:var(--cinza);margin-top:0.5rem;">
-          <strong>Receita</strong>: total consumido pelos clientes nas barracas durante o evento selecionado.
-          <strong>Custo</strong>: total das entradas de estoque cadastradas (todos os eventos — não há vínculo por evento).
+          <strong>Receita</strong>: total consumido pelos clientes nas barracas durante o evento.
+          <strong>Ticket médio</strong>: receita dividida pelo número de vendas.
+          <strong>Clientes compraram</strong>: quantidade de clientes distintos com pelo menos uma venda.
           <strong>Saldo em circulação</strong>: soma do saldo atual de todos os clientes (passivo — pode ser solicitado em devolução).
         </p>
       </div>
@@ -176,9 +177,21 @@
         </div>
       </div>
 
-      <!-- 4) AJUSTES MANUAIS -->
+      <!-- 4) TRANSFERENCIAS DE SALDO -->
       <div class="fc-secao">
-        <h3>4. Ajustes manuais (Diretoria)</h3>
+        <h3>4. Transferências de saldo</h3>
+        <div class="fc-kpis">
+          <div class="fc-kpi"><div class="lbl">Qtd. transferências</div><div class="val" style="color:var(--azul);font-size:1.1rem;" id="transf-qtd">0</div></div>
+          <div class="fc-kpi"><div class="lbl">Volume transferido</div><div class="val" style="color:var(--azul);font-size:1.1rem;" id="transf-vol">R$ 0,00</div></div>
+        </div>
+        <p style="font-size:0.78rem;color:var(--cinza);margin-top:0.5rem;">
+          Transferências entre clientes registradas durante o evento — apenas para referência de auditoria.
+        </p>
+      </div>
+
+      <!-- 5) AJUSTES MANUAIS -->
+      <div class="fc-secao">
+        <h3>5. Ajustes manuais (Diretoria)</h3>
         <div class="fc-kpis">
           <div class="fc-kpi"><div class="lbl">Adicionado</div><div class="val" style="color:var(--verde);font-size:1.1rem;" id="aj-pos">R$ 0,00</div></div>
           <div class="fc-kpi"><div class="lbl">Retirado</div><div class="val" style="color:var(--vermelho);font-size:1.1rem;" id="aj-neg">R$ 0,00</div></div>
@@ -249,22 +262,27 @@
       const vendasQ   = query(collection(db, 'vendas'), where('eventoId', '==', eventoId));
       const movQ      = query(collection(db, 'movimentacoes_saldo'), where('eventoId', '==', eventoId));
       const ajustesQ  = query(collection(db, 'ajustes_saldo'), where('eventoId', '==', eventoId));
+      const transfQ   = query(collection(db, 'transferencias_saldo'), where('eventoId', '==', eventoId));
 
-      const [vendasSnap, comprasSnap, clientesSnap, movSnap, ajustesSnap] = await Promise.all([
+      const [vendasSnap, clientesSnap, movSnap, ajustesSnap, transfSnap] = await Promise.all([
         getDocs(vendasQ),
-        getDocs(collection(db, 'compras')),
         getDocs(collection(db, 'clientes')),
         getDocs(movQ),
-        getDocs(ajustesQ)
+        getDocs(ajustesQ),
+        getDocs(transfQ)
       ]);
 
-      // Vendas → receita + por produto
+      // Vendas → receita + por produto + clientes unicos
       let receita = 0;
+      let qtdVendas = 0;
+      const clientesCompraram = new Set();
       const porProduto = new Map();
       let totalVendasQtd = 0;
       vendasSnap.forEach(d => {
         const v = d.data();
         receita += v.total || 0;
+        qtdVendas += 1;
+        if (v.clienteId) clientesCompraram.add(v.clienteId);
         (v.itens || []).forEach(i => {
           const a = porProduto.get(i.nome) || { qtd: 0, total: 0 };
           a.qtd += i.qtd || 0;
@@ -273,10 +291,6 @@
           porProduto.set(i.nome, a);
         });
       });
-
-      // Compras → custo (não filtrado por evento — não há vínculo)
-      let custo = 0;
-      comprasSnap.forEach(d => custo += d.data().custoTotal || 0);
 
       // Saldo em circulação (passivo) — global
       let saldoCirc = 0;
@@ -297,6 +311,14 @@
         porForma.set(forma, a);
       });
 
+      // Transferencias
+      let transfQtd = 0, transfVol = 0;
+      transfSnap.forEach(d => {
+        const t = d.data();
+        transfQtd += 1;
+        transfVol += t.valor || 0;
+      });
+
       // Ajustes
       let ajPos = 0, ajNeg = 0;
       const ajustesArr = [];
@@ -313,10 +335,14 @@
       });
 
       // Render — KPIs
-      $('receita').textContent     = fmtBRL(receita);
-      $('custo').textContent       = fmtBRL(custo);
-      $('lucro').textContent       = fmtBRL(receita - custo);
-      $('saldo-circ').textContent  = fmtBRL(saldoCirc);
+      $('receita').textContent          = fmtBRL(receita);
+      $('ticket-medio').textContent     = qtdVendas > 0 ? fmtBRL(receita / qtdVendas) : 'R$ 0,00';
+      $('clientes-compraram').textContent = clientesCompraram.size;
+      $('saldo-circ').textContent       = fmtBRL(saldoCirc);
+
+      // Render — Transferencias
+      $('transf-qtd').textContent = transfQtd;
+      $('transf-vol').textContent = fmtBRL(transfVol);
 
       // Render — Recargas
       const tblPagto = $('tbl-pagto');
@@ -378,14 +404,14 @@
       const dataEv = evento?.data ? new Date(evento.data + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
       $('ph-meta').textContent = `Data do evento: ${dataEv}  •  Gerado em: ${new Date().toLocaleString('pt-BR')}`;
 
-      dadosUltimo = { evento, porForma, porProduto, ajustesArr, receita, custo, saldoCirc, totalRecargas };
+      dadosUltimo = { evento, porForma, porProduto, ajustesArr, receita, qtdVendas, clientesCompraram, saldoCirc, totalRecargas, transfQtd, transfVol };
     }
 
     $('btn-print').onclick = () => window.print();
 
     $('btn-csv').onclick = () => {
       if (!dadosUltimo) return;
-      const { evento, porForma, porProduto, ajustesArr, receita, custo, saldoCirc, totalRecargas } = dadosUltimo;
+      const { evento, porForma, porProduto, ajustesArr, receita, qtdVendas, clientesCompraram, saldoCirc, totalRecargas, transfQtd, transfVol } = dadosUltimo;
       const linhas = [];
       linhas.push(['Fechamento de caixa']);
       linhas.push(['Evento', evento?.nome || '']);
@@ -399,9 +425,13 @@
       linhas.push([]);
       linhas.push(['Resumo financeiro']);
       linhas.push(['Receita', receita.toFixed(2)]);
-      linhas.push(['Custo (estoque)', custo.toFixed(2)]);
-      linhas.push(['Lucro', (receita - custo).toFixed(2)]);
-      linhas.push(['Saldo em circulação', saldoCirc.toFixed(2)]);
+      linhas.push(['Ticket medio', qtdVendas > 0 ? (receita / qtdVendas).toFixed(2) : '0.00']);
+      linhas.push(['Clientes que compraram', clientesCompraram.size]);
+      linhas.push(['Saldo em circulacao', saldoCirc.toFixed(2)]);
+      linhas.push([]);
+      linhas.push(['Transferencias de saldo']);
+      linhas.push(['Qtd. transferencias', transfQtd]);
+      linhas.push(['Volume transferido', transfVol.toFixed(2)]);
       linhas.push([]);
       linhas.push(['Produtos vendidos']);
       linhas.push(['Produto', 'Qtd', 'Receita']);
