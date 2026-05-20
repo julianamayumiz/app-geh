@@ -256,9 +256,9 @@
           <div class="row">
             <span class="lbl">Estoque</span>
             <div class="botoes-qtd">
-              <button data-acao="dec">−</button>
+              <button data-acao="dec" aria-label="Diminuir quantidade">−</button>
               <input type="number" min="0" step="1" value="${c.qtdPorta != null ? c.qtdPorta : ''}" data-campo="qtd" style="width:70px;text-align:center;">
-              <button data-acao="inc">+</button>
+              <button data-acao="inc" aria-label="Aumentar quantidade">+</button>
             </div>
           </div>
           <button class="salvar" data-acao="salvar">Salvar</button>

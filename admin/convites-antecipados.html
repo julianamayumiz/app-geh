@@ -161,7 +161,7 @@
           <td>${c.categoria || '—'}</td>
           <td><button class="badge-status ${c.pago === false ? 'badge-aberto' : 'badge-pago'}" data-toggle="${c.id}" data-pago="${c.pago !== false}" style="border:none;cursor:pointer;font-family:inherit;">${c.pago === false ? 'Em aberto' : 'Pago'}</button></td>
           <td>${c.presente ? '<span class="badge-status badge-presente">Presente</span>' : '<span class="badge-status badge-pendente">Pendente</span>'}</td>
-          <td><button class="btn btn-danger" style="width:auto;padding:0.3rem 0.65rem;font-size:0.75rem;" data-del="${c.id}">×</button></td>
+          <td><button class="btn btn-danger" style="width:auto;padding:0.3rem 0.65rem;font-size:0.75rem;" data-del="${c.id}" aria-label="Remover convite">×</button></td>
         </tr>
       `).join('');
       tbody.querySelectorAll('[data-toggle]').forEach(b => {

@@ -30,7 +30,9 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\073712631\\\\Desktop\\\\app-geh\\\\admin\" -Filter \"*.html\")",
       "Bash(Select-Object -ExpandProperty Name)",
       "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"admin dashboard SaaS management panel\" --design-system -f markdown)",
-      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"accessibility form table interaction\" --domain ux)"
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"accessibility form table interaction\" --domain ux)",
+      "Bash(Get-ChildItem *.html)",
+      "Bash(Sort-Object)"
     ]
   }
 }
