@@ -56,6 +56,22 @@
       </div>
     </div>
 
+    <!-- KPIs de recarga — só aparecem quando há evento ativo -->
+    <div id="kpis-recarga" class="kpis-estoque hidden" style="margin-top:0.75rem;">
+      <div class="kpi-small accent-verde">
+        <span class="etiqueta"><span data-icon="arrow-down-circle" data-size="13"></span> Total recarregado</span>
+        <div class="valor" id="kpi-total-recarga">R$ 0,00</div>
+      </div>
+      <div class="kpi-small accent-azul">
+        <span class="etiqueta"><span data-icon="repeat" data-size="13"></span> Nº de recargas</span>
+        <div class="valor" id="kpi-num-recargas">0</div>
+      </div>
+      <div class="kpi-small accent-amarelo">
+        <span class="etiqueta"><span data-icon="receipt" data-size="13"></span> Ticket médio recarga</span>
+        <div class="valor" id="kpi-ticket-recarga">R$ 0,00</div>
+      </div>
+    </div>
+
     <!-- KPIs de estoque -->
     <div class="kpis-estoque">
       <div class="kpi-small accent-azul">
@@ -524,6 +540,21 @@
       $('graficos').classList.remove('hidden');
       criarGraficos();
       criarSparkline();
+
+      // Recargas em tempo real
+      $('kpis-recarga').classList.remove('hidden');
+      onSnapshot(
+        query(collection(db, 'movimentacoes_saldo'), where('eventoId', '==', eventoAtivo.id)),
+        snap => {
+          let totalRecarga = 0;
+          snap.forEach(d => { totalRecarga += d.data().valor || 0; });
+          const nRec = snap.size;
+          $('kpi-total-recarga').textContent  = fmtBRL(totalRecarga);
+          $('kpi-num-recargas').textContent   = nRec;
+          $('kpi-ticket-recarga').textContent = nRec ? fmtBRL(totalRecarga / nRec) : fmtBRL(0);
+        },
+        err => console.error('[dashboard] onSnapshot recargas erro:', err)
+      );
 
       // Vendas em tempo real
       _temEvento = true;
