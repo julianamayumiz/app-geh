@@ -15,6 +15,11 @@
   --cinza-escuro: #374151;
   --verde: #16A34A;
 
+  /* Vermelho de texto — escuro o suficiente pra ter contraste em fundo branco */
+  --vermelho-texto: #B91C1C;
+  /* Cinza de fundo — usado em cards, chips e áreas de destaque no tema claro */
+  --cinza-fundo: #F9FAFB;
+
   --sombra: 0 4px 12px rgba(0, 0, 0, 0.08);
   --sombra-forte: 0 8px 24px rgba(0, 0, 0, 0.15);
   --radius: 12px;
@@ -1004,6 +1009,31 @@ tr:hover td { background: var(--cinza-claro); }
   }
 }
 
+/* ===== Chips de seleção (clientes, filtros) ===== */
+.chips-clientes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  max-height: 140px;
+  overflow-y: auto;
+  padding: 0.25rem;
+}
+
+.chip-cliente {
+  background: var(--cinza-fundo);
+  border: 1px solid var(--cinza-claro);
+  color: var(--cinza-escuro);
+  padding: 0.5rem 0.85rem;
+  min-height: 28px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  transition: background 200ms, color 200ms, border-color 200ms;
+}
+
+.chip-cliente:hover { background: var(--azul); color: white; border-color: var(--azul); }
+.chip-cliente.ativo  { background: var(--azul); color: white; border-color: var(--azul); }
+
 /* ===== Dark Mode =====
    Ativado via atributo data-theme="dark" na tag <html>.
    O init inline em cada HTML lê localStorage ou prefers-color-scheme
@@ -1015,6 +1045,7 @@ tr:hover td { background: var(--cinza-claro); }
   --azul-claro:  #60A5FA;
   --verde:       #22C55E;
   --vermelho:    #EF4444;
+  --vermelho-texto: #FCA5A5;
   --amarelo:     #FCD34D;
 
   /* Superfícies */
@@ -1022,6 +1053,7 @@ tr:hover td { background: var(--cinza-claro); }
   --cinza-claro:  #263548;
   --cinza:        #64748B;
   --cinza-escuro: #E2E8F0;
+  --cinza-fundo:  #1E293B;
 
   --sombra:       0 4px 12px rgba(0, 0, 0, 0.45);
   --sombra-forte: 0 8px 24px rgba(0, 0, 0, 0.65);

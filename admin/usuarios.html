@@ -23,7 +23,7 @@
     .badge-operador { background: rgba(22,163,74,0.12); color: var(--verde); }
     .badge-caixa    { background: rgba(217,119,6,0.14);  color: #B45309; }
     .badge-recepcao { background: rgba(124,58,237,0.14); color: #6D28D9; }
-    .badge-inativo  { background: rgba(220,38,38,0.12); color: #B91C1C; }
+    .badge-inativo  { background: rgba(220,38,38,0.12); color: var(--vermelho-texto); }
     :root[data-theme="dark"] .badge-admin    { background: rgba(59,130,246,0.18); color: #93C5FD; }
     :root[data-theme="dark"] .badge-operador { background: rgba(34,197,94,0.18); color: #86EFAC; }
     :root[data-theme="dark"] .badge-caixa    { background: rgba(245,158,11,0.20); color: #FCD34D; }
@@ -42,7 +42,7 @@
     }
     .acoes-linha button:hover:not(:disabled) { background: var(--cinza-fundo); }
     .acoes-linha button:disabled { opacity: 0.4; cursor: not-allowed; }
-    .acoes-linha .danger { color: #B91C1C; }
+    .acoes-linha .danger { color: var(--vermelho-texto); }
 
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
     .form-grid > .form-group { min-width: 0; }
@@ -119,7 +119,7 @@
         </div>
         <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
           <button id="btn-importar" class="btn btn-primary" style="width:auto;padding:0.6rem 1.25rem;">Importar</button>
-          <span id="label-erros" style="font-size:0.85rem;color:#B91C1C;"></span>
+          <span id="label-erros" style="font-size:0.85rem;color:var(--vermelho-texto);"></span>
         </div>
       </div>
       <div id="progresso-lote" class="hidden" style="margin-top:0.5rem;">
@@ -187,7 +187,7 @@
           </div>
           <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
             <button id="btn-google-importar" class="btn btn-primary" style="width:auto;padding:0.6rem 1.25rem;">Importar</button>
-            <span id="label-erros-google" style="font-size:0.85rem;color:#B91C1C;"></span>
+            <span id="label-erros-google" style="font-size:0.85rem;color:var(--vermelho-texto);"></span>
           </div>
         </div>
         <div id="resultado-google-lote" class="hidden" style="margin-top:0.5rem;"></div>
@@ -352,7 +352,7 @@
         renderIcons(tbl);
       },
       (err) => {
-        tbl.innerHTML = `<tr><td colspan="5" class="text-center" style="color:#B91C1C;">Erro: ${err.message}</td></tr>`;
+        tbl.innerHTML = `<tr><td colspan="5" class="text-center" style="color:var(--vermelho-texto);">Erro: ${err.message}</td></tr>`;
       }
     );
 
@@ -526,7 +526,7 @@
             <td>${esc(l.papel) || '—'}</td>
             <td style="font-size:0.8rem;">${ok
               ? '<span style="color:var(--verde);">✓ OK</span>'
-              : `<span style="color:#B91C1C;" title="${esc(erros.join(', '))}">✗ ${esc(erros.join(', '))}</span>`
+              : `<span style="color:var(--vermelho-texto);" title="${esc(erros.join(', '))}">✗ ${esc(erros.join(', '))}</span>`
             }</td>
           `;
           tbody.appendChild(tr);
@@ -667,7 +667,7 @@
             <td>
               <button data-revogar="${esc(d.id)}"
                 style="padding:0.3rem 0.65rem;font-size:0.78rem;border:1px solid var(--cinza-claro);
-                       background:var(--branco);color:#B91C1C;border-radius:8px;cursor:pointer;">
+                       background:var(--branco);color:var(--vermelho-texto);border-radius:8px;cursor:pointer;">
                 Revogar
               </button>
             </td>
@@ -757,7 +757,7 @@
             <td>${esc(l.papel) || '—'}</td>
             <td style="font-size:0.8rem;">${ok
               ? '<span style="color:var(--verde);">✓ OK</span>'
-              : `<span style="color:#B91C1C;" title="${esc(erros.join(', '))}">✗ ${esc(erros.join(', '))}</span>`
+              : `<span style="color:var(--vermelho-texto);" title="${esc(erros.join(', '))}">✗ ${esc(erros.join(', '))}</span>`
             }</td>
           `;
           tbody.appendChild(tr);
