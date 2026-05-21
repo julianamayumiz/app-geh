@@ -259,8 +259,6 @@
         );
       }
       lista.sort((a, b) => {
-        const fa = (a.familia || '').localeCompare(b.familia || '');
-        if (fa !== 0) return fa;
         const na = parseInt(a.numero) || 0;
         const nb = parseInt(b.numero) || 0;
         return na - nb;
