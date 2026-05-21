@@ -172,7 +172,7 @@
     </div>
 
     <div class="busca-box">
-      <input type="text" id="busca" class="busca-input" placeholder="Buscar por nº, nome ou família…" autocomplete="off">
+      <input type="text" id="busca" class="busca-input" placeholder="Buscar por nº ou nome…" autocomplete="off">
     </div>
 
     <div class="filtros">
@@ -180,8 +180,6 @@
       <button class="chip" data-filtro="pendentes">Pendentes</button>
       <button class="chip" data-filtro="presentes">Presentes</button>
     </div>
-
-    <div id="filtros-familia" class="filtros" style="margin-top:-0.25rem;"></div>
 
     <div id="lista"></div>
   </main>
@@ -234,7 +232,6 @@
 
     let convites = [];
     let filtro = 'todos';
-    let familiaFiltro = 'todas';
     let termoBusca = '';
     let conviteAberto = null;
 
@@ -250,41 +247,15 @@
       $('r-pendentes').textContent = convites.length - pres;
     }
 
-    function renderFiltrosFamilia() {
-      const fams = [...new Set(convites.map(c => c.familia || '(sem família)'))]
-        .sort((a, b) => a.localeCompare(b));
-      const cont = $('filtros-familia');
-      if (fams.length <= 1) {
-        cont.innerHTML = '';
-        return;
-      }
-      const totalPend = (f) => convites.filter(c => (c.familia || '(sem família)') === f && !c.presente).length;
-      cont.innerHTML = `
-        <button class="chip ${familiaFiltro === 'todas' ? 'ativo' : ''}" data-fam="todas">Todas famílias</button>
-        ${fams.map(f => `<button class="chip ${familiaFiltro === f ? 'ativo' : ''}" data-fam="${f.replace(/"/g,'&quot;')}">${f} <span style="opacity:0.7;font-size:0.78rem;">(${totalPend(f)})</span></button>`).join('')}
-      `;
-      cont.querySelectorAll('[data-fam]').forEach(b => {
-        b.onclick = () => {
-          familiaFiltro = b.dataset.fam;
-          renderFiltrosFamilia();
-          render();
-        };
-      });
-    }
-
     function render() {
       const termo = normaliza(termoBusca.trim());
       let lista = convites;
       if (filtro === 'pendentes') lista = lista.filter(c => !c.presente);
       else if (filtro === 'presentes') lista = lista.filter(c => c.presente);
-      if (familiaFiltro !== 'todas') {
-        lista = lista.filter(c => (c.familia || '(sem família)') === familiaFiltro);
-      }
       if (termo) {
         lista = lista.filter(c =>
           String(c.numero).toLowerCase().includes(termo) ||
-          normaliza(c.nome).includes(termo) ||
-          normaliza(c.familia).includes(termo)
+          normaliza(c.nome).includes(termo)
         );
       }
       lista.sort((a, b) => {
@@ -412,7 +383,6 @@
       (snap) => {
         convites = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         atualizarResumo();
-        renderFiltrosFamilia();
         render();
       },
       (err) => {
