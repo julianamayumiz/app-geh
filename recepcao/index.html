@@ -90,6 +90,7 @@
     import { requireAuth } from "../js/auth-guard.js";
     import { instalarBannerPWA } from "../js/install-banner.js";
 
+    const snapPromise = getDoc(doc(db, 'config', 'eventoAtivo'));
     await requireAuth({ papel: 'recepcao' });
     instalarBannerPWA();
 
@@ -98,7 +99,7 @@
       window.location.href = '../admin/login.html';
     };
 
-    const snap = await getDoc(doc(db, 'config', 'eventoAtivo'));
+    const snap = await snapPromise;
     const box  = document.getElementById('evento-box');
     const tag  = document.getElementById('evento-tag');
     const nome = document.getElementById('evento-nome');
