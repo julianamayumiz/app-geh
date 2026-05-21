@@ -206,16 +206,6 @@
     </div>
 
     <div>
-      <div class="section-title">Carregar saldo</div>
-      <ol class="steps">
-        <li><div class="step-num operador"></div><span>Toque em <strong>Carregar saldo</strong>.</span></li>
-        <li><div class="step-num operador"></div><span>Escaneie o QR do cliente.</span></li>
-        <li><div class="step-num operador"></div><span>Digite o <strong>valor</strong> e escolha <strong>dinheiro, Pix ou cartão</strong>.</span></li>
-        <li><div class="step-num operador"></div><span>Confirme. Saldo creditado na hora.</span></li>
-      </ol>
-    </div>
-
-    <div>
       <div class="section-title">Consultar saldo</div>
       <ol class="steps">
         <li><div class="step-num operador"></div><span>Toque em <strong>Consultar saldo</strong>.</span></li>
@@ -277,6 +267,27 @@
         <li>Saldo atual do cliente</li>
         <li>Últimas recargas (data, valor, forma de pagamento)</li>
         <li>Últimas compras realizadas nos balcões</li>
+      </ul>
+    </div>
+
+    <div>
+      <div class="section-title">Transferência de saldo entre clientes</div>
+      <ol class="steps">
+        <li><div class="step-num caixa"></div><span>Escaneie o QR do cliente de <strong>origem</strong>.</span></li>
+        <li><div class="step-num caixa"></div><span>Escolha <strong>Transferir saldo</strong>.</span></li>
+        <li><div class="step-num caixa"></div><span>Escaneie o QR do cliente de <strong>destino</strong>.</span></li>
+        <li><div class="step-num caixa"></div><span>Digite o <strong>valor</strong> e confirme.</span></li>
+      </ol>
+    </div>
+
+    <div>
+      <div class="section-title">Formas de pagamento</div>
+      <ul class="feats">
+        <li><strong>Dinheiro</strong> — pagamento em espécie</li>
+        <li><strong>Pix</strong> — transferência via Pix</li>
+        <li><strong>Cartão</strong> — débito ou crédito</li>
+        <li><strong>Troquinho</strong> — troco que o cliente deixa como saldo</li>
+        <li><strong>Correção</strong> — ajuste interno para corrigir lançamento errado</li>
       </ul>
     </div>
 
@@ -385,7 +396,8 @@
       <div class="section-title">Antes do evento</div>
       <ol class="steps">
         <li><div class="step-num admin"></div><span>Login com Google em <strong>admin/login.html</strong> (papel "admin" e ativo em Usuários).</span></li>
-        <li><div class="step-num admin"></div><span><strong>Eventos</strong> → Novo evento → dar nome → <strong>Ativar</strong>.</span></li>
+        <li><div class="step-num admin"></div><span><strong>Eventos</strong> → Novo evento → dar nome → <strong>Ativar</strong>. Ou use <strong>Preparar para novo evento</strong> para zerar saldos/produtos/convites mantendo o histórico.</span></li>
+        <li><div class="step-num admin"></div><span><strong>Eventos</strong> → <strong>Categorias de ingresso</strong> → cadastrar tipos de convite (preço antecipado, porta e estoque).</span></li>
         <li><div class="step-num admin"></div><span><strong>Produtos</strong> → cadastrar individual ou em lote (CSV). Marcar promoção se tiver.</span></li>
         <li><div class="step-num admin"></div><span><strong>Estoque</strong> → registrar compras de mercadoria (sobe estoque automaticamente).</span></li>
         <li><div class="step-num admin"></div><span><strong>Clientes</strong> → importar em lote os IDs dos QR codes.</span></li>
@@ -396,7 +408,7 @@
     <div>
       <div class="section-title">Durante o evento (acompanhamento)</div>
       <ul class="feats">
-        <li><strong>Dashboard</strong> — total vendido, nº vendas, saldo em circulação, clientes ativos</li>
+        <li><strong>Dashboard</strong> — KPIs de vendas, recargas, presença e estoque; gráficos; ranking de vendedores</li>
         <li><strong>Painel da recepção</strong> — antecipados que chegaram + vendas na porta</li>
         <li><strong>Histórico</strong> — tudo que um cliente específico fez</li>
         <li><strong>Ajuste de saldo</strong> — corrige erro de recarga (auditado)</li>
@@ -407,7 +419,7 @@
         <li><div class="step-num admin"></div><span><strong>Despesas</strong> → lançar todos os gastos do evento.</span></li>
         <li><div class="step-num admin"></div><span><strong>Eventos</strong> → <strong>Encerrar</strong> o evento ativo.</span></li>
         <li><div class="step-num admin"></div><span><strong>Relatório</strong> → conferir números → Exportar CSV ou PDF.</span></li>
-        <li><div class="step-num admin"></div><span><strong>Fechamento</strong> → resumo consolidado pra ata.</span></li>
+        <li><div class="step-num admin"></div><span><strong>Fechamento</strong> → resumo consolidado (ticket médio, clientes únicos, transferências) pra ata.</span></li>
       </ol>
     </div>
 
@@ -418,7 +430,7 @@
       </div>
       <div class="callout warn" style="margin-top:8px">
         <span>⚠️</span>
-        <div><b>Primeira vez no sistema?</b>Peça pra outra pessoa da diretoria já cadastrada ativar seu e-mail em <em>Usuários</em>. Se for a primeira pessoa, ative direto no console do Firebase.</div>
+        <div><b>Primeira vez no sistema?</b>Peça pra outra pessoa da diretoria já cadastrada te adicionar em <em>Usuários</em> — por cadastro manual, importação em lote (xlsx/csv) ou convite Google (whitelist em Pendentes).</div>
       </div>
     </div>
 
