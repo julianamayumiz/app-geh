@@ -18,6 +18,7 @@
 import {
   auth, db, doc, getDoc, onAuthStateChanged, signOut
 } from "./firebase-config.js";
+import { toast } from "./ui.js";
 
 export const SUPER_ADMIN_EMAIL = "juliana.mayumi14@gmail.com";
 
@@ -116,9 +117,16 @@ export function requireAuth({ papel } = {}) {
         const ok = perfil.papel === 'admin' || aceitos.includes(perfil.papel);
         if (!ok) {
           unsub();
+          sessionStorage.setItem('_aviso_acesso', 'Voce nao tem permissao para acessar essa area.');
           window.location.href = homeFor(perfil);
           return;
         }
+      }
+
+      const aviso = sessionStorage.getItem('_aviso_acesso');
+      if (aviso) {
+        sessionStorage.removeItem('_aviso_acesso');
+        requestAnimationFrame(() => toast(aviso, { tipo: 'info', duracao: 4000 }));
       }
 
       resolve({ user, perfil });
