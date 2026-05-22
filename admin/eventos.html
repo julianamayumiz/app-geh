@@ -466,7 +466,7 @@
 
     $('btn-preparar').onclick = async () => {
       const ok = await confirmarAsync(
-        'Isso vai zerar os saldos de todos os clientes, apagar todos os produtos, limpar convites antecipados e vendas na porta. O histórico de vendas fica preservado. Confirmar?',
+        'Isso vai zerar os saldos de todos os clientes, apagar todos os produtos, limpar o historico de entradas de estoque, convites antecipados e vendas na porta. O historico de vendas fica preservado. Confirmar?',
         { destrutivo: true, textoOk: 'Zerar dados' }
       );
       if (!ok) return;
@@ -496,10 +496,11 @@
         }
 
         const qtdProdutos  = await deletarColecao('produtos');
+        const qtdCompras   = await deletarColecao('compras');
         const qtdConvites  = await deletarColecao('convites_antecipados');
         const qtdPorta     = await deletarColecao('vendas_porta');
 
-        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} Pronto! ${clientesSnap.docs.length} saldo(s) zerado(s), ${qtdProdutos} produto(s) removido(s), ${qtdConvites} convite(s) removido(s), ${qtdPorta} venda(s) na porta removida(s).</span>`;
+        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} Pronto! ${clientesSnap.docs.length} saldo(s) zerado(s), ${qtdProdutos} produto(s) removido(s), ${qtdCompras} entrada(s) de estoque removida(s), ${qtdConvites} convite(s) removido(s), ${qtdPorta} venda(s) na porta removida(s).</span>`;
         alerta.className = 'alert alert-success';
       } catch (err) {
         alerta.textContent = `Erro: ${err.message}`;
