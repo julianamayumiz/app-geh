@@ -53,7 +53,7 @@
 
   <script type="module">
     import {
-      db, doc, getDoc, getDocs, collection, query, where, orderBy,
+      db, doc, getDoc, getDocs, collection, query, where, orderBy, limit,
       addDoc, serverTimestamp, runTransaction
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
@@ -78,10 +78,10 @@
       let movSnap, vendasSnap, transfOrigemSnap, transfDestinoSnap;
       try {
         [movSnap, vendasSnap, transfOrigemSnap, transfDestinoSnap] = await Promise.all([
-          getDocs(query(collection(db, 'movimentacoes_saldo'), where('clienteId', '==', clienteId), orderBy('criadoEm', 'desc'))),
-          getDocs(query(collection(db, 'vendas'), where('clienteId', '==', clienteId), orderBy('criadoEm', 'desc'))),
-          getDocs(query(collection(db, 'transferencias_saldo'), where('origemId', '==', clienteId), orderBy('criadoEm', 'desc'))),
-          getDocs(query(collection(db, 'transferencias_saldo'), where('destinoId', '==', clienteId), orderBy('criadoEm', 'desc')))
+          getDocs(query(collection(db, 'movimentacoes_saldo'), where('clienteId', '==', clienteId), orderBy('criadoEm', 'desc'), limit(30))),
+          getDocs(query(collection(db, 'vendas'), where('clienteId', '==', clienteId), orderBy('criadoEm', 'desc'), limit(30))),
+          getDocs(query(collection(db, 'transferencias_saldo'), where('origemId', '==', clienteId), orderBy('criadoEm', 'desc'), limit(30))),
+          getDocs(query(collection(db, 'transferencias_saldo'), where('destinoId', '==', clienteId), orderBy('criadoEm', 'desc'), limit(30)))
         ]);
       } catch (e) {
         console.error('[carregar] falha ao carregar histórico:', e);

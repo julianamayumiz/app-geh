@@ -35,7 +35,7 @@
 
   <script type="module">
     import {
-      db, doc, getDoc, getDocs, collection, query, where, orderBy
+      db, doc, getDoc, getDocs, collection, query, where, orderBy, limit
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
     import { requireAuth } from "../js/auth-guard.js";
@@ -58,8 +58,8 @@
 
     async function carregarHistorico() {
       const [movSnap, vendasSnap] = await Promise.all([
-        getDocs(query(collection(db, 'movimentacoes_saldo'), where('clienteId', '==', clienteId), orderBy('criadoEm', 'desc'))),
-        getDocs(query(collection(db, 'vendas'), where('clienteId', '==', clienteId), orderBy('criadoEm', 'desc')))
+        getDocs(query(collection(db, 'movimentacoes_saldo'), where('clienteId', '==', clienteId), orderBy('criadoEm', 'desc'), limit(30))),
+        getDocs(query(collection(db, 'vendas'), where('clienteId', '==', clienteId), orderBy('criadoEm', 'desc'), limit(30)))
       ]);
 
       const movs = [];

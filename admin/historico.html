@@ -69,7 +69,7 @@
     import { montarNav } from "./_nav.js";
     import { fmtBRL, esc } from "../js/helpers.js";
     import {
-      db, collection, doc, getDoc, getDocs, query, where, orderBy
+      db, collection, doc, getDoc, getDocs, query, where, orderBy, limit
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
     import { abrirDetalhe } from "../js/ui.js";
@@ -150,14 +150,14 @@
       // Filtro por evento aplicado a vendas e movimentações
       const eventoId = $('sel-evento').value;
       const filtrarPorEvento = (col) => eventoId
-        ? query(collection(db, col), where('clienteId', '==', id), where('eventoId', '==', eventoId), orderBy('criadoEm', 'desc'))
-        : query(collection(db, col), where('clienteId', '==', id), orderBy('criadoEm', 'desc'));
+        ? query(collection(db, col), where('clienteId', '==', id), where('eventoId', '==', eventoId), orderBy('criadoEm', 'desc'), limit(50))
+        : query(collection(db, col), where('clienteId', '==', id), orderBy('criadoEm', 'desc'), limit(50));
 
       // Transferencias usam origemId/destinoId em vez de clienteId, entao
       // duas queries separadas (Firestore nao tem OR cross-field facil).
       const filtrarTransfer = (campo) => eventoId
-        ? query(collection(db, 'transferencias_saldo'), where(campo, '==', id), where('eventoId', '==', eventoId), orderBy('criadoEm', 'desc'))
-        : query(collection(db, 'transferencias_saldo'), where(campo, '==', id), orderBy('criadoEm', 'desc'));
+        ? query(collection(db, 'transferencias_saldo'), where(campo, '==', id), where('eventoId', '==', eventoId), orderBy('criadoEm', 'desc'), limit(50))
+        : query(collection(db, 'transferencias_saldo'), where(campo, '==', id), orderBy('criadoEm', 'desc'), limit(50));
 
       // Buscar movimentações de saldo (recargas), vendas, ajustes manuais e transferencias
       const [movSnap, vendasSnap, ajustesSnap, transfOrigemSnap, transfDestinoSnap] = await Promise.all([

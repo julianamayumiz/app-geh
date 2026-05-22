@@ -424,7 +424,7 @@
   <script type="module" src="../js/icons.js"></script>
   <script type="module">
     import {
-      db, collection, doc, getDoc, getDocs, query, orderBy,
+      db, collection, doc, getDoc, getDocs, query, orderBy, limit,
       onSnapshot, runTransaction, serverTimestamp
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
@@ -934,7 +934,7 @@
     }
 
     onSnapshot(
-      query(collection(db, 'transferencias_saldo'), orderBy('criadoEm', 'desc')),
+      query(collection(db, 'transferencias_saldo'), orderBy('criadoEm', 'desc'), limit(50)),
       (snap) => {
         todosTx = snap.docs.map(d => d.data());
         renderHistorico();
