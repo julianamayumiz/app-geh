@@ -75,13 +75,15 @@
 
 
     async function carregarHistorico() {
+      const eventoSnap = await getDoc(doc(db, 'config', 'eventoAtivo'));
+      const eventoId = eventoSnap.exists() ? eventoSnap.data().id : null;
       let movSnap, vendasSnap, transfOrigemSnap, transfDestinoSnap;
       try {
         [movSnap, vendasSnap, transfOrigemSnap, transfDestinoSnap] = await Promise.all([
-          getDocs(query(collection(db, 'movimentacoes_saldo'), where('clienteId', '==', clienteId), orderBy('criadoEm', 'desc'), limit(30))),
-          getDocs(query(collection(db, 'vendas'), where('clienteId', '==', clienteId), orderBy('criadoEm', 'desc'), limit(30))),
-          getDocs(query(collection(db, 'transferencias_saldo'), where('origemId', '==', clienteId), orderBy('criadoEm', 'desc'), limit(30))),
-          getDocs(query(collection(db, 'transferencias_saldo'), where('destinoId', '==', clienteId), orderBy('criadoEm', 'desc'), limit(30)))
+          getDocs(query(collection(db, 'movimentacoes_saldo'), where('clienteId', '==', clienteId), where('eventoId', '==', eventoId), orderBy('criadoEm', 'desc'), limit(30))),
+          getDocs(query(collection(db, 'vendas'), where('clienteId', '==', clienteId), where('eventoId', '==', eventoId), orderBy('criadoEm', 'desc'), limit(30))),
+          getDocs(query(collection(db, 'transferencias_saldo'), where('origemId', '==', clienteId), where('eventoId', '==', eventoId), orderBy('criadoEm', 'desc'), limit(30))),
+          getDocs(query(collection(db, 'transferencias_saldo'), where('destinoId', '==', clienteId), where('eventoId', '==', eventoId), orderBy('criadoEm', 'desc'), limit(30)))
         ]);
       } catch (e) {
         console.error('[carregar] falha ao carregar histórico:', e);
