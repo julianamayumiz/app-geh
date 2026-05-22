@@ -200,7 +200,7 @@ Suco de Laranja, 5.00, 50, Bebidas
       setTimeout(() => alertaLote.classList.add('hidden'), 3000);
     };
 
-    onSnapshot(collection(db, 'produtos'), (snap) => {
+    const unsub = onSnapshot(collection(db, 'produtos'), (snap) => {
       const tbody = $('tbl');
       tbody.innerHTML = '';
       if (snap.empty) {
@@ -255,6 +255,7 @@ Suco de Laranja, 5.00, 50, Bebidas
         tbody.appendChild(tr);
       });
     });
+    window.addEventListener('pagehide', () => unsub());
   </script>
 </body>
 </html>

@@ -284,7 +284,7 @@
     };
 
     // Tabela de últimos ajustes (live)
-    onSnapshot(
+    const unsub = onSnapshot(
       query(collection(db, 'ajustes_saldo'), orderBy('criadoEm', 'desc'), limit(50)),
       (snap) => {
         const tbl = $('tbl-ajustes');
@@ -315,6 +315,8 @@
         $('tbl-ajustes').innerHTML = `<tr><td colspan="5" class="text-center" style="color:#B91C1C;">Erro: ${err.message}</td></tr>`;
       }
     );
+
+    window.addEventListener('pagehide', () => unsub());
 
     carregarClientes();
   </script>

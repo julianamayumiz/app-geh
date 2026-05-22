@@ -36,7 +36,8 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\073712631\\\\Desktop\\\\app-geh\" -Recurse -Filter \"*.js\")",
       "Bash(Select-Object FullName)",
       "Bash(grep -r \"onSnapshot\\\\|getDocs\\\\|getDoc\\\\|query\\\\|where\\\\|orderBy\\\\|limit\" C:/Users/073712631/Desktop/app-geh --include=\"*.html\" --include=\"*.js\" ! -path \"*/node_modules/*\" ! -path \"*/.git/*\" -n)",
-      "Bash(grep -v \":0$\")"
+      "Bash(grep -v \":0$\")",
+      "Bash(for file in \"admin/ajuste-saldo.html\" \"admin/backup.html\" \"admin/clientes.html\" \"admin/convites-antecipados.html\" \"admin/despesas.html\" \"admin/estoque.html\" \"admin/eventos.html\" \"admin/produtos.html\" \"admin/usuarios.html\" \"caixa/transferir.html\" \"recepcao/conferencia.html\"; do *)"
     ]
   }
 }

@@ -376,7 +376,7 @@
       };
     });
 
-    onSnapshot(
+    const unsub = onSnapshot(
       query(collection(db, 'convites_antecipados'), where('eventoId', '==', eventoAtivoId)),
       (snap) => {
         convites = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -391,6 +391,7 @@
         $('lista').innerHTML = `<div class="alert alert-danger">Erro ao carregar a lista: ${err.message}. Recarregue a página.</div>`;
       }
     );
+    window.addEventListener('pagehide', () => unsub());
   </script>
 </body>
 </html>

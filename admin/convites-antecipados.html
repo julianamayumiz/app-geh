@@ -123,8 +123,9 @@
       observarConvites();
     }
 
+    let unsub = null;
     function observarConvites() {
-      onSnapshot(
+      unsub = onSnapshot(
         query(collection(db, 'convites_antecipados'), where('eventoId', '==', eventoAtivoId)),
         (snap) => renderConvites(snap.docs.map(d => ({ id: d.id, ...d.data() })))
       );
@@ -378,6 +379,7 @@
       }
     };
 
+    window.addEventListener('pagehide', () => { if (unsub) unsub(); });
     init();
   </script>
 </body>

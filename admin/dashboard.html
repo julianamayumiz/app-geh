@@ -479,6 +479,8 @@
       }).join('');
     }
 
+    let unsubProdutos, unsubRecargas, unsubConvites, unsubVendas;
+
     // ── Init ──────────────────────────────────────────────────────────
     (async function init() {
       const snap = await getDoc(doc(db, 'config', 'eventoAtivo'));
@@ -487,7 +489,7 @@
       const ESTOQUE_BAIXO = 10;
 
       // Listener de produtos (global — independente do evento ativo)
-      onSnapshot(collection(db, 'produtos'), s => {
+      unsubProdutos = onSnapshot(collection(db, 'produtos'), s => {
         const baixos = [], zerados = [];
         let valorEstoque = 0;
         _produtosCache = [];
@@ -577,7 +579,7 @@
 
       // Recargas em tempo real
       $('kpis-recarga').classList.remove('hidden');
-      onSnapshot(
+      unsubRecargas = onSnapshot(
         query(collection(db, 'movimentacoes_saldo'), where('eventoId', '==', eventoAtivo.id)),
         snap => {
           let totalRecarga = 0;
@@ -593,7 +595,7 @@
 
       // Check-ins em tempo real
       $('kpis-presenca').classList.remove('hidden');
-      onSnapshot(
+      unsubConvites = onSnapshot(
         query(collection(db, 'convites_antecipados'), where('eventoId', '==', eventoAtivo.id)),
         snap => {
           const total = snap.size;
@@ -607,7 +609,7 @@
 
       // Vendas em tempo real
       _temEvento = true;
-      onSnapshot(
+      unsubVendas = onSnapshot(
         query(collection(db, 'vendas'), where('eventoId', '==', eventoAtivo.id), orderBy('criadoEm', 'desc')),
         snap => {
           let total = 0;
@@ -674,6 +676,9 @@
         }
       );
     })();
+    window.addEventListener('pagehide', () => {
+      [unsubProdutos, unsubRecargas, unsubConvites, unsubVendas].filter(Boolean).forEach(u => u());
+    });
   </script>
 </body>
 </html>

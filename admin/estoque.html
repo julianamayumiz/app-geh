@@ -76,7 +76,7 @@
 
     const produtosMap = new Map();
 
-    onSnapshot(collection(db, 'produtos'), (snap) => {
+    const unsub1 = onSnapshot(collection(db, 'produtos'), (snap) => {
       const sel = $('compra-produto');
       const valorAtual = sel.value;
       sel.innerHTML = '<option value="">Selecione...</option>';
@@ -180,7 +180,7 @@
     };
 
     let historicoCache = [];
-    onSnapshot(query(collection(db, 'compras'), orderBy('criadoEm', 'desc'), limit(200)), (snap) => {
+    const unsub2 = onSnapshot(query(collection(db, 'compras'), orderBy('criadoEm', 'desc'), limit(200)), (snap) => {
       historicoCache = [];
       snap.forEach(d => historicoCache.push(d.data()));
       renderHistorico();
@@ -223,6 +223,7 @@
         `;
       });
     }
+    window.addEventListener('pagehide', () => { unsub1(); unsub2(); });
   </script>
 </body>
 </html>

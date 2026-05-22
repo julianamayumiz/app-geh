@@ -417,7 +417,7 @@
     limparOrfaos();
 
     let renderGen = 0;
-    onSnapshot(query(collection(db, 'eventos'), orderBy('criadoEm', 'desc')), async (snap) => {
+    const unsub = onSnapshot(query(collection(db, 'eventos'), orderBy('criadoEm', 'desc')), async (snap) => {
       const myGen = ++renderGen;
       const tbody = $('tbl');
       if (snap.empty) {
@@ -537,6 +537,8 @@
       }
       btn.disabled = false;
     };
+
+    window.addEventListener('pagehide', () => unsub());
 
     carregarAtivo();
   </script>
