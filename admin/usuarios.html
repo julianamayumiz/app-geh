@@ -665,11 +665,18 @@
             <td>${esc(d.id)}</td>
             <td>${esc(p.papel || '—')}</td>
             <td>
-              <button data-revogar="${esc(d.id)}"
-                style="padding:0.3rem 0.65rem;font-size:0.78rem;border:1px solid var(--cinza-claro);
-                       background:var(--branco);color:var(--vermelho-texto);border-radius:8px;cursor:pointer;">
-                Revogar
-              </button>
+              <div class="acoes-linha">
+                <button data-acao-pendente="papel" data-email="${esc(d.id)}" data-papel="${esc(p.papel || 'operador')}"
+                  style="padding:0.3rem 0.65rem;font-size:0.78rem;border:1px solid var(--cinza-claro);
+                         background:var(--branco);color:var(--cinza-escuro);border-radius:8px;cursor:pointer;">
+                  Mudar papel
+                </button>
+                <button data-revogar="${esc(d.id)}"
+                  style="padding:0.3rem 0.65rem;font-size:0.78rem;border:1px solid var(--cinza-claro);
+                         background:var(--branco);color:var(--vermelho-texto);border-radius:8px;cursor:pointer;">
+                  Revogar
+                </button>
+              </div>
             </td>
           `;
           tbl.appendChild(tr);
@@ -678,6 +685,19 @@
     );
 
     $('tbl-pendentes').addEventListener('click', async (e) => {
+      const btnPapel = e.target.closest('[data-acao-pendente="papel"]');
+      if (btnPapel) {
+        const email = btnPapel.dataset.email;
+        const atual = btnPapel.dataset.papel;
+        const novo = await pedirPapelAsync(atual);
+        if (!novo || novo === atual) return;
+        try {
+          await updateDoc(doc(db, 'pendentes', email), { papel: novo });
+        } catch (err) {
+          showErr(`Erro: ${err.message}`);
+        }
+        return;
+      }
       const btn = e.target.closest('[data-revogar]');
       if (!btn) return;
       const email = btn.dataset.revogar;
