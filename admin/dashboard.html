@@ -185,7 +185,8 @@
     import { icon } from "../js/icons.js";
     import {
       db, doc, getDoc, collection,
-      onSnapshot, query, where, orderBy
+      onSnapshot, query, where, orderBy,
+      getAggregateFromServer, sum, count
     } from "../js/firebase-config.js";
 
     montarNav('dashboard.html');
@@ -528,27 +529,30 @@
         console.error('[dashboard] onSnapshot produtos erro:', err);
       });
 
-      // Listener de clientes (global)
-      onSnapshot(collection(db, 'clientes'), s => {
-        let saldo = 0;
-        let semSaldo = 0;
-        s.forEach(d => {
-          const sl = d.data().saldo || 0;
-          saldo += sl;
-          if (sl <= 0) semSaldo++;
-        });
-        $('saldo-circulacao').textContent = fmtBRL(saldo);
-        $('num-clientes').textContent = s.size;
-        const wrap = $('kpi-sem-saldo-wrap');
-        if (wrap) {
-          $('kpi-sem-saldo').textContent = semSaldo;
-          wrap.classList.toggle('hidden', semSaldo === 0);
+      // Agrega totais de clientes via query pontual (evita listener global sobre todos os clientes)
+      async function refreshClientes() {
+        try {
+          const colRef = collection(db, 'clientes');
+          const [totais, semSaldoSnap] = await Promise.all([
+            getAggregateFromServer(colRef, { totalSaldo: sum('saldo'), numClientes: count() }),
+            getAggregateFromServer(query(colRef, where('saldo', '<=', 0)), { num: count() }),
+          ]);
+          const { totalSaldo, numClientes } = totais.data();
+          const semSaldoNum = semSaldoSnap.data().num;
+          $('saldo-circulacao').textContent = fmtBRL(totalSaldo || 0);
+          $('num-clientes').textContent = numClientes;
+          const wrap = $('kpi-sem-saldo-wrap');
+          if (wrap) {
+            $('kpi-sem-saldo').textContent = semSaldoNum;
+            wrap.classList.toggle('hidden', semSaldoNum === 0);
+          }
+        } catch (err) {
+          console.error('[dashboard] refreshClientes erro:', err);
+          $('saldo-circulacao').textContent = '—';
+          $('num-clientes').textContent = '—';
         }
-      }, err => {
-        console.error('[dashboard] onSnapshot clientes erro:', err);
-        $('saldo-circulacao').textContent = '—';
-        $('num-clientes').textContent = '—';
-      });
+      }
+      refreshClientes();
 
       if (!eventoAtivo) {
         $('evento-label').textContent = 'Sem evento ativo';
@@ -582,6 +586,7 @@
           $('kpi-total-recarga').textContent  = fmtBRL(totalRecarga);
           $('kpi-num-recargas').textContent   = nRec;
           $('kpi-ticket-recarga').textContent = nRec ? fmtBRL(totalRecarga / nRec) : fmtBRL(0);
+          refreshClientes();
         },
         err => console.error('[dashboard] onSnapshot recargas erro:', err)
       );
@@ -661,6 +666,7 @@
           if (ultimaHoraEl) ultimaHoraEl.textContent = ultimaHora;
 
           atualizarGraficos(snap.docs);
+          refreshClientes();
         },
         err => {
           console.error('[dashboard] onSnapshot vendas erro:', err);

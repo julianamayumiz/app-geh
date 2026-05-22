@@ -36,7 +36,8 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js";
 import {
   getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc,
-  query, where, orderBy, limit, onSnapshot, serverTimestamp, runTransaction, deleteDoc, writeBatch
+  query, where, orderBy, limit, onSnapshot, serverTimestamp, runTransaction, deleteDoc, writeBatch,
+  getAggregateFromServer, sum, count
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged,
@@ -79,6 +80,7 @@ export {
   app, db, auth, firebaseConfig, criarAppSecundario,
   collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc,
   query, where, orderBy, limit, onSnapshot, serverTimestamp, runTransaction, deleteDoc, writeBatch,
+  getAggregateFromServer, sum, count,
   signInWithEmailAndPassword, signOut, onAuthStateChanged,
   GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword,
   sendPasswordResetEmail
