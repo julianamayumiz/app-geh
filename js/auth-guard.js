@@ -18,6 +18,7 @@
 import {
   auth, db, doc, getDoc, onAuthStateChanged, signOut
 } from "./firebase-config.js";
+import { toast } from "./ui.js";
 
 export const SUPER_ADMIN_EMAIL = "juliana.mayumi14@gmail.com";
 
@@ -39,11 +40,18 @@ function homeFor(perfil) {
 export async function carregarPerfil(user) {
   if (!user) return null;
   let perfil = null;
-  try {
-    const snap = await getDoc(doc(db, 'usuarios', user.uid));
-    if (snap.exists()) perfil = { uid: user.uid, ...snap.data() };
-  } catch (e) {
-    console.warn('[auth-guard] erro lendo perfil', e);
+  // Tenta ate 2 vezes para absorver falhas transientes de rede (ex: telefone
+  // acordando do sleep enquanto o token do App Check ainda esta renovando).
+  for (let tentativa = 1; tentativa <= 2; tentativa++) {
+    try {
+      const snap = await getDoc(doc(db, 'usuarios', user.uid));
+      if (snap.exists()) perfil = { uid: user.uid, ...snap.data() };
+      break;
+    } catch (e) {
+      console.warn(`[auth-guard] erro lendo perfil (tentativa ${tentativa}/2):`, e);
+      if (tentativa < 2) await new Promise(r => setTimeout(r, 1500));
+      else throw e; // Re-lanca na segunda falha — caller decide o que fazer
+    }
   }
   if (!perfil && user.email === SUPER_ADMIN_EMAIL) {
     perfil = {
@@ -66,7 +74,36 @@ export function requireAuth({ papel } = {}) {
         window.location.href = loginUrl() + '?erro=login';
         return;
       }
-      const perfil = await carregarPerfil(user);
+
+      let perfil;
+      try {
+        perfil = await carregarPerfil(user);
+      } catch (e) {
+        // Firestore nao respondeu nem apos a segunda tentativa.
+        // NAO deslogar — o usuario esta autenticado. Mostra erro e
+        // deixa o usuario recarregar manualmente.
+        unsub();
+        document.body.innerHTML = `
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+                      min-height:100dvh;gap:1rem;padding:2rem;font-family:sans-serif;text-align:center;">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ef4444"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M1 6s4-2 11-2 11 2 11 2"/><path d="M1 12s4-2 11-2 11 2 11 2"/>
+              <line x1="1" y1="6" x2="1" y2="18"/><line x1="23" y1="6" x2="23" y2="18"/>
+              <line x1="2" y1="18" x2="22" y2="18"/><line x1="12" y1="2" x2="12" y2="22"/>
+            </svg>
+            <p style="font-size:1.1rem;font-weight:600;color:#1e293b;margin:0">Sem conexao</p>
+            <p style="color:#64748b;margin:0;font-size:0.95rem">
+              Nao foi possivel carregar seu perfil.<br>Verifique a internet e tente novamente.
+            </p>
+            <button onclick="location.reload()"
+              style="margin-top:0.5rem;padding:0.65rem 1.5rem;background:#1e3a8a;color:#fff;
+                     border:none;border-radius:10px;font-size:1rem;cursor:pointer;">
+              Tentar novamente
+            </button>
+          </div>`;
+        return;
+      }
 
       if (!perfil || perfil.ativo === false) {
         unsub();
@@ -80,9 +117,16 @@ export function requireAuth({ papel } = {}) {
         const ok = perfil.papel === 'admin' || aceitos.includes(perfil.papel);
         if (!ok) {
           unsub();
+          sessionStorage.setItem('_aviso_acesso', 'Voce nao tem permissao para acessar essa area.');
           window.location.href = homeFor(perfil);
           return;
         }
+      }
+
+      const aviso = sessionStorage.getItem('_aviso_acesso');
+      if (aviso) {
+        sessionStorage.removeItem('_aviso_acesso');
+        requestAnimationFrame(() => toast(aviso, { tipo: 'info', duracao: 4000 }));
       }
 
       resolve({ user, perfil });

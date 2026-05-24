@@ -67,9 +67,9 @@
 
   <script type="module">
     import { montarNav } from "./_nav.js";
-    import { fmtBRL } from "../js/helpers.js";
+    import { fmtBRL, esc } from "../js/helpers.js";
     import {
-      db, collection, doc, getDoc, getDocs, query, where, orderBy
+      db, collection, doc, getDoc, getDocs, query, where, orderBy, limit
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
     import { abrirDetalhe } from "../js/ui.js";
@@ -114,8 +114,9 @@
         : todosClientes;
       lista.slice(0, 20).forEach(id => {
         const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'chip-cliente';
         btn.textContent = id;
-        btn.style.cssText = 'background:var(--azul-claro);color:white;border:none;padding:0.3rem 0.75rem;border-radius:999px;cursor:pointer;font-size:0.85rem;';
         btn.onclick = () => { $('busca-id').value = id; buscar(id); };
         chips.appendChild(btn);
       });
@@ -133,6 +134,8 @@
       ultimoIdBuscado = id;
       $('resultado').classList.add('hidden');
       $('sem-resultado').classList.add('hidden');
+      $('btn-buscar').disabled = true;
+      try {
 
       const clienteSnap = await getDoc(doc(db, 'clientes', id));
       if (!clienteSnap.exists()) {
@@ -147,14 +150,14 @@
       // Filtro por evento aplicado a vendas e movimentações
       const eventoId = $('sel-evento').value;
       const filtrarPorEvento = (col) => eventoId
-        ? query(collection(db, col), where('clienteId', '==', id), where('eventoId', '==', eventoId), orderBy('criadoEm', 'desc'))
-        : query(collection(db, col), where('clienteId', '==', id), orderBy('criadoEm', 'desc'));
+        ? query(collection(db, col), where('clienteId', '==', id), where('eventoId', '==', eventoId), orderBy('criadoEm', 'desc'), limit(50))
+        : query(collection(db, col), where('clienteId', '==', id), orderBy('criadoEm', 'desc'), limit(50));
 
       // Transferencias usam origemId/destinoId em vez de clienteId, entao
       // duas queries separadas (Firestore nao tem OR cross-field facil).
       const filtrarTransfer = (campo) => eventoId
-        ? query(collection(db, 'transferencias_saldo'), where(campo, '==', id), where('eventoId', '==', eventoId), orderBy('criadoEm', 'desc'))
-        : query(collection(db, 'transferencias_saldo'), where(campo, '==', id), orderBy('criadoEm', 'desc'));
+        ? query(collection(db, 'transferencias_saldo'), where(campo, '==', id), where('eventoId', '==', eventoId), orderBy('criadoEm', 'desc'), limit(50))
+        : query(collection(db, 'transferencias_saldo'), where(campo, '==', id), orderBy('criadoEm', 'desc'), limit(50));
 
       // Buscar movimentações de saldo (recargas), vendas, ajustes manuais e transferencias
       const [movSnap, vendasSnap, ajustesSnap, transfOrigemSnap, transfDestinoSnap] = await Promise.all([
@@ -175,7 +178,7 @@
         movimentos.push({
           quando: m.criadoEm?.toDate?.() || new Date(0),
           tipo: 'recarga',
-          detalhe: `Via ${m.forma || '—'}${m.caixaNome ? ` · caixa ${m.caixaNome}` : ''}`,
+          detalhe: `Via ${esc(m.forma || '—')}${m.caixaNome ? ` · caixa ${esc(m.caixaNome)}` : ''}`,
           valor: m.valor,
           positivo: true,
           cor: 'var(--verde)'
@@ -186,7 +189,7 @@
       vendasSnap.forEach(d => {
         const v = d.data();
         totalGasto += v.total || 0;
-        const itens = (v.itens || []).map(i => `${i.qtd}× ${i.nome}`).join(', ');
+        const itens = (v.itens || []).map(i => `${i.qtd}× ${esc(i.nome)}`).join(', ');
         vendasPorId.set(d.id, { ...v, _id: d.id });
         movimentos.push({
           quando: v.criadoEm?.toDate?.() || new Date(0),
@@ -205,10 +208,10 @@
         movimentos.push({
           quando: a.criadoEm?.toDate?.() || new Date(0),
           tipo: 'ajuste',
-          detalhe: `${a.motivo || '—'}${a.adminNome ? ` · por ${a.adminNome}` : ''}`,
+          detalhe: `${esc(a.motivo || '—')}${a.adminNome ? ` · por ${esc(a.adminNome)}` : ''}`,
           valor: Math.abs(v),
           positivo: v >= 0,
-          cor: '#B45309'
+          cor: 'var(--amarelo-acento)'
         });
       });
 
@@ -217,12 +220,12 @@
       // de fato — so realocam saldo entre clientes.
       transfOrigemSnap.forEach(d => {
         const t = d.data();
-        const para = t.destinoNome ? `${t.destinoId} (${t.destinoNome})` : t.destinoId;
-        const quem = t.usuarioNome || t.usuarioEmail || '—';
+        const para = t.destinoNome ? `${esc(t.destinoId)} (${esc(t.destinoNome)})` : esc(t.destinoId);
+        const quem = esc(t.usuarioNome || t.usuarioEmail || '—');
         movimentos.push({
           quando: t.criadoEm?.toDate?.() || new Date(0),
           tipo: 'transfer ↗',
-          detalhe: `Enviado para ${para}${t.motivo ? ` · ${t.motivo}` : ''} · por ${quem}`,
+          detalhe: `Enviado para ${para}${t.motivo ? ` · ${esc(t.motivo)}` : ''} · por ${quem}`,
           valor: t.valor || 0,
           positivo: false,
           cor: 'var(--azul)'
@@ -230,12 +233,12 @@
       });
       transfDestinoSnap.forEach(d => {
         const t = d.data();
-        const de = t.origemNome ? `${t.origemId} (${t.origemNome})` : t.origemId;
-        const quem = t.usuarioNome || t.usuarioEmail || '—';
+        const de = t.origemNome ? `${esc(t.origemId)} (${esc(t.origemNome)})` : esc(t.origemId);
+        const quem = esc(t.usuarioNome || t.usuarioEmail || '—');
         movimentos.push({
           quando: t.criadoEm?.toDate?.() || new Date(0),
           tipo: 'transfer ↙',
-          detalhe: `Recebido de ${de}${t.motivo ? ` · ${t.motivo}` : ''} · por ${quem}`,
+          detalhe: `Recebido de ${de}${t.motivo ? ` · ${esc(t.motivo)}` : ''} · por ${quem}`,
           valor: t.valor || 0,
           positivo: true,
           cor: 'var(--azul)'
@@ -276,6 +279,9 @@
       };
 
       $('resultado').classList.remove('hidden');
+      } finally {
+        $('btn-buscar').disabled = false;
+      }
     }
 
     function abrirDetalheVenda(v) {

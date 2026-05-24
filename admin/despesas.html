@@ -310,7 +310,7 @@
     document.querySelectorAll('input[name="dp-tipo"]').forEach(r => r.addEventListener('change', atualizarLabelResponsavel));
 
     // Insumos — onSnapshot
-    onSnapshot(collection(db, 'insumos'), (snap) => {
+    const unsub1 = onSnapshot(collection(db, 'insumos'), (snap) => {
       insumos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       insumos.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
       atualizarSelectInsumos();
@@ -359,7 +359,7 @@
     };
 
     // Despesas — onSnapshot
-    onSnapshot(query(collection(db, 'despesas'), orderBy('data', 'desc')), (snap) => {
+    const unsub2 = onSnapshot(query(collection(db, 'despesas'), orderBy('data', 'desc')), (snap) => {
       despesas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       atualizarCategorias();
       renderizar();
@@ -716,6 +716,7 @@
         $('btn-lote').innerHTML = 'Importar lote';
       }
     };
+    window.addEventListener('pagehide', () => { unsub1(); unsub2(); });
   </script>
 </body>
 </html>

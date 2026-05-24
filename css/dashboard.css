@@ -115,6 +115,21 @@
 .kpi-small.accent-amarelo  .valor { color: var(--amarelo-acento); }
 .kpi-small.accent-azul     { border-left-color: var(--azul); }
 .kpi-small.accent-azul     .valor { color: var(--azul); }
+.kpi-small.accent-vermelho { border-left-color: var(--vermelho); }
+.kpi-small.accent-vermelho .valor { color: var(--vermelho); }
+
+/* ---- KPIs de estoque (linha secundaria) ---- */
+.kpis-estoque {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+@media (min-width: 860px) {
+  .kpis-estoque {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
 
 /* ---- Ranking de vendedores (pódio + resto) ---- */
 .podium {

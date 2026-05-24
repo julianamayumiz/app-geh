@@ -236,7 +236,6 @@
     <h3>Operador</h3>
     <a href="#op-home"><span class="ico">📱</span> Tela inicial</a>
     <a href="#op-vender"><span class="ico">🛒</span> Vender</a>
-    <a href="#op-carregar"><span class="ico">💵</span> Carregar saldo</a>
     <a href="#op-consultar"><span class="ico">🔎</span> Consultar saldo</a>
 
     <h3>Caixa</h3>
@@ -340,11 +339,11 @@
     <!-- OPERADOR -->
     <section id="op-home">
       <h2>📱 Operador — Tela inicial <span class="badge">sem login</span></h2>
-      <p class="lead">Mostra o evento ativo e dá acesso às três ações principais.</p>
+      <p class="lead">Mostra o evento ativo e dá acesso às duas ações principais.</p>
       <ul class="feats">
         <li>Cabeçalho com nome do <b>evento ativo</b> em tempo real</li>
         <li>Botão grande <b>Vender</b> (fluxo principal)</li>
-        <li>Botões <b>Carregar saldo</b> e <b>Consultar saldo</b></li>
+        <li>Botão <b>Consultar saldo</b></li>
       </ul>
       <div class="warn">
         <span>⚠️</span>
@@ -372,16 +371,6 @@
       <div class="tip"><span>💡</span><div><b>Dica de barulho</b>O toast vibra o celular pra você ter certeza que deu certo, mesmo sem ouvir nada.</div></div>
     </section>
 
-    <section id="op-carregar">
-      <h2>💵 Operador — Carregar saldo</h2>
-      <ol class="steps">
-        <li>Na home, toque em <b>Carregar saldo</b>.</li>
-        <li>Escaneie o QR do cliente.</li>
-        <li>Digite o <b>valor</b> e escolha a <b>forma</b>: dinheiro, Pix ou cartão.</li>
-        <li>Confirme. O saldo é creditado na hora.</li>
-      </ol>
-    </section>
-
     <section id="op-consultar">
       <h2>🔎 Operador — Consultar saldo</h2>
       <p class="lead">Quando o cliente só quer saber quanto tem — sem vender nada.</p>
@@ -402,6 +391,22 @@
         <li>Na mesma tela aparece o <b>extrato resumido</b>: últimas recargas + últimas vendas.</li>
         <li>Digite valor e forma de pagamento, confirme.</li>
       </ol>
+      <h3>Transferência de saldo entre clientes</h3>
+      <ol class="steps">
+        <li>Escaneie o QR do cliente <b>de origem</b>.</li>
+        <li>Escolha a opção <b>Transferir saldo</b>.</li>
+        <li>Escaneie o QR do cliente <b>de destino</b>.</li>
+        <li>Digite o <b>valor</b> e confirme. O saldo sai de um e entra no outro na hora.</li>
+      </ol>
+
+      <h3>Formas de pagamento disponíveis</h3>
+      <ul class="feats">
+        <li><b>Dinheiro</b> — pagamento em espécie</li>
+        <li><b>Pix</b> — transferência via Pix</li>
+        <li><b>Cartão</b> — débito ou crédito</li>
+        <li><b>Troquinho</b> — saldo deixado como troco pelo cliente (não entra como receita)</li>
+        <li><b>Correção</b> — ajuste interno feito pelo caixa para corrigir lançamento errado</li>
+      </ul>
       <div class="tip"><span>💡</span><div><b>Por que separado do operador?</b>O caixa fica num lugar fixo (mesa de entrada), o operador anda pelos balcões. Telas separadas evitam confusão e permitem fluxos diferentes.</div></div>
     </section>
 
@@ -442,13 +447,40 @@
     <section id="ad-dashboard">
       <h2>📊 Diretoria — Dashboard</h2>
       <p class="lead">A primeira tela depois do login. Visão em <b>tempo real</b> do evento ativo.</p>
+      <h3>KPIs de vendas</h3>
       <ul class="feats">
-        <li><b>Total vendido</b> no evento</li>
+        <li><b>Total vendido</b> no evento, com ticket médio, hora de pico e vendas na última hora</li>
         <li><b>Nº de vendas</b> realizadas</li>
-        <li><b>Saldo em circulação</b> (recargas - vendas)</li>
-        <li><b>Clientes ativos</b> no evento</li>
-        <li>Lista das <b>últimas vendas</b> conforme acontecem</li>
+        <li><b>Saldo em circulação</b> (recargas − vendas)</li>
+        <li><b>Clientes ativos</b> e quantos estão sem saldo</li>
       </ul>
+      <h3>KPIs de recarga</h3>
+      <ul class="feats">
+        <li><b>Total recarregado</b> no evento</li>
+        <li><b>Nº de recargas</b> realizadas</li>
+        <li><b>Ticket médio de recarga</b></li>
+      </ul>
+      <h3>KPIs de presença (convites antecipados)</h3>
+      <ul class="feats">
+        <li><b>Presentes</b> — quantos antecipados já fizeram check-in</li>
+        <li><b>Total de convites</b> importados</li>
+        <li><b>Pendentes</b> — ainda não chegaram</li>
+      </ul>
+      <h3>KPIs de estoque</h3>
+      <ul class="feats">
+        <li><b>Itens vendidos</b> no total</li>
+        <li><b>Produtos sem estoque</b></li>
+        <li><b>Valor em estoque</b> restante</li>
+      </ul>
+      <h3>Gráficos e tabelas</h3>
+      <ul class="feats">
+        <li><b>Receita por hora</b> — ritmo de vendas ao longo do evento</li>
+        <li><b>Top produtos</b> — os mais vendidos em gráfico</li>
+        <li><b>Ranking de vendedores</b> — pódio com os operadores que mais venderam</li>
+        <li><b>Situação do estoque</b> — tabela com estoque atual, unidades vendidas e status de cada produto</li>
+        <li><b>Alerta de estoque</b> — aparece automaticamente quando algum produto está baixo ou zerado</li>
+      </ul>
+      <p style="margin-top:14px; color:var(--muted); font-size:13.5px">Os blocos de recarga e presença ficam ocultos quando não há evento ativo.</p>
     </section>
 
     <section id="ad-eventos">
@@ -459,6 +491,35 @@
         <li>Quando acabar, toque em <b>Encerrar</b>.</li>
       </ol>
       <div class="tip"><span>💡</span><div><b>Só um por vez</b>Só pode existir um evento ativo. Ativar outro encerra o anterior automaticamente.</div></div>
+
+      <h3>Categorias de ingresso</h3>
+      <p class="lead">Com o evento ativo, você pode cadastrar tipos de convite — cada um com preço antecipado, preço na porta e estoque disponível na porta.</p>
+      <ul class="feats">
+        <li>Exemplos: Adulto, Idoso, Criança</li>
+        <li>Cada categoria tem <b>preço antecipado</b>, <b>preço na porta</b> e <b>estoque na porta</b></li>
+        <li>As categorias aparecem na tela de venda na porta da recepção</li>
+      </ul>
+
+      <h3>Preparar para novo evento</h3>
+      <p class="lead">Limpa os dados operacionais sem apagar o histórico de vendas — ideal pra reutilizar os mesmos clientes e QR codes.</p>
+      <ul class="feats">
+        <li>Zera o saldo de todos os clientes</li>
+        <li>Apaga todos os produtos</li>
+        <li>Limpa convites antecipados e vendas na porta</li>
+        <li><b>O histórico de vendas e movimentações fica preservado</b></li>
+      </ul>
+      <div class="warn"><span>⚠️</span><div><b>Ação irreversível.</b>Confirme antes de usar — não tem como desfazer os zeros.</div></div>
+
+      <h3>Excluir todos os clientes</h3>
+      <p class="lead">Remove permanentemente todos os cadastros de clientes do sistema.</p>
+      <div class="warn"><span>⚠️</span><div><b>Ação irreversível.</b>Use só quando quiser começar do zero com uma nova base de QR codes.</div></div>
+
+      <h3>Outras ações no histórico</h3>
+      <ul class="feats">
+        <li><b>Editar nome</b> de qualquer evento (inclusive o ativo)</li>
+        <li><b>Reativar</b> um evento encerrado (encerra o ativo atual, se houver)</li>
+        <li><b>Excluir</b> evento sem vendas (eventos com vendas ficam preservados como histórico)</li>
+      </ul>
     </section>
 
     <section id="ad-comparativo">
@@ -551,6 +612,16 @@
     <section id="ad-fechamento">
       <h2>📄 Diretoria — Fechamento</h2>
       <p class="lead">Consolidação financeira final do evento: vendas + porta + despesas + ajustes, num único resumo pronto pra ata.</p>
+      <ul class="feats">
+        <li><b>Receita total</b> — vendas com saldo + vendas na porta</li>
+        <li><b>Despesas</b> lançadas no evento</li>
+        <li><b>Lucro bruto</b> (receita − despesas)</li>
+        <li><b>Ticket médio</b> por cliente</li>
+        <li><b>Clientes únicos</b> que compraram no evento</li>
+        <li><b>Transferências</b> entre clientes registradas no evento</li>
+        <li>Saldo em circulação, ajustes de saldo e recargas por forma de pagamento</li>
+        <li>Espaço para <b>assinaturas</b> na versão impressa</li>
+      </ul>
     </section>
 
     <section id="ad-usuarios">
@@ -560,6 +631,13 @@
         <li>Defina o <b>papel</b> (admin) e marque/desmarque <b>ativo</b>.</li>
         <li>Desativar é a forma mais segura de tirar acesso de alguém — sem precisar excluir o registro.</li>
       </ol>
+      <h3>Formas de cadastrar novos usuários</h3>
+      <ul class="feats">
+        <li><b>Cadastro individual</b> — nome, e-mail e senha provisória; a pessoa troca depois pelo "Esqueci minha senha"</li>
+        <li><b>Importação em lote</b> — suba um arquivo xlsx ou csv com vários usuários de uma vez; tem preview e barra de progresso</li>
+        <li><b>Convite Google</b> — adicione o e-mail na whitelist em <i>Pendentes</i>; na primeira vez que a pessoa entrar com Google, o perfil é provisionado automaticamente</li>
+      </ul>
+      <div class="tip"><span>💡</span><div><b>Convite Google é o mais fácil</b>A pessoa não precisa memorizar senha — entra com a conta Google que já usa.</div></div>
     </section>
 
     <!-- EXTRAS -->

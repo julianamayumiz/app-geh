@@ -25,7 +25,19 @@
       "PowerShell($ids = @\\(\\); 1001..1200 | %{ $ids += $_ }; 5001..5350 | %{ $ids += $_ }; $ids -join \"`n\" | Out-File -FilePath \"dev-tools\\\\csv-exemplo\\\\clientes-teste.txt\" -Encoding utf8 -NoNewline; \\(Get-Content \"dev-tools\\\\csv-exemplo\\\\clientes-teste.txt\"\\).Count)",
       "Bash(git check-ignore *)",
       "PowerShell(cd \"C:\\\\Users\\\\julia\\\\Desktop\\\\App GEH\"; \"--- diff HEAD ---\"; git --no-pager diff HEAD -- admin/produtos.html | Select-Object -First 8; \"--- HEAD tem a mudanca? ---\"; git show HEAD:admin/produtos.html | Select-String \"servidos a vontade\" -SimpleMatch; \"--- git dir ---\"; git rev-parse --git-dir; \"--- worktree list ---\"; git worktree list; \"--- mtime real do arquivo ---\"; \\(Get-Item admin\\\\produtos.html\\).LastWriteTime)",
-      "PowerShell(\"---\")"
+      "PowerShell(\"---\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\073712631\\\\Desktop\\\\app-geh\\\\dev-tools\\\\csv-exemplo\" -Force)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\073712631\\\\Desktop\\\\app-geh\\\\admin\" -Filter \"*.html\")",
+      "Bash(Select-Object -ExpandProperty Name)",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"admin dashboard SaaS management panel\" --design-system -f markdown)",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"accessibility form table interaction\" --domain ux)",
+      "Bash(Get-ChildItem *.html)",
+      "Bash(Sort-Object)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\073712631\\\\Desktop\\\\app-geh\" -Recurse -Filter \"*.js\")",
+      "Bash(Select-Object FullName)",
+      "Bash(grep -r \"onSnapshot\\\\|getDocs\\\\|getDoc\\\\|query\\\\|where\\\\|orderBy\\\\|limit\" C:/Users/073712631/Desktop/app-geh --include=\"*.html\" --include=\"*.js\" ! -path \"*/node_modules/*\" ! -path \"*/.git/*\" -n)",
+      "Bash(grep -v \":0$\")",
+      "Bash(for file in \"admin/ajuste-saldo.html\" \"admin/backup.html\" \"admin/clientes.html\" \"admin/convites-antecipados.html\" \"admin/despesas.html\" \"admin/estoque.html\" \"admin/eventos.html\" \"admin/produtos.html\" \"admin/usuarios.html\" \"caixa/transferir.html\" \"recepcao/conferencia.html\"; do *)"
     ]
   }
 }

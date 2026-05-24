@@ -155,6 +155,7 @@
     import { renderIcons } from "../js/icons.js";
     import { requireAuth } from "../js/auth-guard.js";
 
+    const snapPromise = getDoc(doc(db, 'config', 'eventoAtivo'));
     await requireAuth({ papel: 'caixa' });
 
     document.getElementById('btn-logout').onclick = async () => {
@@ -162,7 +163,7 @@
       window.location.href = '../admin/login.html';
     };
 
-    const snap = await getDoc(doc(db, 'config', 'eventoAtivo'));
+    const snap = await snapPromise;
     const box  = document.getElementById('evento-box');
     const tag  = document.getElementById('evento-tag');
     const nome = document.getElementById('evento-nome');

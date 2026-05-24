@@ -34,6 +34,7 @@
         <div class="meta">
           <span><strong id="kpi-ticket">R$ 0,00</strong> ticket médio</span>
           <span><strong id="kpi-pico">—</strong> hora de pico</span>
+          <span><strong id="kpi-ultima-hora">—</strong> na última hora</span>
         </div>
         <div class="spark">
           <canvas id="chart-spark"></canvas>
@@ -53,6 +54,57 @@
       <div class="kpi-small accent-verde">
         <span class="etiqueta"><span data-icon="users" data-size="13"></span> Clientes ativos</span>
         <div class="valor" id="num-clientes">0</div>
+        <div id="kpi-sem-saldo-wrap" class="hidden" style="font-size:0.78rem;color:var(--vermelho);font-weight:600;margin-top:0.25rem;">
+          <span data-icon="alert-circle" data-size="12"></span> <span id="kpi-sem-saldo">0</span> sem saldo
+        </div>
+      </div>
+    </div>
+
+    <!-- KPIs de recarga — só aparecem quando há evento ativo -->
+    <div id="kpis-recarga" class="kpis-estoque hidden" style="margin-top:0.75rem;">
+      <div class="kpi-small accent-verde">
+        <span class="etiqueta"><span data-icon="arrow-down-circle" data-size="13"></span> Total recarregado</span>
+        <div class="valor" id="kpi-total-recarga">R$ 0,00</div>
+      </div>
+      <div class="kpi-small accent-azul">
+        <span class="etiqueta"><span data-icon="repeat" data-size="13"></span> Nº de recargas</span>
+        <div class="valor" id="kpi-num-recargas">0</div>
+      </div>
+      <div class="kpi-small accent-amarelo">
+        <span class="etiqueta"><span data-icon="receipt" data-size="13"></span> Ticket médio recarga</span>
+        <div class="valor" id="kpi-ticket-recarga">R$ 0,00</div>
+      </div>
+    </div>
+
+    <!-- KPIs de presença — só aparecem quando há evento ativo -->
+    <div id="kpis-presenca" class="kpis-estoque hidden" style="margin-top:0.75rem;">
+      <div class="kpi-small accent-verde">
+        <span class="etiqueta"><span data-icon="door-open" data-size="13"></span> Presentes</span>
+        <div class="valor" id="kpi-presentes">0</div>
+      </div>
+      <div class="kpi-small accent-azul">
+        <span class="etiqueta"><span data-icon="ticket" data-size="13"></span> Total convites</span>
+        <div class="valor" id="kpi-total-convites">0</div>
+      </div>
+      <div class="kpi-small accent-amarelo">
+        <span class="etiqueta"><span data-icon="clock" data-size="13"></span> Pendentes</span>
+        <div class="valor" id="kpi-pendentes">0</div>
+      </div>
+    </div>
+
+    <!-- KPIs de estoque -->
+    <div class="kpis-estoque">
+      <div class="kpi-small accent-azul">
+        <span class="etiqueta"><span data-icon="layers" data-size="13"></span> Itens vendidos</span>
+        <div class="valor" id="kpi-itens-vendidos">—</div>
+      </div>
+      <div class="kpi-small accent-vermelho">
+        <span class="etiqueta"><span data-icon="x-circle" data-size="13"></span> Sem estoque</span>
+        <div class="valor" id="kpi-sem-estoque">0</div>
+      </div>
+      <div class="kpi-small accent-verde">
+        <span class="etiqueta"><span data-icon="package" data-size="13"></span> Valor em estoque</span>
+        <div class="valor" id="kpi-valor-estoque">R$ 0,00</div>
       </div>
     </div>
 
@@ -94,6 +146,28 @@
       <p id="ranking-vazio" class="text-muted text-center hidden" style="margin:0.5rem 0;">Ainda ninguém pontuou neste evento.</p>
     </div>
 
+    <!-- Situacao do estoque por produto (sempre visivel) -->
+    <div class="card" style="margin-top:1.5rem;">
+      <h3 class="card-title" style="display:inline-flex;align-items:center;gap:0.5rem;">
+        <span data-icon="package" data-size="18"></span> Situação do estoque
+      </h3>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Produto</th>
+              <th>Estoque</th>
+              <th>Vendidos</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-estoque-produtos">
+            <tr><td colspan="4" class="text-center text-muted">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <h3 style="color:var(--azul);margin:1.5rem 0 0.75rem;">Últimas vendas</h3>
     <div class="table-wrapper">
       <table>
@@ -107,11 +181,12 @@
 
   <script type="module">
     import { montarNav } from "./_nav.js";
-    import { fmtBRL } from "../js/helpers.js";
+    import { fmtBRL, esc } from "../js/helpers.js";
     import { icon } from "../js/icons.js";
     import {
       db, doc, getDoc, collection,
-      onSnapshot, query, where, orderBy
+      onSnapshot, query, where, orderBy,
+      getAggregateFromServer, sum, count
     } from "../js/firebase-config.js";
 
     montarNav('dashboard.html');
@@ -353,7 +428,7 @@
         return `
           <div class="podium-card ${m.cls}">
             <div class="medalha">${m.medalha}</div>
-            <div class="nome">${r.nome}</div>
+            <div class="nome">${esc(r.nome)}</div>
             <div class="total">${fmtBRL(r.total)}</div>
             <div class="meta">${r.vendas} venda${r.vendas === 1 ? '' : 's'}</div>
           </div>`;
@@ -363,15 +438,123 @@
       resto.innerHTML = resto_arr.map((r, i) => `
         <div class="ranking-row">
           <span class="pos">${i + 4}</span>
-          <span class="nome">${r.nome} <span style="color:var(--cinza);font-weight:500;font-size:0.8rem;">· ${r.vendas} venda${r.vendas === 1 ? '' : 's'}</span></span>
+          <span class="nome">${esc(r.nome)} <span style="color:var(--cinza);font-weight:500;font-size:0.8rem;">· ${r.vendas} venda${r.vendas === 1 ? '' : 's'}</span></span>
           <span class="total">${fmtBRL(r.total)}</span>
         </div>`).join('');
     }
+
+    // ── Estado compartilhado entre listeners ─────────────────────────
+    let _produtosCache = [];   // [{id, nome, estoque, preco, ...}]
+    let _vendasProdMap = {};   // produtoId -> qtd vendida no evento
+    let _temEvento     = false;
+
+    function renderEstoqueProdutos() {
+      const tbody = $('tbody-estoque-produtos');
+      if (!tbody) return;
+      if (_produtosCache.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Nenhum produto cadastrado.</td></tr>';
+        return;
+      }
+      const sorted = [..._produtosCache].sort((a, b) => (a.estoque ?? 0) - (b.estoque ?? 0));
+      tbody.innerHTML = sorted.map(p => {
+        const est = p.estoque ?? 0;
+        const vendidos = _temEvento ? (_vendasProdMap[p.id] || 0) : '—';
+        let corEst, badge;
+        if (est <= 0) {
+          corEst = 'var(--vermelho)';
+          badge  = '<span style="background:var(--vermelho);color:#fff;padding:2px 8px;border-radius:999px;font-size:0.75rem;font-weight:600;">Esgotado</span>';
+        } else if (est <= 10) {
+          corEst = 'var(--amarelo-acento)';
+          badge  = '<span style="background:var(--amarelo);color:#1F2937;padding:2px 8px;border-radius:999px;font-size:0.75rem;font-weight:600;">Baixo</span>';
+        } else {
+          corEst = 'var(--verde)';
+          badge  = '<span style="background:var(--verde);color:#fff;padding:2px 8px;border-radius:999px;font-size:0.75rem;font-weight:600;">OK</span>';
+        }
+        return `<tr>
+          <td>${esc(p.nome)}</td>
+          <td style="font-variant-numeric:tabular-nums;font-weight:700;color:${corEst};">${est}</td>
+          <td style="font-variant-numeric:tabular-nums;">${vendidos}</td>
+          <td>${badge}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    let unsubProdutos, unsubRecargas, unsubConvites, unsubVendas;
 
     // ── Init ──────────────────────────────────────────────────────────
     (async function init() {
       const snap = await getDoc(doc(db, 'config', 'eventoAtivo'));
       const eventoAtivo = snap.exists() && snap.data().id ? snap.data() : null;
+
+      const ESTOQUE_BAIXO = 10;
+
+      // Listener de produtos (global — independente do evento ativo)
+      unsubProdutos = onSnapshot(collection(db, 'produtos'), s => {
+        const baixos = [], zerados = [];
+        let valorEstoque = 0;
+        _produtosCache = [];
+        s.forEach(d => {
+          const p = { id: d.id, ...d.data() };
+          _produtosCache.push(p);
+          const est = p.estoque ?? 0;
+          valorEstoque += est > 0 ? est * (p.preco || 0) : 0;
+          if (est <= 0) zerados.push(p);
+          else if (est <= ESTOQUE_BAIXO) baixos.push(p);
+        });
+
+        const kpiSem = $('kpi-sem-estoque');
+        if (kpiSem) kpiSem.textContent = zerados.length;
+        const kpiValor = $('kpi-valor-estoque');
+        if (kpiValor) kpiValor.textContent = fmtBRL(valorEstoque);
+
+        const card = $('card-estoque');
+        const lista = $('lista-estoque');
+        if (zerados.length === 0 && baixos.length === 0) {
+          card.classList.add('hidden');
+        } else {
+          card.classList.remove('hidden');
+          card.style.borderLeftColor = zerados.length > 0 ? 'var(--vermelho)' : 'var(--amarelo)';
+          const chip = (p, cor, txt, icone) => `
+            <span style="display:inline-flex;align-items:center;gap:0.4rem;background:${cor.bg};color:${cor.fg};padding:6px 12px;border-radius:999px;font-size:0.85rem;font-weight:600;">
+              ${icon(icone, { size: 14 })} ${esc(p.nome)} <span style="opacity:0.85;font-weight:500;">— ${txt}</span>
+            </span>`;
+          const corVerm = { bg: 'var(--vermelho)', fg: '#fff' };
+          const corAmar = { bg: 'var(--amarelo)', fg: '#1F2937' };
+          lista.innerHTML =
+            zerados.map(p => chip(p, corVerm, 'esgotado', 'x-circle')).join('') +
+            baixos.sort((a,b) => (a.estoque||0) - (b.estoque||0))
+                  .map(p => chip(p, corAmar, `restam ${p.estoque}`, 'alert-triangle')).join('');
+        }
+
+        renderEstoqueProdutos();
+      }, err => {
+        console.error('[dashboard] onSnapshot produtos erro:', err);
+      });
+
+      // Agrega totais de clientes via query pontual (evita listener global sobre todos os clientes)
+      async function refreshClientes() {
+        try {
+          const colRef = collection(db, 'clientes');
+          const [totais, semSaldoSnap] = await Promise.all([
+            getAggregateFromServer(colRef, { totalSaldo: sum('saldo'), numClientes: count() }),
+            getAggregateFromServer(query(colRef, where('saldo', '<=', 0)), { num: count() }),
+          ]);
+          const { totalSaldo, numClientes } = totais.data();
+          const semSaldoNum = semSaldoSnap.data().num;
+          $('saldo-circulacao').textContent = fmtBRL(totalSaldo || 0);
+          $('num-clientes').textContent = numClientes;
+          const wrap = $('kpi-sem-saldo-wrap');
+          if (wrap) {
+            $('kpi-sem-saldo').textContent = semSaldoNum;
+            wrap.classList.toggle('hidden', semSaldoNum === 0);
+          }
+        } catch (err) {
+          console.error('[dashboard] refreshClientes erro:', err);
+          $('saldo-circulacao').textContent = '—';
+          $('num-clientes').textContent = '—';
+        }
+      }
+      refreshClientes();
 
       if (!eventoAtivo) {
         $('evento-label').textContent = 'Sem evento ativo';
@@ -379,40 +562,74 @@
         $('total-vendido').textContent = 'R$ 0,00';
         $('num-vendas').textContent = '0';
         $('tbl-vendas').innerHTML = '<tr><td colspan="4" class="text-center text-muted">Nenhum evento ativo.</td></tr>';
-        onSnapshot(collection(db, 'clientes'), s => {
-          let saldo = 0;
-          s.forEach(d => saldo += d.data().saldo || 0);
-          $('saldo-circulacao').textContent = fmtBRL(saldo);
-          $('num-clientes').textContent = s.size;
-        }, err => {
-          console.error('[dashboard] onSnapshot clientes (sem evento) erro:', err);
-          $('saldo-circulacao').textContent = '—';
-          $('num-clientes').textContent = '—';
-        });
         return;
       }
 
       $('evento-label').innerHTML = `
         <strong style="color:var(--verde);display:inline-flex;align-items:center;gap:0.4rem;">
           <span style="width:8px;height:8px;background:var(--verde);border-radius:50%;display:inline-block;"></span>
-          ${eventoAtivo.nome}
+          ${esc(eventoAtivo.nome)}
         </strong>
         <span style="color:var(--cinza);"> — números deste evento</span>`;
 
-      // Mostrar seção de gráficos e inicializar
+      // Mostrar secao de graficos e inicializar
       $('graficos').classList.remove('hidden');
       criarGraficos();
       criarSparkline();
 
+      // Recargas em tempo real
+      $('kpis-recarga').classList.remove('hidden');
+      unsubRecargas = onSnapshot(
+        query(collection(db, 'movimentacoes_saldo'), where('eventoId', '==', eventoAtivo.id)),
+        snap => {
+          let totalRecarga = 0;
+          snap.forEach(d => { totalRecarga += d.data().valor || 0; });
+          const nRec = snap.size;
+          $('kpi-total-recarga').textContent  = fmtBRL(totalRecarga);
+          $('kpi-num-recargas').textContent   = nRec;
+          $('kpi-ticket-recarga').textContent = nRec ? fmtBRL(totalRecarga / nRec) : fmtBRL(0);
+          refreshClientes();
+        },
+        err => console.error('[dashboard] onSnapshot recargas erro:', err)
+      );
+
+      // Check-ins em tempo real
+      $('kpis-presenca').classList.remove('hidden');
+      unsubConvites = onSnapshot(
+        query(collection(db, 'convites_antecipados'), where('eventoId', '==', eventoAtivo.id)),
+        snap => {
+          const total = snap.size;
+          const presentes = snap.docs.filter(d => d.data().presente).length;
+          $('kpi-presentes').textContent     = presentes;
+          $('kpi-total-convites').textContent = total;
+          $('kpi-pendentes').textContent     = total - presentes;
+        },
+        err => console.error('[dashboard] onSnapshot convites erro:', err)
+      );
+
       // Vendas em tempo real
-      onSnapshot(
+      _temEvento = true;
+      unsubVendas = onSnapshot(
         query(collection(db, 'vendas'), where('eventoId', '==', eventoAtivo.id), orderBy('criadoEm', 'desc')),
         snap => {
           let total = 0;
+          let totalItens = 0;
+          _vendasProdMap = {};
           const tbody = $('tbl-vendas');
           tbody.innerHTML = '';
 
-          snap.docs.forEach(d => total += d.data().total || 0);
+          snap.docs.forEach(d => {
+            total += d.data().total || 0;
+            (d.data().itens || []).forEach(item => {
+              totalItens += item.qtd || 0;
+              if (item.id) _vendasProdMap[item.id] = (_vendasProdMap[item.id] || 0) + (item.qtd || 0);
+            });
+          });
+
+          renderEstoqueProdutos();
+
+          const kpiItens = $('kpi-itens-vendidos');
+          if (kpiItens) kpiItens.textContent = totalItens;
 
           snap.docs.slice(0, 50).forEach(d => {
             const v = d.data();
@@ -421,7 +638,7 @@
             tbody.innerHTML += `
               <tr>
                 <td>${quando}</td>
-                <td>${v.clienteNome || v.clienteId}</td>
+                <td>${esc(v.clienteNome || v.clienteId)}</td>
                 <td>${qtd}</td>
                 <td>${fmtBRL(v.total)}</td>
               </tr>`;
@@ -432,70 +649,36 @@
           }
 
           $('total-vendido').textContent = fmtBRL(total);
-          // Hero: só o número (o "R$" já está estilizado em <small>)
+          // Hero: so o numero (o "R$" ja esta estilizado em <small>)
           const numHero = document.getElementById('total-vendido-num');
           if (numHero) numHero.textContent = total.toFixed(2).replace('.', ',');
           $('num-vendas').textContent = snap.size;
 
-          // Ticket médio
+          // Ticket medio
           const ticketEl = document.getElementById('kpi-ticket');
           if (ticketEl) ticketEl.textContent = snap.size ? fmtBRL(total / snap.size) : fmtBRL(0);
 
+          // Vendas na ultima hora
+          const umHoraAtras = Date.now() - 60 * 60 * 1000;
+          const ultimaHora = snap.docs.filter(d => {
+            const t = d.data().criadoEm?.toDate?.()?.getTime?.();
+            return t && t >= umHoraAtras;
+          }).length;
+          const ultimaHoraEl = $('kpi-ultima-hora');
+          if (ultimaHoraEl) ultimaHoraEl.textContent = ultimaHora;
+
           atualizarGraficos(snap.docs);
+          refreshClientes();
         },
         err => {
           console.error('[dashboard] onSnapshot vendas erro:', err);
           $('tbl-vendas').innerHTML = `<tr><td colspan="4"><div class="alert alert-danger">Erro carregando vendas: ${err.message}</div></td></tr>`;
         }
       );
-
-      // Alerta de estoque (real time)
-      const ESTOQUE_BAIXO = 10;
-      onSnapshot(collection(db, 'produtos'), s => {
-        const baixos = [];
-        const zerados = [];
-        s.forEach(d => {
-          const p = { id: d.id, ...d.data() };
-          const est = p.estoque ?? 0;
-          if (est <= 0) zerados.push(p);
-          else if (est <= ESTOQUE_BAIXO) baixos.push(p);
-        });
-        const card = $('card-estoque');
-        const lista = $('lista-estoque');
-        if (zerados.length === 0 && baixos.length === 0) {
-          card.classList.add('hidden');
-          return;
-        }
-        card.classList.remove('hidden');
-        card.style.borderLeftColor = zerados.length > 0 ? 'var(--vermelho)' : 'var(--amarelo)';
-        const chip = (p, cor, txt, icone) => `
-          <span style="display:inline-flex;align-items:center;gap:0.4rem;background:${cor.bg};color:${cor.fg};padding:6px 12px;border-radius:999px;font-size:0.85rem;font-weight:600;">
-            ${icon(icone, { size: 14 })} ${p.nome} <span style="opacity:0.85;font-weight:500;">— ${txt}</span>
-          </span>`;
-        const corVerm = { bg: 'var(--vermelho)', fg: '#fff' };
-        const corAmar = { bg: 'var(--amarelo)', fg: '#1F2937' };
-        lista.innerHTML =
-          zerados.map(p => chip(p, corVerm, 'esgotado', 'x-circle')).join('') +
-          baixos.sort((a,b) => (a.estoque||0) - (b.estoque||0))
-                .map(p => chip(p, corAmar, `restam ${p.estoque}`, 'alert-triangle')).join('');
-      }, err => {
-        console.error('[dashboard] onSnapshot produtos erro:', err);
-        // Não polui a UI pra alerta de estoque — só loga; o KPI principal
-        // ainda funciona mesmo sem o card de estoque baixo.
-      });
-
-      // Saldo + clientes (globais)
-      onSnapshot(collection(db, 'clientes'), s => {
-        let saldo = 0;
-        s.forEach(d => saldo += d.data().saldo || 0);
-        $('saldo-circulacao').textContent = fmtBRL(saldo);
-        $('num-clientes').textContent = s.size;
-      }, err => {
-        console.error('[dashboard] onSnapshot clientes (globais) erro:', err);
-        $('saldo-circulacao').textContent = '—';
-        $('num-clientes').textContent = '—';
-      });
     })();
+    window.addEventListener('pagehide', () => {
+      [unsubProdutos, unsubRecargas, unsubConvites, unsubVendas].filter(Boolean).forEach(u => u());
+    });
   </script>
 </body>
 </html>

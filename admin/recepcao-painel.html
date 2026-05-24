@@ -205,6 +205,7 @@
     let eventoAtivoId = null;
     let convites = [];
     let vendasPorta = [];
+    let unsub1, unsub2, unsub3;
 
     async function init() {
       const cfg = await getDoc(doc(db, 'config', 'eventoAtivo'));
@@ -216,21 +217,21 @@
       }
       $('conteudo').classList.remove('hidden');
 
-      onSnapshot(
+      unsub1 = onSnapshot(
         query(collection(db, 'convites_antecipados'), where('eventoId', '==', eventoAtivoId)),
         (snap) => {
           convites = snap.docs.map(d => ({ id: d.id, ...d.data() }));
           atualizar();
         }
       );
-      onSnapshot(
+      unsub2 = onSnapshot(
         query(collection(db, 'vendas_porta'), where('eventoId', '==', eventoAtivoId)),
         (snap) => {
           vendasPorta = snap.docs.map(d => ({ id: d.id, ...d.data() }));
           atualizar();
         }
       );
-      onSnapshot(doc(db, 'eventos', eventoAtivoId), (snap) => {
+      unsub3 = onSnapshot(doc(db, 'eventos', eventoAtivoId), (snap) => {
         if (!snap.exists()) return;
         const cats = (snap.data().categoriasIngresso || []).filter(c => c.precoPorta != null);
         renderEstoque(cats);
@@ -256,9 +257,9 @@
           <div class="row">
             <span class="lbl">Estoque</span>
             <div class="botoes-qtd">
-              <button data-acao="dec">−</button>
+              <button data-acao="dec" aria-label="Diminuir quantidade">−</button>
               <input type="number" min="0" step="1" value="${c.qtdPorta != null ? c.qtdPorta : ''}" data-campo="qtd" style="width:70px;text-align:center;">
-              <button data-acao="inc">+</button>
+              <button data-acao="inc" aria-label="Aumentar quantidade">+</button>
             </div>
           </div>
           <button class="salvar" data-acao="salvar">Salvar</button>
@@ -383,6 +384,7 @@
       }
     }
 
+    window.addEventListener('pagehide', () => { if (unsub1) unsub1(); if (unsub2) unsub2(); if (unsub3) unsub3(); });
     init();
   </script>
 </body>

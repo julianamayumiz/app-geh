@@ -424,7 +424,7 @@
   <script type="module" src="../js/icons.js"></script>
   <script type="module">
     import {
-      db, collection, doc, getDoc, getDocs, query, orderBy,
+      db, collection, doc, getDoc, getDocs, query, orderBy, limit,
       onSnapshot, runTransaction, serverTimestamp
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
@@ -933,8 +933,8 @@
       });
     }
 
-    onSnapshot(
-      query(collection(db, 'transferencias_saldo'), orderBy('criadoEm', 'desc')),
+    const unsub = onSnapshot(
+      query(collection(db, 'transferencias_saldo'), orderBy('criadoEm', 'desc'), limit(50)),
       (snap) => {
         todosTx = snap.docs.map(d => d.data());
         renderHistorico();
@@ -943,6 +943,8 @@
         $('lista-tx').innerHTML = `<div class="alert alert-danger">Erro ao carregar histórico: ${err.message}</div>`;
       }
     );
+
+    window.addEventListener('pagehide', () => unsub());
 
     carregarClientes();
   </script>

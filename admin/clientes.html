@@ -165,12 +165,13 @@
 
     $('busca').oninput = renderizar;
 
-    onSnapshot(collection(db, 'clientes'), (snap) => {
+    const unsub = onSnapshot(collection(db, 'clientes'), (snap) => {
       todos = [];
       snap.forEach(d => todos.push({ id: d.id, ...d.data() }));
       todos.sort((a, b) => a.id.localeCompare(b.id));
       renderizar();
     });
+    window.addEventListener('pagehide', () => unsub());
   </script>
 </body>
 </html>

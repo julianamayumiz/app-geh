@@ -543,12 +543,14 @@
     }
 
     // ---- watchers ----
-    onSnapshot(doc(db, 'config', 'eventoAtivo'), (snap) => {
+    const unsub = onSnapshot(doc(db, 'config', 'eventoAtivo'), (snap) => {
       const data = snap.exists() ? snap.data() : null;
       eventoAtivo = (data && data.id) ? data : null;
       considerarAutoIniciar();
       atualizarUI();
     });
+
+    window.addEventListener('pagehide', () => unsub());
 
     // ---- bind ----
     $('bk-escolher-pasta').onclick = escolherPasta;

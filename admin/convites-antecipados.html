@@ -123,8 +123,9 @@
       observarConvites();
     }
 
+    let unsub = null;
     function observarConvites() {
-      onSnapshot(
+      unsub = onSnapshot(
         query(collection(db, 'convites_antecipados'), where('eventoId', '==', eventoAtivoId)),
         (snap) => renderConvites(snap.docs.map(d => ({ id: d.id, ...d.data() })))
       );
@@ -132,8 +133,6 @@
 
     function renderConvites(lista) {
       lista.sort((a, b) => {
-        const fa = (a.familia || '').localeCompare(b.familia || '');
-        if (fa !== 0) return fa;
         const na = parseInt(a.numero) || 0;
         const nb = parseInt(b.numero) || 0;
         return na - nb;
@@ -161,7 +160,7 @@
           <td>${c.categoria || '—'}</td>
           <td><button class="badge-status ${c.pago === false ? 'badge-aberto' : 'badge-pago'}" data-toggle="${c.id}" data-pago="${c.pago !== false}" style="border:none;cursor:pointer;font-family:inherit;">${c.pago === false ? 'Em aberto' : 'Pago'}</button></td>
           <td>${c.presente ? '<span class="badge-status badge-presente">Presente</span>' : '<span class="badge-status badge-pendente">Pendente</span>'}</td>
-          <td><button class="btn btn-danger" style="width:auto;padding:0.3rem 0.65rem;font-size:0.75rem;" data-del="${c.id}">×</button></td>
+          <td><button class="btn btn-danger" style="width:auto;padding:0.3rem 0.65rem;font-size:0.75rem;" data-del="${c.id}" aria-label="Remover convite">×</button></td>
         </tr>
       `).join('');
       tbody.querySelectorAll('[data-toggle]').forEach(b => {
@@ -231,10 +230,7 @@
           const l = linhas[i];
           const numero = String(l[idxNum] ?? '').trim();
           const nome = String(l[idxNome] ?? '').trim();
-          if (!numero && !nome) continue;
-          if (!numero || !nome) {
-            throw new Error(`Linha ${i + 1}: número ou nome em branco.`);
-          }
+          if (!numero || !nome) continue;
           itens.push({
             familia: idxFam >= 0 ? String(l[idxFam] ?? '').trim() : '',
             numero,
@@ -383,6 +379,7 @@
       }
     };
 
+    window.addEventListener('pagehide', () => { if (unsub) unsub(); });
     init();
   </script>
 </body>

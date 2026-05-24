@@ -81,6 +81,30 @@
       <button id="btn-criar" class="btn btn-primary" style="max-width:220px;">Criar e ativar evento</button>
     </div>
 
+    <div class="card" style="border-left:4px solid var(--laranja,#f97316);">
+      <h3 class="card-title" style="display:inline-flex;align-items:center;gap:0.5rem;"><span data-icon="refresh-cw" data-size="18"></span> Preparar para novo evento</h3>
+      <p style="font-size:0.85rem;color:var(--cinza);margin-bottom:0.75rem;">
+        Zera os saldos de todos os clientes, apaga todos os produtos e limpa convites antecipados e vendas na porta.<br>
+        <strong>O histórico de vendas e movimentações fica preservado.</strong>
+      </p>
+      <div id="alerta-preparar" class="alert hidden"></div>
+      <div style="display:flex;justify-content:flex-end;">
+        <button id="btn-preparar" class="btn btn-danger" style="max-width:260px;">Zerar dados para novo evento</button>
+      </div>
+    </div>
+
+    <div class="card" style="border-left:4px solid var(--vermelho,#ef4444);">
+      <h3 class="card-title" style="display:inline-flex;align-items:center;gap:0.5rem;"><span data-icon="users-x" data-size="18"></span> Excluir todos os clientes</h3>
+      <p style="font-size:0.85rem;color:var(--cinza);margin-bottom:0.75rem;">
+        Remove permanentemente todos os cadastros de clientes.<br>
+        <strong>Ação irreversível. Use só quando quiser começar do zero.</strong>
+      </p>
+      <div id="alerta-excluir-clientes" class="alert hidden"></div>
+      <div style="display:flex;justify-content:flex-end;">
+        <button id="btn-excluir-clientes" class="btn btn-danger" style="max-width:260px;">Excluir todos os clientes</button>
+      </div>
+    </div>
+
     <h3 style="color:var(--azul);margin:1.5rem 0 0.75rem;">Histórico de eventos</h3>
     <div class="table-wrapper">
       <table>
@@ -95,14 +119,56 @@
     import { fmtBRL, esc } from "../js/helpers.js";
     import {
       db, collection, doc, setDoc, getDoc, updateDoc, getDocs, deleteDoc,
-      addDoc, onSnapshot, query, orderBy, where, serverTimestamp
+      addDoc, onSnapshot, query, orderBy, where, serverTimestamp, writeBatch
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
-    import { confirmarAsync } from "../js/ui.js";
+    import { confirmarAsync, toast } from "../js/ui.js";
 
     montarNav('eventos.html');
     renderIcons();
     const $ = id => document.getElementById(id);
+
+    function pedirTextoAsync(mensagem, valorInicial = '') {
+      return new Promise(resolve => {
+        const backdrop = document.createElement('div');
+        backdrop.className = 'confirm-backdrop';
+        backdrop.innerHTML = `
+          <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="pedirtexto-msg">
+            <p id="pedirtexto-msg" class="confirm-msg"></p>
+            <div class="form-group" style="margin-bottom:0.75rem;">
+              <input type="text" id="pedirtexto-input" style="width:100%;padding:0.6rem;border:1px solid var(--cinza-claro);border-radius:8px;font-size:0.95rem;">
+            </div>
+            <div class="confirm-acoes">
+              <button type="button" class="btn btn-secondary" data-acao="cancelar">Cancelar</button>
+              <button type="button" class="btn btn-primary" data-acao="ok">Salvar</button>
+            </div>
+          </div>
+        `;
+        backdrop.querySelector('#pedirtexto-msg').textContent = mensagem;
+        const input = backdrop.querySelector('#pedirtexto-input');
+        input.value = valorInicial;
+        document.body.appendChild(backdrop);
+        input.focus();
+        input.select();
+        const fechar = (valor) => {
+          document.removeEventListener('keydown', onKey);
+          backdrop.remove();
+          resolve(valor);
+        };
+        const onKey = (e) => {
+          if (e.key === 'Escape') fechar(null);
+          if (e.key === 'Enter') { e.preventDefault(); fechar(input.value); }
+        };
+        document.addEventListener('keydown', onKey);
+        backdrop.addEventListener('click', (e) => {
+          if (e.target === backdrop) fechar(null);
+          const acao = e.target.closest('[data-acao]')?.dataset.acao;
+          if (acao === 'ok') fechar(input.value);
+          if (acao === 'cancelar') fechar(null);
+        });
+      });
+    }
+
     const alerta = $('alerta');
 
     // Data padrão = hoje
@@ -269,7 +335,7 @@
       const evSnap = await getDoc(doc(db, 'eventos', id));
       if (!evSnap.exists()) return;
       const atual = evSnap.data();
-      const novoNome = prompt('Novo nome do evento:', atual.nome);
+      const novoNome = await pedirTextoAsync('Novo nome do evento:', atual.nome);
       if (novoNome === null) return;
       const nome = novoNome.trim();
       if (!nome) return;
@@ -291,7 +357,7 @@
 
     // Editar nome de evento do histórico
     async function editarEvento(id, nomeAtual) {
-      const novo = prompt('Novo nome do evento:', nomeAtual);
+      const novo = await pedirTextoAsync('Novo nome do evento:', nomeAtual);
       if (novo === null) return;
       const nome = novo.trim();
       if (!nome || nome === nomeAtual) return;
@@ -307,7 +373,7 @@
     // Excluir evento
     async function excluirEvento(id, nome, totalVendas) {
       if (totalVendas > 0) {
-        alert(`Não é possível excluir "${nome}": existem ${totalVendas} venda(s) vinculadas. Apague as vendas primeiro ou mantenha o evento como histórico.`);
+        toast(`Não é possível excluir "${nome}": existem ${totalVendas} venda(s) vinculadas. Mantenha como histórico.`, { tipo: 'erro', duracao: 5000 });
         return;
       }
       if (!(await confirmarAsync(`Excluir definitivamente "${nome}"? Esta ação não pode ser desfeita.`, { destrutivo: true, textoOk: 'Excluir' }))) return;
@@ -351,7 +417,7 @@
     limparOrfaos();
 
     let renderGen = 0;
-    onSnapshot(query(collection(db, 'eventos'), orderBy('criadoEm', 'desc')), async (snap) => {
+    const unsub = onSnapshot(query(collection(db, 'eventos'), orderBy('criadoEm', 'desc')), async (snap) => {
       const myGen = ++renderGen;
       const tbody = $('tbl');
       if (snap.empty) {
@@ -369,29 +435,110 @@
         const badge = ev.status === 'ativo'
           ? `<span style="background:var(--verde);color:white;padding:2px 8px;border-radius:999px;font-size:0.8rem;">Ativo</span>`
           : `<span style="background:var(--cinza);color:white;padding:2px 8px;border-radius:999px;font-size:0.8rem;">Encerrado</span>`;
-        const nomeEsc = ev.nome.replace(/'/g, "\\'");
         linhas.push(`
           <tr>
-            <td><strong>${ev.nome}</strong></td>
+            <td><strong>${esc(ev.nome)}</strong></td>
             <td>${dataFmt}</td>
             <td>${badge}</td>
             <td>${vendasSnap.size}</td>
             <td>${fmtBRL(receita)}</td>
             <td>
               <div style="display:flex;gap:0.35rem;justify-content:flex-end;flex-wrap:wrap;">
-                ${ev.status !== 'ativo' ? `<button class="btn btn-secondary" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" onclick="window._ativar('${ev.id}','${nomeEsc}','${ev.data||''}')">Reativar</button>` : ''}
-                <button class="btn btn-secondary" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" onclick="window._editar('${ev.id}','${nomeEsc}')">Editar</button>
-                <button class="btn btn-danger" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" onclick="window._excluir('${ev.id}','${nomeEsc}',${vendasSnap.size})">Excluir</button>
+                ${ev.status !== 'ativo' ? `<button class="btn btn-secondary" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" data-acao="ativar" data-id="${esc(ev.id)}" data-nome="${esc(ev.nome)}" data-data="${ev.data||''}">Reativar</button>` : ''}
+                <button class="btn btn-secondary" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" data-acao="editar" data-id="${esc(ev.id)}" data-nome="${esc(ev.nome)}">Editar</button>
+                <button class="btn btn-danger" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" data-acao="excluir" data-id="${esc(ev.id)}" data-nome="${esc(ev.nome)}" data-vendas="${vendasSnap.size}">Excluir</button>
               </div>
             </td>
           </tr>`);
       }
       if (myGen !== renderGen) return;
       tbody.innerHTML = linhas.join('');
-      window._ativar = ativarEvento;
-      window._editar = editarEvento;
-      window._excluir = excluirEvento;
     });
+
+    $('tbl').addEventListener('click', async (e) => {
+      const btn = e.target.closest('button[data-acao]');
+      if (!btn) return;
+      const { acao, id, nome, data: evData, vendas } = btn.dataset;
+      if (acao === 'ativar') await ativarEvento(id, nome, evData);
+      if (acao === 'editar') await editarEvento(id, nome);
+      if (acao === 'excluir') await excluirEvento(id, nome, parseInt(vendas, 10));
+    });
+
+    $('btn-preparar').onclick = async () => {
+      const ok = await confirmarAsync(
+        'Isso vai zerar os saldos de todos os clientes, apagar todos os produtos, limpar o historico de entradas de estoque, convites antecipados e vendas na porta. O historico de vendas fica preservado. Confirmar?',
+        { destrutivo: true, textoOk: 'Zerar dados' }
+      );
+      if (!ok) return;
+
+      const btn = $('btn-preparar');
+      const alerta = $('alerta-preparar');
+      btn.disabled = true;
+      alerta.textContent = 'Preparando...';
+      alerta.className = 'alert alert-warning';
+
+      try {
+        async function deletarColecao(nome) {
+          const snap = await getDocs(collection(db, nome));
+          for (let i = 0; i < snap.docs.length; i += 499) {
+            const batch = writeBatch(db);
+            snap.docs.slice(i, i + 499).forEach(d => batch.delete(d.ref));
+            await batch.commit();
+          }
+          return snap.docs.length;
+        }
+
+        const clientesSnap = await getDocs(collection(db, 'clientes'));
+        for (let i = 0; i < clientesSnap.docs.length; i += 499) {
+          const batch = writeBatch(db);
+          clientesSnap.docs.slice(i, i + 499).forEach(d => batch.update(d.ref, { saldo: 0 }));
+          await batch.commit();
+        }
+
+        const qtdProdutos  = await deletarColecao('produtos');
+        const qtdCompras   = await deletarColecao('compras');
+        const qtdConvites  = await deletarColecao('convites_antecipados');
+        const qtdPorta     = await deletarColecao('vendas_porta');
+
+        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} Pronto! ${clientesSnap.docs.length} saldo(s) zerado(s), ${qtdProdutos} produto(s) removido(s), ${qtdCompras} entrada(s) de estoque removida(s), ${qtdConvites} convite(s) removido(s), ${qtdPorta} venda(s) na porta removida(s).</span>`;
+        alerta.className = 'alert alert-success';
+      } catch (err) {
+        alerta.textContent = `Erro: ${err.message}`;
+        alerta.className = 'alert alert-danger';
+      }
+      btn.disabled = false;
+    };
+
+    $('btn-excluir-clientes').onclick = async () => {
+      const ok = await confirmarAsync(
+        'Isso vai EXCLUIR permanentemente todos os cadastros de clientes. Essa ação não pode ser desfeita. Confirmar?',
+        { destrutivo: true, textoOk: 'Excluir tudo' }
+      );
+      if (!ok) return;
+
+      const btn = $('btn-excluir-clientes');
+      const alerta = $('alerta-excluir-clientes');
+      btn.disabled = true;
+      alerta.textContent = 'Excluindo...';
+      alerta.className = 'alert alert-warning';
+
+      try {
+        const snap = await getDocs(collection(db, 'clientes'));
+        for (let i = 0; i < snap.docs.length; i += 499) {
+          const batch = writeBatch(db);
+          snap.docs.slice(i, i + 499).forEach(d => batch.delete(d.ref));
+          await batch.commit();
+        }
+        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} Pronto! ${snap.docs.length} cliente(s) excluído(s).</span>`;
+        alerta.className = 'alert alert-success';
+      } catch (err) {
+        alerta.textContent = `Erro: ${esc(err.message)}`;
+        alerta.className = 'alert alert-danger';
+      }
+      btn.disabled = false;
+    };
+
+    window.addEventListener('pagehide', () => unsub());
 
     carregarAtivo();
   </script>
