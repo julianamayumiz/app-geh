@@ -785,10 +785,11 @@
       });
     });
 
-    let eventoAtivo = null;
-    getDoc(doc(db, 'config', 'eventoAtivo'))
-      .then(s => { if (s.exists()) eventoAtivo = s.data(); })
-      .catch(e => console.warn('[transferir] falha ao ler eventoAtivo:', e));
+    // Evento ativo — await garante que o valor esta pronto antes do primeiro clique
+    const eventoAtivoPromise = getDoc(doc(db, 'config', 'eventoAtivo'))
+      .then(s => s.exists() ? s.data() : null)
+      .catch(e => { console.warn('[transferir] falha ao ler eventoAtivo:', e); return null; });
+    let eventoAtivo = await eventoAtivoPromise;
 
     $('btn-confirmar').onclick = async () => {
       if (!origem || !destino) return showAlerta('Selecione origem e destino.', 'warning');

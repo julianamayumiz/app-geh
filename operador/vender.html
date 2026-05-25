@@ -89,11 +89,11 @@
     import { toast } from "../js/ui.js";
     import { fmtBRL } from "../js/helpers.js";
 
-    // Evento ativo
-    let eventoAtivo = null;
-    getDoc(doc(db, 'config', 'eventoAtivo'))
-      .then(s => { if (s.exists()) eventoAtivo = s.data(); })
-      .catch(e => console.warn('[vender] falha ao ler eventoAtivo:', e));
+    // Evento ativo — await garante que o valor esta pronto antes do primeiro clique
+    const eventoAtivoPromise = getDoc(doc(db, 'config', 'eventoAtivo'))
+      .then(s => s.exists() ? s.data() : null)
+      .catch(e => { console.warn('[vender] falha ao ler eventoAtivo:', e); return null; });
+    let eventoAtivo = await eventoAtivoPromise;
 
     const params = new URLSearchParams(window.location.search);
     const clienteId = params.get('cliente');

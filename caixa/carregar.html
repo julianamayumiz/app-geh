@@ -162,10 +162,11 @@
       renderIcons();
     }
 
-    let eventoAtivo = null;
-    getDoc(doc(db, 'config', 'eventoAtivo'))
-      .then(s => { if (s.exists()) eventoAtivo = s.data(); })
-      .catch(e => console.warn('[carregar] falha ao ler eventoAtivo:', e));
+    // Promise mantida para o handler aguardar antes de gravar
+    const eventoAtivoPromise = getDoc(doc(db, 'config', 'eventoAtivo'))
+      .then(s => s.exists() ? s.data() : null)
+      .catch(e => { console.warn('[carregar] falha ao ler eventoAtivo:', e); return null; });
+    let eventoAtivo = await eventoAtivoPromise;
 
     const $ = (id) => document.getElementById(id);
     const alerta = $('alerta');
