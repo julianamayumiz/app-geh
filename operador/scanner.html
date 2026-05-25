@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="../css/style.css">
   <link rel="manifest" href="../manifest.json">
   <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="../js/vendor/html5-qrcode.min.js"></script>
 </head>
 <body>
   <header class="header">
@@ -55,13 +55,21 @@
   <script type="module" src="../js/icons.js"></script>
 
   <script type="module">
-    const { requireAuth } = await import('../js/auth-guard.js');
-    await requireAuth({ papel: 'operador' });
+    // Carrega todos os modulos em paralelo. Antes era uma cadeia
+    // sequencial de await import() que serializava 3 round-trips.
+    const [
+      { requireAuth },
+      { icon },
+      { iniciarScanner }
+    ] = await Promise.all([
+      import('../js/auth-guard.js'),
+      import('../js/icons.js'),
+      import('../js/scanner.js'),
+    ]);
 
     const params = new URLSearchParams(window.location.search);
     const acao = params.get('acao') || 'consultar';
 
-    const { icon } = await import('../js/icons.js');
     const titulos = {
       vender:    { ic: 'shopping-cart', txt: 'Vender para cliente' },
       consultar: { ic: 'eye', txt: 'Consultar saldo' }
@@ -85,30 +93,47 @@
       }
     }
 
-    const { iniciarScanner } = await import('../js/scanner.js');
+    // Inicia a camera EM PARALELO com a checagem de auth. A negociacao
+    // WebRTC e o prompt de permissao demoram 0.5-2s; rodando junto com a
+    // leitura do perfil no Firestore, o tempo total e o maior dos dois,
+    // nao a soma. Se o usuario ler o QR antes do auth confirmar, o ID
+    // fica pendente e e processado quando o auth liberar.
+    let authConfirmado = false;
+    let qrPendente = null;
 
-    let scannerHandle = null;
-    try {
-      scannerHandle = await iniciarScanner({
-        elementId: 'reader',
-        onDetected: (texto) => {
-          statusTexto.textContent = '✓ QR code detectado!';
-          statusTexto.style.color = 'var(--verde)';
-          dicaScan.style.display = 'none';
-          irPara(texto);
-        },
-        onReady: () => {
-          statusTexto.textContent = 'Câmera pronta - Aproxime o QR code';
-          statusTexto.style.color = 'var(--azul)';
-        }
-      });
-    } catch (err) {
+    const scannerPromise = iniciarScanner({
+      elementId: 'reader',
+      onDetected: (texto) => {
+        if (!authConfirmado) { qrPendente = texto; return; }
+        statusTexto.textContent = '✓ QR code detectado!';
+        statusTexto.style.color = 'var(--verde)';
+        dicaScan.style.display = 'none';
+        irPara(texto);
+      },
+      onReady: () => {
+        statusTexto.textContent = 'Câmera pronta - Aproxime o QR code';
+        statusTexto.style.color = 'var(--azul)';
+      }
+    }).catch(err => {
       console.error('Erro ao iniciar scanner:', err);
       alerta.textContent = "Não consegui acessar a câmera. Use o botão abaixo para digitar o ID.";
       alerta.className = "alert alert-warning mt-2";
       dicaScan.style.display = 'none';
       statusTexto.textContent = 'Câmera indisponível';
       statusTexto.style.color = 'var(--vermelho)';
+      return null;
+    });
+
+    await requireAuth({ papel: 'operador' });
+    authConfirmado = true;
+
+    const scannerHandle = await scannerPromise;
+
+    if (qrPendente) {
+      statusTexto.textContent = '✓ QR code detectado!';
+      statusTexto.style.color = 'var(--verde)';
+      dicaScan.style.display = 'none';
+      irPara(qrPendente);
     }
 
     document.getElementById('btn-manual').onclick = () => {
