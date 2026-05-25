@@ -38,7 +38,11 @@
       "Bash(grep -r \"onSnapshot\\\\|getDocs\\\\|getDoc\\\\|query\\\\|where\\\\|orderBy\\\\|limit\" C:/Users/073712631/Desktop/app-geh --include=\"*.html\" --include=\"*.js\" ! -path \"*/node_modules/*\" ! -path \"*/.git/*\" -n)",
       "Bash(grep -v \":0$\")",
       "Bash(for file in \"admin/ajuste-saldo.html\" \"admin/backup.html\" \"admin/clientes.html\" \"admin/convites-antecipados.html\" \"admin/despesas.html\" \"admin/estoque.html\" \"admin/eventos.html\" \"admin/produtos.html\" \"admin/usuarios.html\" \"caixa/transferir.html\" \"recepcao/conferencia.html\"; do *)",
-      "Bash(curl -sL -o \"C:/Users/julia/Desktop/App GEH/js/vendor/html5-qrcode.min.js\" \"https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js\")"
+      "Bash(curl -sL -o \"C:/Users/julia/Desktop/App GEH/js/vendor/html5-qrcode.min.js\" \"https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js\")",
+      "Read(//c/Users/julia/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/1f229689-00e3-4c90-a617-1d4eb0154776/606fa850-9aab-4ead-a4cb-f1c010dff027/skills/xlsx/**)",
+      "Bash(python -c ' *)",
+      "Bash(git show *)",
+      "Bash(python3 -c ' *)"
     ]
   }
 }
