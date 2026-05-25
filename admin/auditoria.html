@@ -266,7 +266,7 @@
   <script type="module">
     import { montarNav } from "./_nav.js";
     import {
-      db, collection, doc, getDoc, getDocs, query, where, orderBy, limit,
+      db, collection, doc, getDoc, getDocs, query, where, orderBy,
       onSnapshot
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
@@ -280,7 +280,7 @@
       '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
     }[c]));
 
-    const LIMITE_POR_COLECAO = 2000;
+
     const LOTE_FEED = 50;
     const LS_LIVE_KEY = 'auditoria-live';
 
@@ -439,8 +439,7 @@
       const q = query(
         collection(db, coll),
         where('eventoId', '==', eventoAtual),
-        orderBy('criadoEm', 'desc'),
-        limit(LIMITE_POR_COLECAO)
+        orderBy('criadoEm', 'desc')
       );
       // Captura a versão atual do filtro — se o filtro mudar antes do snapshot
       // chegar, o handler se descarta em vez de pintar dados obsoletos.
