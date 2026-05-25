@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fix eventoId nulo — Admin GEH</title>
+  <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <header class="header">
+    <a href="dashboard.html" class="back" aria-label="Voltar"><span data-icon="arrow-left" data-size="24"></span></a>
+    <h1>Fix — eventoId nulo</h1>
+  </header>
+  <main style="max-width:700px;margin:0 auto;">
+    <div class="card" style="margin-bottom:1rem;">
+      <p>Corrige documentos de <strong>movimentacoes_saldo</strong> gravados sem <code>eventoId</code> por race condition no caixa.</p>
+      <p>Escopo: documentos com <code>eventoId == null</code> criados entre as datas do evento selecionado.</p>
+    </div>
+
+    <div class="card" style="margin-bottom:1rem;">
+      <div class="form-group">
+        <label for="sel-evento">Evento</label>
+        <select id="sel-evento"><option value="">Carregando…</option></select>
+      </div>
+      <button id="btn-buscar" class="btn btn-secondary">Buscar documentos afetados</button>
+    </div>
+
+    <div id="resultado" class="hidden">
+      <div id="resumo" class="card" style="margin-bottom:1rem;"></div>
+      <div id="lista" style="margin-bottom:1rem;max-height:320px;overflow-y:auto;"></div>
+      <button id="btn-corrigir" class="btn btn-success" style="display:none;">Aplicar correção</button>
+    </div>
+
+    <div id="alerta" class="alert hidden"></div>
+  </main>
+  <script type="module" src="../js/icons.js"></script>
+  <script type="module">
+    import {
+      db, collection, doc, getDoc, getDocs, writeBatch,
+      query, where, orderBy
+    } from "../js/firebase-config.js";
+    import { requireAuth } from "../js/auth-guard.js";
+    import { fmtBRL } from "../js/helpers.js";
+    import { confirmarAsync } from "../js/ui.js";
+
+    await requireAuth({ papel: 'admin' });
+
+    const $ = id => document.getElementById(id);
+    const alerta = $('alerta');
+
+    function showAlerta(msg, tipo = 'info') {
+      alerta.textContent = msg;
+      alerta.className = `alert alert-${tipo}`;
+      alerta.classList.remove('hidden');
+    }
+
+    // Carregar lista de eventos
+    const eventosSnap = await getDocs(
+      query(collection(db, 'eventos'), orderBy('criadoEm', 'desc'))
+    );
+    const selEvento = $('sel-evento');
+    selEvento.innerHTML = '<option value="">Selecione um evento</option>';
+    eventosSnap.forEach(d => {
+      const e = d.data();
+      const opt = document.createElement('option');
+      opt.value = d.id;
+      opt.textContent = e.nome || d.id;
+      opt.dataset.nome = e.nome || d.id;
+      opt.dataset.data = e.data || '';
+      selEvento.appendChild(opt);
+    });
+
+    let docsAfetados = [];
+
+    $('btn-buscar').onclick = async () => {
+      const opt = selEvento.selectedOptions[0];
+      if (!opt?.value) return showAlerta('Selecione um evento.', 'warning');
+
+      const eventoId   = opt.value;
+      const eventoNome = opt.dataset.nome;
+      const dataStr    = opt.dataset.data; // "YYYY-MM-DD"
+
+      if (!dataStr) return showAlerta('Evento sem data cadastrada.', 'warning');
+
+      // Janela: dia do evento (00:00 UTC) ate o dia seguinte (23:59 UTC)
+      const tsInicio = new Date(dataStr + 'T00:00:00Z');
+      const tsFim    = new Date(dataStr + 'T23:59:59Z');
+      // Estender ate o dia seguinte para cobrir eventos que vao ate a madrugada
+      tsFim.setUTCDate(tsFim.getUTCDate() + 1);
+
+      $('btn-buscar').disabled = true;
+      $('btn-buscar').textContent = 'Buscando…';
+
+      // Firestore nao suporta where('eventoId', '==', null) em todos os SDKs;
+      // buscar por data e filtrar em memória
+      let q;
+      try {
+        q = await getDocs(query(
+          collection(db, 'movimentacoes_saldo'),
+          where('criadoEm', '>=', tsInicio),
+          where('criadoEm', '<=', tsFim)
+        ));
+      } catch(e) {
+        showAlerta('Erro ao buscar: ' + e.message, 'danger');
+        $('btn-buscar').disabled = false;
+        $('btn-buscar').textContent = 'Buscar documentos afetados';
+        return;
+      }
+
+      docsAfetados = [];
+      q.forEach(d => {
+        const data = d.data();
+        if (data.eventoId == null) {
+          docsAfetados.push({ id: d.id, ...data });
+        }
+      });
+
+      $('btn-buscar').disabled = false;
+      $('btn-buscar').textContent = 'Buscar documentos afetados';
+
+      const total = docsAfetados.reduce((s, d) => s + (d.valor || 0), 0);
+
+      const resumo = $('resumo');
+      if (docsAfetados.length === 0) {
+        resumo.innerHTML = '<strong>Nenhum documento com eventoId nulo encontrado no periodo.</strong>';
+        $('btn-corrigir').style.display = 'none';
+      } else {
+        resumo.innerHTML = `
+          <strong>${docsAfetados.length} documento(s) afetado(s)</strong> — total: <strong>${fmtBRL(total)}</strong><br>
+          <small>Evento destino: <strong>${eventoNome}</strong> (${eventoId})</small>`;
+        $('btn-corrigir').style.display = '';
+        $('btn-corrigir').dataset.eventoId   = eventoId;
+        $('btn-corrigir').dataset.eventoNome = eventoNome;
+      }
+
+      const lista = $('lista');
+      lista.innerHTML = docsAfetados.map(d => {
+        const dt = d.criadoEm?.toDate?.()?.toLocaleString('pt-BR') || '—';
+        return `<div class="card" style="font-size:0.85rem;margin-bottom:0.4rem;padding:0.5rem 0.75rem;">
+          <strong>${d.clienteId}</strong> · ${fmtBRL(d.valor)} · ${d.forma || '—'} · ${dt}
+          <span style="color:var(--cinza);font-size:0.75rem;"> #${d.id.slice(-6).toUpperCase()}</span>
+        </div>`;
+      }).join('') || '';
+
+      $('resultado').classList.remove('hidden');
+    };
+
+    $('btn-corrigir').onclick = async () => {
+      const eventoId   = $('btn-corrigir').dataset.eventoId;
+      const eventoNome = $('btn-corrigir').dataset.eventoNome;
+
+      const ok = await confirmarAsync(
+        `Atualizar ${docsAfetados.length} documento(s) com eventoId="${eventoId}" (${eventoNome})?`,
+        { rotuloCancelar: 'Cancelar', rotuloConfirmar: 'Corrigir', classeConfirmar: 'btn-success' }
+      );
+      if (!ok) return;
+
+      $('btn-corrigir').disabled = true;
+      $('btn-corrigir').textContent = 'Aplicando…';
+
+      // writeBatch suporta até 500 ops; dividir se necessário
+      const LOTE = 490;
+      let corrigidos = 0;
+      try {
+        for (let i = 0; i < docsAfetados.length; i += LOTE) {
+          const batch = writeBatch(db);
+          docsAfetados.slice(i, i + LOTE).forEach(d => {
+            batch.update(doc(db, 'movimentacoes_saldo', d.id), { eventoId, eventoNome });
+          });
+          await batch.commit();
+          corrigidos += Math.min(LOTE, docsAfetados.length - i);
+        }
+        showAlerta(`${corrigidos} documento(s) corrigido(s) com sucesso.`, 'success');
+        $('btn-corrigir').style.display = 'none';
+      } catch(e) {
+        showAlerta('Erro ao corrigir: ' + e.message, 'danger');
+        $('btn-corrigir').disabled = false;
+        $('btn-corrigir').textContent = 'Aplicar correção';
+      }
+    };
+  </script>
+</body>
+</html>
