@@ -202,5 +202,17 @@ service cloud.firestore {
       allow read, create: if isRecepcao();
       allow update, delete: if isAdmin();
     }
+
+    // Fechamentos históricos importados manualmente para alimentar o modelo
+    // de predição de demanda. Só admin pode gerenciar; imutáveis exceto delete.
+    match /fechamentos_historicos/{doc} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.nome is string
+        && request.resource.data.nome.size() >= 3
+        && request.resource.data.itens is list;
+      allow delete: if isAdmin();
+      allow update: if false;
+    }
   }
 }

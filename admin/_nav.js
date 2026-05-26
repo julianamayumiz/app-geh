@@ -16,6 +16,7 @@ const GRUPOS = [
       { href: 'comparativo.html', icone: 'git-compare', texto: 'Comparativo' },
       { href: 'eventos.html',     icone: 'calendar',  texto: 'Eventos'     },
       { href: 'historico.html',   icone: 'search',    texto: 'Histórico'   },
+      { href: 'predicao.html',   icone: 'sparkles',  texto: 'Predição'    },
     ],
   },
   {

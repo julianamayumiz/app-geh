@@ -42,7 +42,9 @@
       "Read(//c/Users/julia/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/1f229689-00e3-4c90-a617-1d4eb0154776/606fa850-9aab-4ead-a4cb-f1c010dff027/skills/xlsx/**)",
       "Bash(python -c ' *)",
       "Bash(git show *)",
-      "Bash(python3 -c ' *)"
+      "Bash(python3 -c ' *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\julia\\\\Desktop\\\\App GEH\\\\admin\" -File)",
+      "Bash(Select-Object Name)"
     ]
   }
 }
