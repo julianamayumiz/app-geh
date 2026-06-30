@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Backup — Admin GEH</title>
+  <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="manifest" href="../manifest.json">
+  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+  <style>
+    .bk-status {
+      padding: 1.25rem;
+      border-radius: 0.75rem;
+      font-size: 1.05rem;
+      font-weight: 600;
+      display: flex; align-items: center; gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .bk-status.ativo   { background: #dcfce7; color: #166534; }
+    .bk-status.inativo { background: #f1f5f9; color: #475569; }
+    .bk-status.erro    { background: #fee2e2; color: #991b1b; }
+    [data-theme="dark"] .bk-status.ativo   { background: #14532d; color: #bbf7d0; }
+    [data-theme="dark"] .bk-status.inativo { background: #1e293b; color: #cbd5e1; }
+    [data-theme="dark"] .bk-status.erro    { background: #7f1d1d; color: #fecaca; }
+    .bk-dot {
+      width: 0.75rem; height: 0.75rem; border-radius: 50%;
+      background: currentColor; flex-shrink: 0;
+    }
+    .bk-status.ativo .bk-dot { animation: bk-pulse 1.5s ease-in-out infinite; }
+    @keyframes bk-pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: 0.4; transform: scale(1.3); }
+    }
+    .bk-aviso {
+      padding: 0.75rem 1rem;
+      border-radius: 0.5rem;
+      background: #fef3c7;
+      color: #78350f;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+      border-left: 4px solid #f59e0b;
+    }
+    [data-theme="dark"] .bk-aviso { background: #422006; color: #fde68a; }
+    .bk-aviso.erro {
+      background: #fee2e2; color: #991b1b;
+      border-left-color: #dc2626;
+    }
+    [data-theme="dark"] .bk-aviso.erro { background: #7f1d1d; color: #fecaca; }
+    .bk-aviso code {
+      background: rgba(0,0,0,0.08); padding: 0.05rem 0.3rem;
+      border-radius: 0.25rem; font-size: 0.85em;
+    }
+    [data-theme="dark"] .bk-aviso code { background: rgba(255,255,255,0.08); }
+    .bk-pasta {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.75rem; background: var(--cinza-claro);
+      border-radius: 0.5rem; margin-bottom: 1rem;
+      font-size: 0.9rem;
+    }
+    .bk-pasta code {
+      background: var(--branco); padding: 0.15rem 0.4rem;
+      border-radius: 0.25rem; font-size: 0.85rem;
+    }
+    .bk-acoes {
+      display: flex; gap: 0.5rem; flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    .bk-acoes .btn { width: auto; flex: 0 0 auto; }
+    .bk-log {
+      max-height: 240px; overflow-y: auto;
+      font-family: ui-monospace, monospace;
+      font-size: 0.8rem;
+      background: var(--cinza-claro);
+      border-radius: 0.5rem;
+      padding: 0.75rem;
+    }
+    .bk-log .ok  { color: var(--verde); }
+    .bk-log .err { color: var(--vermelho); }
+    .bk-log-vazio { color: var(--cinza); font-style: italic; }
+    .bk-toggle { display: flex; align-items: center; gap: 0.5rem; }
+    .bk-arquivos {
+      margin-top: 0.75rem;
+      border-top: 1px solid var(--cinza-claro);
+      padding-top: 0.75rem;
+    }
+    .bk-arq-titulo {
+      font-size: 0.78rem;
+      color: var(--cinza);
+      margin-bottom: 0.4rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .bk-arq {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 0.5rem;
+      padding: 0.3rem 0.4rem;
+      font-size: 0.8rem;
+    }
+    .bk-arq + .bk-arq { border-top: 1px dashed var(--cinza-claro); }
+    .bk-arq-nome {
+      font-family: ui-monospace, monospace;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--cinza-escuro);
+      min-width: 0;
+    }
+    .bk-arq-meta {
+      color: var(--cinza);
+      white-space: nowrap;
+      font-size: 0.72rem;
+      flex-shrink: 0;
+    }
+    .bk-arq-vazio {
+      font-size: 0.8rem;
+      color: var(--cinza);
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <main class="admin">
+    <h2 style="color:var(--azul);margin-bottom:1rem;display:inline-flex;align-items:center;gap:0.5rem;">
+      <span data-icon="hard-drive" data-size="24"></span> Backup do Banco
+    </h2>
+
+    <div id="bk-incompativel" class="bk-aviso erro hidden">
+      <strong>Navegador não suportado.</strong> O backup automático precisa do
+      <strong>Chrome</strong> ou <strong>Edge</strong> num computador
+      (a API <code>showDirectoryPicker</code> não existe no Firefox, Safari nem em celulares).
+    </div>
+
+    <div id="bk-status" class="bk-status inativo">
+      <span class="bk-dot"></span>
+      <span id="bk-status-texto">Carregando…</span>
+    </div>
+
+    <div id="bk-precisa-permissao" class="bk-aviso hidden">
+      <strong>Permissão da pasta expirou.</strong> Clique em
+      <strong>Trocar pasta</strong> abaixo (ou em <strong>Iniciar agora</strong>)
+      pra liberar o acesso de novo — o navegador esquece a permissão quando
+      a janela é totalmente fechada.
+    </div>
+
+    <div class="bk-aviso">
+      <strong>Importante:</strong> mantenha esta aba aberta durante o evento.
+      Se fechar, o backup automático para. Pode minimizar a janela normalmente.
+    </div>
+
+    <div class="card">
+      <h3 style="color:var(--azul);margin-bottom:0.75rem;">Pasta de destino</h3>
+      <div id="bk-pasta-info" class="bk-pasta">Nenhuma pasta escolhida.</div>
+      <button id="bk-escolher-pasta" class="btn btn-primary" style="width:auto;">
+        Escolher pasta
+      </button>
+      <p style="font-size:0.8rem;color:var(--cinza);margin-top:0.5rem;">
+        Escolha uma vez (ex: <code>Desktop\backups-geh</code>) — depois disso,
+        os arquivos vão direto pra ela. Mantém os 30 mais recentes; os antigos
+        são apagados automaticamente.
+      </p>
+      <div id="bk-arquivos" class="bk-arquivos hidden"></div>
+    </div>
+
+    <div class="card">
+      <h3 style="color:var(--azul);margin-bottom:0.75rem;">Controles</h3>
+
+      <label class="bk-toggle" style="margin-bottom:0.75rem;">
+        <input type="checkbox" id="bk-auto" checked>
+        <span>Iniciar automaticamente quando houver <strong>evento ativo</strong></span>
+      </label>
+
+      <div class="bk-acoes">
+        <button id="bk-iniciar" class="btn btn-success">Iniciar agora</button>
+        <button id="bk-parar"   class="btn btn-danger">Parar</button>
+        <button id="bk-agora"   class="btn">Backup imediato</button>
+      </div>
+
+      <p style="font-size:0.85rem;color:var(--cinza);">
+        O backup roda <strong>imediatamente</strong> ao iniciar e depois a cada
+        <strong>10 minutos</strong>. Cada arquivo é independente — abra qualquer
+        um pra ver os dados daquele momento.
+      </p>
+    </div>
+
+    <div class="card">
+      <h3 style="color:var(--azul);margin-bottom:0.75rem;">Histórico desta sessão</h3>
+      <div id="bk-log" class="bk-log">
+        <div class="bk-log-vazio">Nenhum backup gerado ainda nesta sessão.</div>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { montarNav } from "./_nav.js";
+    import {
+      db, doc, getDoc, getDocs, collection, onSnapshot
+    } from "../js/firebase-config.js";
+    import { renderIcons } from "../js/icons.js";
+    import * as XLSX from "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm";
+
+    montarNav('backup.html');
+    renderIcons();
+
+    // Lista hardcoded das coleções (o SDK web do Firestore nao tem
+    // listCollections; usamos a lista que existe no firestore.rules).
+    const COLECOES = [
+      'usuarios', 'produtos', 'clientes', 'vendas',
+      'movimentacoes_saldo', 'eventos', 'config', 'compras',
+      'despesas', 'insumos', 'ajustes_saldo',
+      'convites_antecipados', 'vendas_porta',
+    ];
+
+    const INTERVALO_MS    = 10 * 60 * 1000;   // 10 minutos
+    const MANTER_ULTIMOS  = 30;
+    const IDB_NOME        = 'app-geh-backup';
+    const IDB_STORE       = 'kv';
+    const IDB_HANDLE_KEY  = 'pastaHandle';
+    const LS_AUTO_KEY     = 'bk-auto-iniciar';
+
+    const $ = (id) => document.getElementById(id);
+
+    // ---- estado ----
+    let dirHandle        = null;
+    let timerId          = null;
+    let countdownId      = null;
+    let proximoEm        = 0;
+    let rodando          = false;
+    let eventoAtivo      = null;
+    let auto             = localStorage.getItem(LS_AUTO_KEY) !== '0';
+    let precisaPermissao = false;
+    const SUPORTADO      = 'showDirectoryPicker' in window;
+
+    // ---- IndexedDB minimo (pra guardar o handle da pasta) ----
+    function idbOpen() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(IDB_NOME, 1);
+        req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror   = () => reject(req.error);
+      });
+    }
+    async function idbGet(key) {
+      const dbi = await idbOpen();
+      return new Promise((resolve, reject) => {
+        const tx = dbi.transaction(IDB_STORE, 'readonly');
+        const r  = tx.objectStore(IDB_STORE).get(key);
+        r.onsuccess = () => resolve(r.result);
+        r.onerror   = () => reject(r.error);
+      });
+    }
+    async function idbSet(key, val) {
+      const dbi = await idbOpen();
+      return new Promise((resolve, reject) => {
+        const tx = dbi.transaction(IDB_STORE, 'readwrite');
+        tx.objectStore(IDB_STORE).put(val, key);
+        tx.oncomplete = () => resolve();
+        tx.onerror    = () => reject(tx.error);
+      });
+    }
+
+    // ---- pasta ----
+    async function escolherPasta() {
+      if (!SUPORTADO) return;
+      try {
+        const handle = await window.showDirectoryPicker({
+          mode: 'readwrite',
+          id: 'app-geh-backup',
+          startIn: 'desktop',
+        });
+        dirHandle = handle;
+        precisaPermissao = false;
+        await idbSet(IDB_HANDLE_KEY, handle);
+        atualizarUI();
+        atualizarListaArquivos();
+        // Tenta auto-iniciar caso ja tenha evento rolando
+        considerarAutoIniciar();
+      } catch (e) {
+        if (e.name !== 'AbortError') console.error(e);
+      }
+    }
+
+    async function restaurarPasta() {
+      const h = await idbGet(IDB_HANDLE_KEY);
+      if (!h) return false;
+      const opts = { mode: 'readwrite' };
+      const perm = await h.queryPermission(opts);
+      dirHandle = h;
+      if (perm === 'granted') { precisaPermissao = false; return true; }
+      // 'prompt' / 'denied' — precisa gesto do usuario; sinaliza no UI
+      precisaPermissao = true;
+      return false;
+    }
+
+    async function garantirPermissaoPasta() {
+      if (!dirHandle) return false;
+      const opts = { mode: 'readwrite' };
+      const perm = await dirHandle.queryPermission(opts);
+      if (perm === 'granted') { precisaPermissao = false; atualizarUI(); atualizarListaArquivos(); return true; }
+      const req = await dirHandle.requestPermission(opts);
+      const ok = req === 'granted';
+      precisaPermissao = !ok;
+      atualizarUI();
+      if (ok) atualizarListaArquivos();
+      return ok;
+    }
+
+    // ---- conversao Firestore -> celula ----
+    function celula(v) {
+      if (v === null || v === undefined) return '';
+      if (v && typeof v.toDate === 'function') {
+        try { return v.toDate().toISOString(); } catch (e) {}
+      }
+      if (v instanceof Date) return v.toISOString();
+      if (typeof v === 'object') {
+        try { return JSON.stringify(v); } catch (e) { return String(v); }
+      }
+      return v;
+    }
+    function docParaLinha(d) {
+      const data = d.data() || {};
+      const linha = { _id: d.id };
+      for (const [k, v] of Object.entries(data)) linha[k] = celula(v);
+      return linha;
+    }
+
+    // ---- geracao do .xlsx ----
+    function timestampNome() {
+      const d = new Date();
+      const p = (n) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;
+    }
+
+    async function gerarBackup() {
+      const wb = XLSX.utils.book_new();
+      const resumo = [];
+      for (const nome of COLECOES) {
+        const snap = await getDocs(collection(db, nome));
+        const linhas = snap.docs.map(docParaLinha);
+        const ws = linhas.length
+          ? XLSX.utils.json_to_sheet(linhas)
+          : XLSX.utils.aoa_to_sheet([['(coleção vazia)']]);
+        XLSX.utils.book_append_sheet(wb, ws, nome.slice(0, 31));
+        resumo.push({ colecao: nome, documentos: linhas.length });
+      }
+      const wsResumo = XLSX.utils.json_to_sheet([
+        { campo: 'gerado_em',        valor: new Date().toISOString() },
+        { campo: 'evento_ativo',     valor: eventoAtivo?.nome || '(nenhum)' },
+        { campo: 'evento_ativo_id',  valor: eventoAtivo?.id   || '' },
+        { campo: 'total_colecoes',   valor: resumo.length },
+        { campo: 'total_documentos', valor: resumo.reduce((s, r) => s + r.documentos, 0) },
+        {},
+        ...resumo.map(r => ({ campo: r.colecao, valor: r.documentos })),
+      ]);
+      XLSX.utils.book_append_sheet(wb, wsResumo, '_resumo');
+
+      const buf  = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const nome = 'backup-' + timestampNome() + '.xlsx';
+      const fh   = await dirHandle.getFileHandle(nome, { create: true });
+      const w    = await fh.createWritable();
+      await w.write(buf);
+      await w.close();
+      await podarAntigos();
+      return { nome, totalDocs: resumo.reduce((s, r) => s + r.documentos, 0) };
+    }
+
+    async function listarArquivosBackup() {
+      if (!dirHandle) return [];
+      const arquivos = [];
+      try {
+        for await (const [nome, h] of dirHandle.entries()) {
+          if (h.kind === 'file' && nome.startsWith('backup-') && nome.endsWith('.xlsx')) {
+            try {
+              const f = await h.getFile();
+              arquivos.push({ nome, mtime: f.lastModified, tamanho: f.size });
+            } catch (e) { /* ignore */ }
+          }
+        }
+      } catch (e) {
+        console.warn('[backup] listar arquivos falhou:', e);
+        return [];
+      }
+      arquivos.sort((a, b) => b.mtime - a.mtime);
+      return arquivos;
+    }
+
+    async function podarAntigos() {
+      if (!MANTER_ULTIMOS || MANTER_ULTIMOS <= 0) return;
+      const arquivos = await listarArquivosBackup();
+      const remover = arquivos.slice(MANTER_ULTIMOS);
+      for (const { nome } of remover) {
+        try { await dirHandle.removeEntry(nome); } catch (e) { /* ignore */ }
+      }
+    }
+
+    function fmtTamanho(bytes) {
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+      return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    }
+    function fmtData(ms) {
+      const d = new Date(ms);
+      const hoje = new Date();
+      const mesmoDia = d.toDateString() === hoje.toDateString();
+      return mesmoDia
+        ? `hoje ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+        : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    }
+    async function atualizarListaArquivos() {
+      const box = $('bk-arquivos');
+      if (!box) return;
+      if (!dirHandle || precisaPermissao) {
+        box.innerHTML = '';
+        box.classList.add('hidden');
+        return;
+      }
+      const todos = await listarArquivosBackup();
+      box.classList.remove('hidden');
+      if (todos.length === 0) {
+        box.innerHTML = '<div class="bk-arq-vazio">Pasta vazia — nenhum backup salvo ainda.</div>';
+        return;
+      }
+      const top = todos.slice(0, 5);
+      const sufixo = todos.length > 5 ? ` (5 mais recentes)` : '';
+      const titulo = `${todos.length} backup${todos.length > 1 ? 's' : ''} na pasta${sufixo}`;
+      const linhas = top.map(a => `
+        <div class="bk-arq">
+          <span class="bk-arq-nome" title="${a.nome}">${a.nome}</span>
+          <span class="bk-arq-meta">${fmtTamanho(a.tamanho)} · ${fmtData(a.mtime)}</span>
+        </div>
+      `).join('');
+      box.innerHTML = `<div class="bk-arq-titulo">${titulo}</div>${linhas}`;
+    }
+
+    // ---- loop ----
+    async function rodarBackupAgora() {
+      if (rodando) return;
+      if (!dirHandle) {
+        addLog('✗ Escolha uma pasta antes.', 'err');
+        return;
+      }
+      const ok = await garantirPermissaoPasta();
+      if (!ok) {
+        addLog('✗ Permissão da pasta negada.', 'err');
+        return;
+      }
+      rodando = true;
+      atualizarUI();
+      try {
+        const { nome, totalDocs } = await gerarBackup();
+        addLog(`✓ ${nome} (${totalDocs} docs)`, 'ok');
+      } catch (e) {
+        console.error(e);
+        addLog(`✗ Falha: ${e.message || e}`, 'err');
+      } finally {
+        rodando = false;
+        proximoEm = Date.now() + INTERVALO_MS;
+        atualizarUI();
+        atualizarListaArquivos();
+      }
+    }
+
+    function iniciar() {
+      if (timerId) return;
+      proximoEm = Date.now() + INTERVALO_MS;
+      timerId      = setInterval(rodarBackupAgora, INTERVALO_MS);
+      countdownId  = setInterval(atualizarUI, 1000);
+      rodarBackupAgora();
+      atualizarUI();
+    }
+
+    function parar() {
+      if (timerId)     { clearInterval(timerId);     timerId = null; }
+      if (countdownId) { clearInterval(countdownId); countdownId = null; }
+      atualizarUI();
+    }
+
+    function considerarAutoIniciar() {
+      if (!auto) return;
+      if (eventoAtivo && !timerId && dirHandle) iniciar();
+      if (!eventoAtivo && timerId) parar();
+    }
+
+    // ---- UI ----
+    function fmtMS(ms) {
+      const s = Math.max(0, Math.floor(ms / 1000));
+      const m = Math.floor(s / 60);
+      const r = s % 60;
+      return `${m}:${String(r).padStart(2, '0')}`;
+    }
+    function atualizarUI() {
+      const status   = $('bk-status');
+      const texto    = $('bk-status-texto');
+      const ativo    = !!timerId;
+      status.classList.toggle('ativo', ativo);
+      status.classList.toggle('inativo', !ativo);
+
+      let msg;
+      if (ativo) {
+        const restante = proximoEm - Date.now();
+        msg = rodando
+          ? 'ATIVO • salvando backup agora…'
+          : `ATIVO • próximo backup em ${fmtMS(restante)}`;
+        if (eventoAtivo) msg += ` • evento: ${eventoAtivo.nome}`;
+      } else {
+        msg = eventoAtivo
+          ? `INATIVO • há um evento ativo (${eventoAtivo.nome})`
+          : 'INATIVO • sem evento';
+      }
+      texto.textContent = msg;
+
+      // Pasta
+      const info = $('bk-pasta-info');
+      if (dirHandle) {
+        info.innerHTML = `Salvando em: <code>${dirHandle.name}</code>`;
+      } else {
+        info.textContent = 'Nenhuma pasta escolhida.';
+      }
+
+      // Aviso de permissao pendente
+      $('bk-precisa-permissao').classList.toggle('hidden', !precisaPermissao);
+
+      // Texto dinamico do botao de pasta
+      $('bk-escolher-pasta').textContent = dirHandle ? 'Trocar pasta' : 'Escolher pasta';
+
+      // Botoes
+      $('bk-iniciar').disabled = ativo || !dirHandle;
+      $('bk-parar').disabled   = !ativo;
+      $('bk-agora').disabled   = rodando || !dirHandle;
+    }
+
+    function addLog(msg, classe) {
+      const log = $('bk-log');
+      log.querySelector('.bk-log-vazio')?.remove();
+      const linha = document.createElement('div');
+      const hora  = new Date().toLocaleTimeString('pt-BR');
+      linha.className = classe || '';
+      linha.textContent = `[${hora}] ${msg}`;
+      log.prepend(linha);
+    }
+
+    // ---- watchers ----
+    const unsub = onSnapshot(doc(db, 'config', 'eventoAtivo'), (snap) => {
+      const data = snap.exists() ? snap.data() : null;
+      eventoAtivo = (data && data.id) ? data : null;
+      considerarAutoIniciar();
+      atualizarUI();
+    });
+
+    window.addEventListener('pagehide', () => unsub());
+
+    // ---- bind ----
+    $('bk-escolher-pasta').onclick = escolherPasta;
+    $('bk-iniciar').onclick        = iniciar;
+    $('bk-parar').onclick          = parar;
+    $('bk-agora').onclick          = rodarBackupAgora;
+    $('bk-auto').checked = auto;
+    $('bk-auto').onchange = (e) => {
+      auto = e.target.checked;
+      localStorage.setItem(LS_AUTO_KEY, auto ? '1' : '0');
+      considerarAutoIniciar();
+      atualizarUI();
+    };
+
+    // ---- bootstrap ----
+    (async () => {
+      if (!SUPORTADO) {
+        $('bk-incompativel').classList.remove('hidden');
+        $('bk-status-texto').textContent = 'INDISPONÍVEL neste navegador';
+        ['bk-escolher-pasta','bk-iniciar','bk-parar','bk-agora','bk-auto']
+          .forEach(id => { const el = $(id); if (el) el.disabled = true; });
+        return;
+      }
+      try {
+        await restaurarPasta();
+      } catch (e) { console.error(e); }
+      atualizarUI();
+      atualizarListaArquivos();
+    })();
+
+    // Avisa antes de fechar a aba se o backup automatico estiver rodando
+    window.addEventListener('beforeunload', (e) => {
+      if (timerId) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
+  </script>
+</body>
+</html>

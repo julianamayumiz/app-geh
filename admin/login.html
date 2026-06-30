@@ -3,57 +3,120 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0F1D4D">
+  <meta name="theme-color" content="#0A1436" media="(prefers-color-scheme: dark)">
   <title>Login Admin — App GEH</title>
   <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
   <link rel="stylesheet" href="../css/style.css">
   <link rel="manifest" href="../manifest.json">
   <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+  <style>
+    .login-card {
+      background: var(--branco);
+      color: var(--cinza-escuro);
+      padding: 1.75rem 1.5rem;
+      border-radius: 16px;
+      box-shadow: 0 24px 60px -20px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.06) inset;
+      border: 1px solid rgba(15,29,77,0.08);
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+    .login-card .form-group { margin-bottom: 0; }
+    .login-card .btn { width: 100%; }
+    .login-divider {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--cinza);
+      font-size: 0.8rem;
+      letter-spacing: 0.05em;
+      margin: 0.25rem 0;
+    }
+    .login-divider::before,
+    .login-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--cinza-claro);
+    }
+    .login-link {
+      background: none;
+      border: none;
+      color: var(--azul);
+      font-size: 0.85rem;
+      cursor: pointer;
+      text-decoration: underline;
+      padding: 0.25rem;
+      align-self: center;
+    }
+    .login-voltar {
+      margin-top: 0.5rem;
+      align-self: center;
+      color: rgba(255,255,255,0.7);
+      font-size: 0.85rem;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .login-voltar:hover { color: white; }
+  </style>
 </head>
 <body>
-  <div class="landing">
-    <img src="../assets/logo.png" alt="GEH" onerror="this.style.display='none'">
+  <div class="landing login">
+    <span class="tag warn"><span class="dot"></span> Acesso restrito</span>
+
+    <div class="logo-wrap">
+      <img src="../assets/logo.png" alt="GEH" onerror="this.style.display='none'">
+    </div>
+
     <h1>Diretoria de Eventos</h1>
-    <p>Acesso restrito</p>
+    <p>Entre com seu e-mail institucional ou conta Google.</p>
 
-    <div class="acoes" style="background: var(--branco); padding: 1.5rem; border-radius: 12px; color: var(--cinza-escuro);">
-      <div class="form-group">
-        <label>E-mail</label>
-        <input type="email" id="email" autocomplete="email">
+    <div class="acoes">
+      <div class="login-card">
+        <div class="form-group">
+          <label for="email">E-mail</label>
+          <input type="email" id="email" autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label for="senha">Senha</label>
+          <input type="password" id="senha" autocomplete="current-password">
+        </div>
+        <div id="alerta" class="alert alert-danger hidden"></div>
+        <div id="alerta-ok" class="alert alert-success hidden"></div>
+        <button id="btn-login" class="btn btn-primary">Entrar</button>
+        <button id="btn-esqueci" type="button" class="login-link">Esqueci minha senha</button>
+
+        <div class="login-divider"><span>ou</span></div>
+
+        <button id="btn-google" class="btn btn-secondary">
+          <svg width="18" height="18" viewBox="0 0 48 48">
+            <path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 7.9 3l5.7-5.7C34.1 5.8 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.6-.4-3.9z"/>
+            <path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.1 7.9 3l5.7-5.7C34.1 5.8 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
+            <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2c-2 1.4-4.5 2.4-7.2 2.4-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/>
+            <path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2c-.4.4 6.6-4.8 6.6-14.8 0-1.3-.1-2.6-.4-3.9z"/>
+          </svg>
+          Entrar com Google
+        </button>
       </div>
-      <div class="form-group">
-        <label>Senha</label>
-        <input type="password" id="senha" autocomplete="current-password">
-      </div>
-      <div id="alerta" class="alert alert-danger hidden"></div>
-      <div id="alerta-ok" class="alert alert-success hidden"></div>
-      <button id="btn-login" class="btn btn-primary">Entrar</button>
-      <button id="btn-esqueci" type="button" style="background:none;border:none;color:var(--azul);font-size:0.85rem;cursor:pointer;text-decoration:underline;padding:0.25rem;margin-top:0.25rem;">Esqueci minha senha</button>
 
-      <div style="display:flex;align-items:center;gap:0.5rem;margin:0.5rem 0;color:var(--cinza);font-size:0.85rem;">
-        <div style="flex:1;height:1px;background:var(--cinza-claro);"></div>
-        <span>ou</span>
-        <div style="flex:1;height:1px;background:var(--cinza-claro);"></div>
-      </div>
-
-      <button id="btn-google" class="btn btn-secondary" style="display:flex;align-items:center;justify-content:center;gap:0.5rem;">
-        <svg width="18" height="18" viewBox="0 0 48 48">
-          <path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 7.9 3l5.7-5.7C34.1 5.8 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.6-.4-3.9z"/>
-          <path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.1 7.9 3l5.7-5.7C34.1 5.8 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
-          <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2c-2 1.4-4.5 2.4-7.2 2.4-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/>
-          <path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2c-.4.4 6.6-4.8 6.6-14.8 0-1.3-.1-2.6-.4-3.9z"/>
-        </svg>
-        Entrar com Google
-      </button>
-
-      <a href="../index.html" class="btn btn-secondary"><span data-icon="arrow-left" data-size="18"></span> Voltar</a>
+      <a href="../index.html" class="login-voltar"><span data-icon="arrow-left" data-size="16"></span> Voltar à tela inicial</a>
     </div>
   </div>
   <script type="module" src="../js/icons.js"></script>
 
   <script type="module">
     import {
+<<<<<<< HEAD
       auth, signInWithEmailAndPassword, onAuthStateChanged,
       GoogleAuthProvider, signInWithPopup, signOut, sendPasswordResetEmail
+=======
+      auth, db, signInWithEmailAndPassword, onAuthStateChanged,
+      GoogleAuthProvider, signInWithPopup, signOut, sendPasswordResetEmail,
+      doc, getDoc, setDoc, deleteDoc
+>>>>>>> 9bf69ef8c85ddfdc4a7d07f92bae193ae334a660
     } from "../js/firebase-config.js";
     import { carregarPerfil } from "../js/auth-guard.js";
     import { icon } from "../js/icons.js";
@@ -61,6 +124,18 @@
     const alerta = document.getElementById('alerta');
     const alertaOk = document.getElementById('alerta-ok');
 
+<<<<<<< HEAD
+=======
+    // Permite digitar so o usuario (ex: "operador07") no lugar do e-mail
+    // completo: sem "@", apenda o dominio de teste. E-mail real (ja com
+    // "@") e login Google passam intactos.
+    function normalizarEmail(valor) {
+      const v = (valor || '').trim();
+      if (!v) return '';
+      return v.includes('@') ? v : v + '@teste.com';
+    }
+
+>>>>>>> 9bf69ef8c85ddfdc4a7d07f92bae193ae334a660
     const params = new URLSearchParams(location.search);
     if (params.get('erro') === 'sem-acesso') {
       alerta.textContent = 'Sua conta não tem acesso. Fale com a diretoria para ser cadastrada.';
@@ -69,11 +144,44 @@
 
     function destinoPor(perfil) {
       if (perfil?.papel === 'operador') return '../operador/index.html';
+<<<<<<< HEAD
+=======
+      if (perfil?.papel === 'caixa')    return '../caixa/index.html';
+      if (perfil?.papel === 'recepcao') return '../recepcao/index.html';
+>>>>>>> 9bf69ef8c85ddfdc4a7d07f92bae193ae334a660
       return 'dashboard.html';
     }
 
     async function dispatch(user) {
+<<<<<<< HEAD
       const perfil = await carregarPerfil(user);
+=======
+      let perfil = await carregarPerfil(user);
+
+      // Auto-provisionamento: usuario sem perfil que tem convite em /pendentes
+      // (tipico do primeiro login com Google apos admin ter adicionado o e-mail)
+      if (!perfil && user.email) {
+        try {
+          const emailKey = user.email.toLowerCase();
+          const conviteSnap = await getDoc(doc(db, 'pendentes', emailKey));
+          if (conviteSnap.exists()) {
+            const c = conviteSnap.data();
+            await setDoc(doc(db, 'usuarios', user.uid), {
+              nome: c.nome,
+              email: emailKey,
+              papel: c.papel,
+              ativo: true,
+              criadoEm: new Date(),
+            });
+            await deleteDoc(doc(db, 'pendentes', emailKey));
+            perfil = await carregarPerfil(user);
+          }
+        } catch (e) {
+          console.warn('[login] erro no auto-provisionamento:', e);
+        }
+      }
+
+>>>>>>> 9bf69ef8c85ddfdc4a7d07f92bae193ae334a660
       if (!perfil || perfil.ativo === false) {
         await signOut(auth);
         alerta.textContent = perfil?.ativo === false
@@ -90,7 +198,7 @@
     });
 
     document.getElementById('btn-login').onclick = async () => {
-      const email = document.getElementById('email').value.trim();
+      const email = normalizarEmail(document.getElementById('email').value);
       const senha = document.getElementById('senha').value;
       alerta.classList.add('hidden');
       try {
@@ -103,7 +211,7 @@
     };
 
     document.getElementById('btn-esqueci').onclick = async () => {
-      const email = document.getElementById('email').value.trim();
+      const email = normalizarEmail(document.getElementById('email').value);
       alerta.classList.add('hidden');
       alertaOk.classList.add('hidden');
       if (!email) {

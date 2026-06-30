@@ -4,17 +4,33 @@ rules_version = '2';
 //
 // Modelo de acesso baseado em papel (role):
 // - SUPER ADMIN: e-mail hardcoded da Juliana — sempre passa, mesmo
+<<<<<<< HEAD
 //   sem doc em /usuarios. Resolve o bootstrap (primeiro acesso).
 // - ADMIN: tem doc em /usuarios/{uid} com papel='admin' e ativo=true.
 //   Faz qualquer coisa.
 // - OPERADOR: tem doc em /usuarios/{uid} com papel='operador' e
 //   ativo=true. Pode ler dados do evento e registrar vendas/recargas.
+=======
+//   sem doc em /usuarios. Resolve o bootstrap (primeiro acesso) e
+//   garante que ela nunca fica trancada do lado de fora.
+// - ADMIN: tem doc em /usuarios/{uid} com papel='admin' e ativo=true.
+//   Faz qualquer coisa.
+// - OPERADOR: doc em /usuarios/{uid} com papel='operador' e ativo=true.
+//   Lê dados do evento e registra vendas.
+// - CAIXA: doc em /usuarios/{uid} com papel='caixa' e ativo=true.
+//   Recarrega saldo dos clientes (lendo o QR).
+// - RECEPCAO: doc em /usuarios/{uid} com papel='recepcao' e ativo=true.
+//   Confere convites antecipados, registra check-in e venda na porta.
+>>>>>>> 9bf69ef8c85ddfdc4a7d07f92bae193ae334a660
 // - QUALQUER OUTRO: bloqueado.
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
+<<<<<<< HEAD
     // ── Helpers ──────────────────────────────────────────────────────
+=======
+>>>>>>> 9bf69ef8c85ddfdc4a7d07f92bae193ae334a660
     function logado() {
       return request.auth != null;
     }
@@ -35,6 +51,7 @@ service cloud.firestore {
     function isOperador() {
       return isAdmin() || (temPerfilAtivo() && perfil().papel == 'operador');
     }
+<<<<<<< HEAD
 
     // ── /usuarios — gerenciamento de acesso ──────────────────────────
     // Só admin lê e escreve. Cada um pode ler o próprio doc (pro
@@ -48,6 +65,49 @@ service cloud.firestore {
     // ── Dados do evento ──────────────────────────────────────────────
     // Operador lê tudo e escreve nas operações da venda.
     // Admin tem acesso total.
+=======
+    function isCaixa() {
+      return isAdmin() || (temPerfilAtivo() && perfil().papel == 'caixa');
+    }
+    function isRecepcao() {
+      return isAdmin() || (temPerfilAtivo() && perfil().papel == 'recepcao');
+    }
+    // Qualquer membro da equipe (operador, caixa, recepcao ou admin) —
+    // usado em leituras compartilhadas como /clientes, /config/eventoAtivo.
+    function isEquipe() {
+      return isAdmin() || isOperador() || isCaixa() || isRecepcao();
+    }
+
+    // /usuarios — gerenciamento de acesso.
+    // Cada um lê o próprio doc (pro auth-guard funcionar).
+    // Listar, atualizar e excluir: só admin.
+    // Criar: admin, OU o proprio usuario se tiver convite em /pendentes
+    // (auto-provisionamento no primeiro login Google).
+    match /usuarios/{uid} {
+      allow get: if isAdmin() || (logado() && request.auth.uid == uid);
+      allow list: if isAdmin();
+      allow update, delete: if isAdmin();
+      allow create: if isAdmin()
+        || (
+          logado()
+          && request.auth.uid == uid
+          && exists(/databases/$(database)/documents/pendentes/$(request.auth.token.email))
+          && request.resource.data.email == request.auth.token.email
+          && request.resource.data.papel ==
+               get(/databases/$(database)/documents/pendentes/$(request.auth.token.email)).data.papel
+          && request.resource.data.ativo == true
+          && request.resource.data.nome is string
+        );
+    }
+
+    // /pendentes — whitelist de e-mails Google pre-autorizados pelo admin.
+    // Admin gerencia; o proprio usuario autenticado pode ler e apagar
+    // o convite dele (necessario para o auto-provisionamento).
+    match /pendentes/{email} {
+      allow read, write: if isAdmin();
+      allow get, delete: if logado() && request.auth.token.email == email;
+    }
+>>>>>>> 9bf69ef8c85ddfdc4a7d07f92bae193ae334a660
 
     match /produtos/{doc} {
       allow read: if isOperador();
@@ -56,8 +116,22 @@ service cloud.firestore {
     }
 
     match /clientes/{doc} {
+<<<<<<< HEAD
       allow read: if isOperador();
       allow update: if isOperador();
+=======
+      allow read: if isEquipe();
+      // Admin pode tudo. Caixa/operador só podem alterar saldo (via TX no app)
+      // e o saldo resultante precisa ser >=0. Recepcao não toca em saldo.
+      // Bloqueia escrita direta via SDK que tentasse mexer em outros campos.
+      allow update: if isAdmin()
+        || (
+          (isCaixa() || isOperador())
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['saldo'])
+          && request.resource.data.saldo is number
+          && request.resource.data.saldo >= 0
+        );
+>>>>>>> 9bf69ef8c85ddfdc4a7d07f92bae193ae334a660
       allow create, delete: if isAdmin();
     }
 
@@ -67,23 +141,127 @@ service cloud.firestore {
     }
 
     match /movimentacoes_saldo/{doc} {
+<<<<<<< HEAD
       allow read, create: if isOperador();
+=======
+      // Read aberto a toda equipe (operador consulta histórico do cliente).
+      allow read: if isEquipe();
+      // Create só pelo Caixa — recargas no fluxo normal.
+      // Valida tipo e que o valor é positivo pra evitar lixo na auditoria.
+      allow create: if isCaixa()
+        && request.resource.data.valor is number
+        && request.resource.data.valor > 0
+        && request.resource.data.clienteId is string;
+>>>>>>> 9bf69ef8c85ddfdc4a7d07f92bae193ae334a660
       allow update, delete: if isAdmin();
     }
 
     match /eventos/{doc} {
+<<<<<<< HEAD
       allow read: if isOperador();
       allow write: if isAdmin();
     }
 
     match /config/{doc} {
       allow read: if isOperador();
+=======
+      allow read: if isEquipe();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin()
+        || (
+          isRecepcao()
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['categoriasIngresso'])
+        );
+    }
+
+    match /config/{doc} {
+      allow read: if isEquipe();
+>>>>>>> 9bf69ef8c85ddfdc4a7d07f92bae193ae334a660
       allow write: if isAdmin();
     }
 
     match /compras/{doc} {
       allow read: if isAdmin();
       allow write: if isAdmin();
+<<<<<<< HEAD
+=======
+    }
+
+    match /despesas/{doc} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /insumos/{doc} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Ajustes manuais de saldo feitos pela Diretoria — auditoria
+    // separada das recargas do Caixa. Imutavel: nao permite update
+    // nem delete (nem para admin) pra preservar a trilha.
+    match /ajustes_saldo/{doc} {
+      allow read: if isAdmin();
+      // Valor pode ser negativo (correção pra menos), mas precisa ser número
+      // e motivo precisa existir (>=5 chars conforme regra do app).
+      allow create: if isAdmin()
+        && request.resource.data.valor is number
+        && request.resource.data.motivo is string
+        && request.resource.data.motivo.size() >= 5
+        && request.resource.data.clienteId is string;
+      allow update, delete: if false;
+    }
+
+    // Transferencias de saldo entre clientes (ex: familia juntando
+    // QRs pra fazer uma compra). Caixa e operador podem criar pra
+    // agilizar no balcao; recepcao nao mexe em saldo. Imutavel pra
+    // preservar a trilha — correcao depois sai por ajuste-saldo.
+    match /transferencias_saldo/{doc} {
+      allow read: if isEquipe();
+      allow create: if (isCaixa() || isOperador())
+        && request.resource.data.valor is number
+        && request.resource.data.valor > 0
+        && request.resource.data.origemId is string
+        && request.resource.data.destinoId is string
+        && request.resource.data.origemId != request.resource.data.destinoId;
+      allow update, delete: if false;
+    }
+
+    // Convites antecipados (lista de conferência da recepção):
+    // importados em lote via Excel. Recepção lê, busca e marca check-in
+    // (update do campo presente/checkInEm). Admin gerencia.
+    match /convites_antecipados/{doc} {
+      allow read: if isRecepcao();
+      // Recepção só pode marcar/desfazer presença — não pode alterar
+      // dados do convite (nome, familia, categoria, pago).
+      allow update: if isAdmin()
+        || (
+          isRecepcao()
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['presente', 'checkInEm', 'checkInPor'])
+        );
+      allow create, delete: if isAdmin();
+    }
+
+    // Vendas na porta — convites criados na hora pela recepção.
+    // Histórico imutável (só admin pode corrigir/excluir).
+    match /vendas_porta/{doc} {
+      allow read, create: if isRecepcao();
+      allow update, delete: if isAdmin();
+    }
+
+    // Fechamentos históricos importados manualmente para alimentar o modelo
+    // de predição de demanda. Só admin pode gerenciar; imutáveis exceto delete.
+    match /fechamentos_historicos/{doc} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.nome is string
+        && request.resource.data.nome.size() >= 3
+        && request.resource.data.itens is list;
+      allow delete: if isAdmin();
+      allow update: if false;
+>>>>>>> 9bf69ef8c85ddfdc4a7d07f92bae193ae334a660
     }
   }
 }

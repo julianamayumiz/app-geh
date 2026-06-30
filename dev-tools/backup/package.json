@@ -1,0 +1,17 @@
+{
+  "name": "app-geh-backup",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Backup automatizado do Firestore do App GEH para Excel local.",
+  "main": "backup.js",
+  "scripts": {
+    "backup": "node backup.js",
+    "seed-usuarios": "node seed-usuarios.js",
+    "seed-saldos": "node seed-saldos.js",
+    "limpar-evento": "node limpar-evento.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0",
+    "xlsx": "^0.18.5"
+  }
+}

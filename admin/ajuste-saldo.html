@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ajuste de Saldo — Admin GEH</title>
+  <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="manifest" href="../manifest.json">
+  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+  <style>
+    /* .chips-clientes e .chip-cliente definidos em css/style.css */
+    .saldo-preview {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 0.5rem;
+      align-items: center;
+      padding: 0.75rem;
+      background: var(--cinza-fundo);
+      border-radius: 12px;
+      margin-top: 0.5rem;
+    }
+    .saldo-preview .col { text-align:center; }
+    .saldo-preview .label { font-size:0.72rem; color:var(--cinza); text-transform:uppercase; letter-spacing:0.05em; }
+    .saldo-preview .valor { font-size:1.15rem; font-weight:700; color:var(--cinza-escuro); margin-top:0.15rem; }
+    .saldo-preview .seta { color:var(--cinza); }
+    .saldo-preview .valor.pos { color: var(--verde); }
+    .saldo-preview .valor.neg { color: var(--vermelho); }
+    .badge-ajuste {
+      display:inline-block;
+      padding:2px 8px;
+      border-radius:999px;
+      font-size:0.72rem;
+      font-weight:700;
+      background:rgba(217,119,6,0.14);
+      color:#B45309;
+      letter-spacing:0.02em;
+      text-transform:uppercase;
+    }
+    :root[data-theme="dark"] .badge-ajuste { background:rgba(245,158,11,0.20); color:#FCD34D; }
+  </style>
+</head>
+<body>
+  <main class="admin">
+    <h2 style="color:var(--azul);margin-bottom:0.25rem;display:inline-flex;align-items:center;gap:0.5rem;">
+      <span data-icon="edit" data-size="24"></span> Ajuste de saldo
+    </h2>
+    <p style="color:var(--cinza);margin-bottom:1rem;">
+      Correção manual no saldo de um cliente. Use para reparar lançamentos errados ou compensar falhas do caixa.
+      <strong>Não dispara reembolso financeiro</strong> — é só ajuste interno do sistema, registrado para auditoria.
+    </p>
+
+    <div class="card">
+      <div class="form-group">
+        <label for="busca">Buscar cliente (ID ou nome)</label>
+        <input type="text" id="busca" placeholder="Ex: GEH001 ou Maria" autocomplete="off">
+        <div id="chips" class="chips-clientes" style="margin-top:0.5rem;"></div>
+      </div>
+
+      <div id="cliente-selecionado" class="hidden">
+        <div class="cliente-info">
+          <div class="nome" id="cli-id"></div>
+          <div class="saldo-label">Saldo atual</div>
+          <div class="saldo" id="cli-saldo">R$ 0,00</div>
+        </div>
+
+        <div class="form-group">
+          <label for="valor">Valor do ajuste (R$) — use sinal negativo para retirar</label>
+          <input type="number" id="valor" step="0.01" placeholder="Ex: 10,00 ou -5,00" inputmode="decimal">
+        </div>
+
+        <div class="form-group">
+          <label for="motivo">Motivo / justificativa <span style="color:var(--vermelho)">*</span></label>
+          <textarea id="motivo" rows="3" placeholder="Ex: falha na submissão do caixa João em 25/04 — recarga de R$ 20 não foi registrada"></textarea>
+          <small style="color:var(--cinza);font-size:0.78rem;">Mínimo 5 caracteres. Esse texto vai pro log de auditoria.</small>
+        </div>
+
+        <div id="preview" class="saldo-preview hidden">
+          <div class="col"><div class="label">Saldo atual</div><div class="valor" id="prev-atual">R$ 0,00</div></div>
+          <div class="seta" data-icon="arrow-right" data-size="20"></div>
+          <div class="col"><div class="label">Após ajuste</div><div class="valor" id="prev-novo">R$ 0,00</div></div>
+        </div>
+
+        <div id="alerta" class="alert hidden" style="margin-top:0.75rem;"></div>
+
+        <button id="btn-confirmar" class="btn btn-primary" style="margin-top:0.75rem;">
+          <span data-icon="check" data-size="16"></span> Aplicar ajuste
+        </button>
+      </div>
+    </div>
+
+    <h3 style="color:var(--azul);margin:1.5rem 0 0.75rem;">Últimos ajustes</h3>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr><th>Quando</th><th>Cliente</th><th>Valor</th><th>Motivo</th><th>Diretoria</th></tr>
+        </thead>
+        <tbody id="tbl-ajustes">
+          <tr><td colspan="5" class="text-center text-muted">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <script type="module" src="../js/icons.js"></script>
+  <script type="module">
+    import { montarNav } from "./_nav.js";
+    import { fmtBRL } from "../js/helpers.js";
+    import {
+      db, collection, doc, getDoc, getDocs, addDoc, query, orderBy, limit,
+      onSnapshot, runTransaction, serverTimestamp
+    } from "../js/firebase-config.js";
+    import { icon, renderIcons } from "../js/icons.js";
+    import { requireAuth } from "../js/auth-guard.js";
+    import { confirmarAsync } from "../js/ui.js";
+
+    montarNav('ajuste-saldo.html');
+    let perfilAtual = null;
+    requireAuth({ papel: 'admin' }).then(({ perfil }) => { perfilAtual = perfil; });
+
+    const $ = id => document.getElementById(id);
+    const alerta = $('alerta');
+
+    function showAlerta(msg, tipo = 'info') {
+      alerta.textContent = msg;
+      alerta.className = `alert alert-${tipo}`;
+      alerta.classList.remove('hidden');
+    }
+
+    let todosClientes = [];
+    let clienteSelecionado = null;
+
+    async function carregarClientes() {
+      const snap = await getDocs(collection(db, 'clientes'));
+      todosClientes = [];
+      snap.forEach(d => todosClientes.push({ id: d.id, ...d.data() }));
+      todosClientes.sort((a, b) => a.id.localeCompare(b.id));
+      renderChips('');
+    }
+
+    function renderChips(filtro) {
+      const f = filtro.toLowerCase();
+      const lista = f
+        ? todosClientes.filter(c => c.id.toLowerCase().includes(f) || (c.nome || '').toLowerCase().includes(f))
+        : todosClientes;
+      const chips = $('chips');
+      chips.innerHTML = '';
+      lista.slice(0, 30).forEach(c => {
+        const btn = document.createElement('button');
+        btn.className = 'chip-cliente';
+        btn.textContent = c.nome ? `${c.id} — ${c.nome}` : c.id;
+        btn.onclick = () => selecionarCliente(c.id);
+        chips.appendChild(btn);
+      });
+      if (lista.length > 30) {
+        chips.insertAdjacentHTML('beforeend', `<span class="text-muted" style="font-size:0.78rem;align-self:center;">+${lista.length - 30}…</span>`);
+      }
+      if (lista.length === 0) {
+        chips.innerHTML = '<span class="text-muted" style="font-size:0.85rem;">Nenhum cliente encontrado.</span>';
+      }
+    }
+
+    async function selecionarCliente(id) {
+      const snap = await getDoc(doc(db, 'clientes', id));
+      if (!snap.exists()) return showAlerta('Cliente não encontrado.', 'danger');
+      clienteSelecionado = { id, ...snap.data() };
+      $('cli-id').textContent = clienteSelecionado.nome ? `${id} — ${clienteSelecionado.nome}` : id;
+      $('cli-saldo').textContent = fmtBRL(clienteSelecionado.saldo || 0);
+      $('cliente-selecionado').classList.remove('hidden');
+      $('valor').value = '';
+      $('motivo').value = '';
+      $('preview').classList.add('hidden');
+      alerta.classList.add('hidden');
+      $('cliente-selecionado').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function atualizarPreview() {
+      const valor = parseFloat($('valor').value);
+      if (!Number.isFinite(valor) || valor === 0 || !clienteSelecionado) {
+        $('preview').classList.add('hidden');
+        return;
+      }
+      const atual = clienteSelecionado.saldo || 0;
+      const novo = atual + valor;
+      $('prev-atual').textContent = fmtBRL(atual);
+      const elNovo = $('prev-novo');
+      elNovo.textContent = fmtBRL(novo);
+      elNovo.className = 'valor ' + (valor >= 0 ? 'pos' : 'neg');
+      $('preview').classList.remove('hidden');
+      renderIcons($('preview'));
+    }
+
+    $('busca').oninput = () => renderChips($('busca').value);
+    $('valor').addEventListener('input', atualizarPreview);
+
+    $('btn-confirmar').onclick = async () => {
+      if (!perfilAtual) return showAlerta('Aguardando autenticação…', 'warning');
+      if (!clienteSelecionado) return showAlerta('Selecione um cliente primeiro.', 'warning');
+
+      // Captura o cliente-alvo no início — evita aplicar ajuste em outro cliente
+      // caso o usuário troque a seleção durante as confirmações async.
+      const cliAlvo = { id: clienteSelecionado.id, nome: clienteSelecionado.nome || null };
+      const saldoAtual = clienteSelecionado.saldo || 0;
+
+      const valor = parseFloat($('valor').value);
+      const motivo = $('motivo').value.trim();
+
+      if (!Number.isFinite(valor) || valor === 0) return showAlerta('Digite um valor diferente de zero.', 'warning');
+      if (motivo.length < 5) return showAlerta('Motivo é obrigatório (mínimo 5 caracteres).', 'warning');
+
+      const saldoNovo = saldoAtual + valor;
+      if (saldoNovo < 0) {
+        if (!(await confirmarAsync(
+          `Atenção: o saldo do cliente ficará NEGATIVO (${fmtBRL(saldoNovo)}). Continuar mesmo assim?`,
+          { destrutivo: true, textoOk: 'Continuar' }
+        ))) return;
+      }
+
+      const sinal = valor >= 0 ? '+' : '';
+      if (!(await confirmarAsync(
+        `Confirmar ajuste em ${cliAlvo.id}? ` +
+        `Saldo: ${fmtBRL(saldoAtual)} → ${fmtBRL(saldoNovo)}. ` +
+        `Variação: ${sinal}${fmtBRL(valor)}. ` +
+        `Motivo: ${motivo}. ` +
+        `Esta ação fica registrada para auditoria.`,
+        { textoOk: 'Aplicar ajuste' }
+      ))) return;
+
+      $('btn-confirmar').disabled = true;
+      $('btn-confirmar').innerHTML = '<div class="loader"></div> Processando…';
+
+      let eventoAtivo = null;
+      try {
+        const evSnap = await getDoc(doc(db, 'config', 'eventoAtivo'));
+        if (evSnap.exists()) eventoAtivo = evSnap.data();
+      } catch (e) {
+        // Ajuste continua mesmo sem evento — só vincula null. Mas loga
+        // pra distinguir erro de leitura de "sem evento ativo" na auditoria.
+        console.warn('[ajuste-saldo] falha ao ler eventoAtivo:', e);
+      }
+
+      try {
+        await runTransaction(db, async (tx) => {
+          const ref = doc(db, 'clientes', cliAlvo.id);
+          const snap = await tx.get(ref);
+          if (!snap.exists()) throw new Error('Cliente não existe mais.');
+          const saldo = snap.data().saldo || 0;
+          tx.update(ref, { saldo: saldo + valor });
+
+          const ajusteRef = doc(collection(db, 'ajustes_saldo'));
+          tx.set(ajusteRef, {
+            clienteId: cliAlvo.id,
+            clienteNome: cliAlvo.nome,
+            valor,
+            saldoAntes: saldo,
+            saldoDepois: saldo + valor,
+            motivo,
+            eventoId: eventoAtivo?.id || null,
+            eventoNome: eventoAtivo?.nome || null,
+            // Auditoria — quem da Diretoria fez o ajuste
+            adminId: perfilAtual.uid,
+            adminEmail: perfilAtual.email || null,
+            adminNome: perfilAtual.nome || null,
+            criadoEm: serverTimestamp()
+          });
+        });
+
+        showAlerta(`Ajuste aplicado: ${sinal}${fmtBRL(valor)} em ${cliAlvo.id}.`, 'success');
+        $('valor').value = '';
+        $('motivo').value = '';
+        $('preview').classList.add('hidden');
+        // Recarregar saldo exibido — só se o cliente exibido ainda é o do ajuste
+        if (clienteSelecionado && clienteSelecionado.id === cliAlvo.id) {
+          const re = await getDoc(doc(db, 'clientes', cliAlvo.id));
+          clienteSelecionado = { id: cliAlvo.id, ...re.data() };
+          $('cli-saldo').textContent = fmtBRL(clienteSelecionado.saldo || 0);
+        }
+      } catch (err) {
+        showAlerta(`Erro: ${err.message}`, 'danger');
+      } finally {
+        $('btn-confirmar').disabled = false;
+        $('btn-confirmar').innerHTML = `${icon('check', { size: 16 })} Aplicar ajuste`;
+      }
+    };
+
+    // Tabela de últimos ajustes (live)
+    const unsub = onSnapshot(
+      query(collection(db, 'ajustes_saldo'), orderBy('criadoEm', 'desc'), limit(50)),
+      (snap) => {
+        const tbl = $('tbl-ajustes');
+        if (snap.empty) {
+          tbl.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Nenhum ajuste manual registrado ainda.</td></tr>';
+          return;
+        }
+        tbl.innerHTML = '';
+        snap.docs.slice(0, 50).forEach(d => {
+          const a = d.data();
+          const dt = a.criadoEm?.toDate?.()?.toLocaleString('pt-BR') || '—';
+          const cor = (a.valor || 0) >= 0 ? 'var(--verde)' : 'var(--vermelho)';
+          const sinal = (a.valor || 0) >= 0 ? '+' : '';
+          const cli = a.clienteNome ? `${a.clienteId} — ${a.clienteNome}` : a.clienteId;
+          const quem = a.adminNome || a.adminEmail || '—';
+          tbl.innerHTML += `
+            <tr>
+              <td style="font-size:0.85rem;">${dt}</td>
+              <td>${cli}</td>
+              <td style="font-weight:700;color:${cor};">${sinal}${fmtBRL(a.valor)}</td>
+              <td style="font-size:0.85rem;max-width:280px;">${(a.motivo || '').replace(/[<>]/g, '')}</td>
+              <td style="font-size:0.85rem;">${quem}</td>
+            </tr>
+          `;
+        });
+      },
+      (err) => {
+        $('tbl-ajustes').innerHTML = `<tr><td colspan="5" class="text-center" style="color:#B91C1C;">Erro: ${err.message}</td></tr>`;
+      }
+    );
+
+    window.addEventListener('pagehide', () => unsub());
+
+    carregarClientes();
+  </script>
+</body>
+</html>

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1E3A8A">
+  <meta name="theme-color" content="#0F172A" media="(prefers-color-scheme: dark)">
+  <title>Consultar Saldo — App GEH</title>
+  <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="manifest" href="../manifest.json">
+  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+</head>
+<body>
+  <header class="header">
+    <a href="index.html" class="back" aria-label="Voltar"><span data-icon="arrow-left" data-size="24"></span></a>
+    <h1 id="titulo" style="display:inline-flex;align-items:center;gap:0.5rem;"><span data-icon="eye" data-size="22"></span> Saldo do cliente</h1>
+  </header>
+
+  <main>
+    <div class="cliente-info">
+      <div class="nome" id="cliente-nome"><span class="skel skel-on-dark skel-title" style="width:60%"></span></div>
+      <div class="saldo-label">Saldo atual</div>
+      <div class="saldo" id="cliente-saldo"><span class="skel skel-on-dark skel-num" style="width:140px;height:1.8rem"></span></div>
+    </div>
+
+    <div id="alerta" class="alert hidden"></div>
+
+    <div id="historico" class="hidden">
+      <h3 style="color:var(--azul);margin:1rem 0 0.75rem;display:inline-flex;align-items:center;gap:0.5rem;"><span data-icon="clock" data-size="20"></span> Histórico</h3>
+      <div id="lista-hist" class="hist-list"></div>
+    </div>
+  </main>
+  <script type="module" src="../js/icons.js"></script>
+
+  <script type="module">
+    import {
+      db, doc, getDoc, getDocs, collection, query, where, orderBy, limit
+    } from "../js/firebase-config.js";
+    import { icon, renderIcons } from "../js/icons.js";
+    import { requireAuth } from "../js/auth-guard.js";
+    import { fmtBRL } from "../js/helpers.js";
+
+    await requireAuth({ papel: 'operador' });
+
+    const params = new URLSearchParams(window.location.search);
+    const clienteId = params.get('cliente');
+    if (!clienteId) window.location.href = 'index.html';
+
+    const $ = (id) => document.getElementById(id);
+    const alerta = $('alerta');
+
+    function mostrarAlerta(msg, tipo = 'info') {
+      alerta.textContent = msg;
+      alerta.className = `alert alert-${tipo}`;
+      alerta.classList.remove('hidden');
+    }
+
+    async function carregarHistorico() {
+      const eventoSnap = await getDoc(doc(db, 'config', 'eventoAtivo'));
+      const eventoId = eventoSnap.exists() ? eventoSnap.data().id : null;
+      const [movSnap, vendasSnap] = await Promise.all([
+        getDocs(query(collection(db, 'movimentacoes_saldo'), where('clienteId', '==', clienteId), where('eventoId', '==', eventoId), orderBy('criadoEm', 'desc'), limit(30))),
+        getDocs(query(collection(db, 'vendas'), where('clienteId', '==', clienteId), where('eventoId', '==', eventoId), orderBy('criadoEm', 'desc'), limit(30)))
+      ]);
+
+      const movs = [];
+      movSnap.forEach(d => {
+        const m = d.data();
+        movs.push({
+          quando: m.criadoEm?.toDate?.() || new Date(0),
+          tipo: 'recarga',
+          detalhe: `Via ${m.forma || '—'}`,
+          valor: m.valor,
+          positivo: true
+        });
+      });
+      vendasSnap.forEach(d => {
+        const v = d.data();
+        const itens = (v.itens || []).map(i => `${i.qtd}× ${i.nome}`).join(', ');
+        movs.push({
+          quando: v.criadoEm?.toDate?.() || new Date(0),
+          tipo: 'venda',
+          detalhe: itens || '—',
+          valor: v.total,
+          positivo: false
+        });
+      });
+      movs.sort((a, b) => b.quando - a.quando);
+
+      const lista = $('lista-hist');
+      if (movs.length === 0) {
+        lista.innerHTML = `<div class="empty-state">${icon('inbox', { size: 32 })}<p>Sem movimentações.</p></div>`;
+      } else {
+        lista.innerHTML = movs.map(m => {
+          const cor = m.positivo ? 'var(--verde)' : 'var(--vermelho)';
+          const sinal = m.positivo ? '+' : '-';
+          const dt = m.quando.toLocaleDateString('pt-BR');
+          const hr = m.quando.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          return `<div class="hist-item">
+            <div class="hist-row">
+              <span class="hist-badge" style="background:${cor};">${m.tipo}</span>
+              <span class="hist-quando">${dt} · ${hr}</span>
+              <span class="hist-valor" style="color:${cor};">${sinal} ${fmtBRL(m.valor)}</span>
+            </div>
+            <div class="hist-detalhe">${m.detalhe}</div>
+          </div>`;
+        }).join('');
+      }
+      $('historico').classList.remove('hidden');
+      renderIcons();
+    }
+
+    async function carregarCliente() {
+      const ref = doc(db, 'clientes', clienteId);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) {
+        $('cliente-nome').innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('x-circle', { size: 20 })} Cliente não cadastrado</span>`;
+        mostrarAlerta(`Cliente ${clienteId} não encontrado.`, 'danger');
+        return;
+      }
+      $('cliente-nome').textContent = clienteId;
+      $('cliente-saldo').textContent = fmtBRL(snap.data().saldo);
+      carregarHistorico();
+    }
+
+    carregarCliente();
+  </script>
+</body>
+</html>

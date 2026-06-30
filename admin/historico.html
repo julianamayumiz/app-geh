@@ -16,10 +16,17 @@
     <div class="card">
       <div style="display:flex;gap:0.75rem;align-items:flex-end;">
         <div class="form-group" style="flex:1;margin-bottom:0;">
-          <label>ID do cliente (QR code)</label>
+          <label for="busca-id">ID do cliente (QR code)</label>
           <input type="text" id="busca-id" placeholder="Ex: GEH001" autocomplete="off">
         </div>
         <button id="btn-buscar" class="btn btn-primary" style="width:auto;padding:0.75rem 1.25rem;">Buscar</button>
+      </div>
+
+      <div class="form-group" style="margin-top:0.75rem;margin-bottom:0;">
+        <label for="sel-evento">Filtrar por evento</label>
+        <select id="sel-evento">
+          <option value="">Todos os eventos</option>
+        </select>
       </div>
 
       <div id="clientes-lista" class="hidden" style="margin-top:0.75rem;">
@@ -59,17 +66,35 @@
   </main>
 
   <script type="module">
-    import { montarNav, fmtBRL } from "./_nav.js";
+    import { montarNav } from "./_nav.js";
+    import { fmtBRL, esc } from "../js/helpers.js";
     import {
-      db, collection, doc, getDoc, getDocs, query, where, orderBy
+      db, collection, doc, getDoc, getDocs, query, where, orderBy, limit
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
+    import { abrirDetalhe } from "../js/ui.js";
 
     montarNav('historico.html');
     renderIcons();
 
     const $ = (id) => document.getElementById(id);
     let todosClientes = [];
+    let ultimoIdBuscado = '';
+    // Map venda-id → dados completos pra abrir modal de detalhe
+    const vendasPorId = new Map();
+
+    // Carregar eventos no select
+    async function carregarEventos() {
+      const snap = await getDocs(collection(db, 'eventos'));
+      const sel = $('sel-evento');
+      snap.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.id;
+        opt.textContent = d.data().nome;
+        sel.appendChild(opt);
+      });
+      sel.onchange = () => { if (ultimoIdBuscado) buscar(ultimoIdBuscado); };
+    }
 
     // Carregar lista de IDs pra sugestão
     async function carregarClientes() {
@@ -89,8 +114,9 @@
         : todosClientes;
       lista.slice(0, 20).forEach(id => {
         const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'chip-cliente';
         btn.textContent = id;
-        btn.style.cssText = 'background:var(--azul-claro);color:white;border:none;padding:0.3rem 0.75rem;border-radius:999px;cursor:pointer;font-size:0.85rem;';
         btn.onclick = () => { $('busca-id').value = id; buscar(id); };
         chips.appendChild(btn);
       });
@@ -105,8 +131,11 @@
 
     async function buscar(id) {
       if (!id) return;
+      ultimoIdBuscado = id;
       $('resultado').classList.add('hidden');
       $('sem-resultado').classList.add('hidden');
+      $('btn-buscar').disabled = true;
+      try {
 
       const clienteSnap = await getDoc(doc(db, 'clientes', id));
       if (!clienteSnap.exists()) {
@@ -118,19 +147,26 @@
       $('res-id').textContent = id;
       $('res-saldo').textContent = fmtBRL(saldo);
 
-      // Buscar movimentações de saldo (recargas)
-      const movSnap = await getDocs(query(
-        collection(db, 'movimentacoes_saldo'),
-        where('clienteId', '==', id),
-        orderBy('criadoEm', 'desc')
-      ));
+      // Filtro por evento aplicado a vendas e movimentações
+      const eventoId = $('sel-evento').value;
+      const filtrarPorEvento = (col) => eventoId
+        ? query(collection(db, col), where('clienteId', '==', id), where('eventoId', '==', eventoId), orderBy('criadoEm', 'desc'), limit(50))
+        : query(collection(db, col), where('clienteId', '==', id), orderBy('criadoEm', 'desc'), limit(50));
 
-      // Buscar vendas
-      const vendasSnap = await getDocs(query(
-        collection(db, 'vendas'),
-        where('clienteId', '==', id),
-        orderBy('criadoEm', 'desc')
-      ));
+      // Transferencias usam origemId/destinoId em vez de clienteId, entao
+      // duas queries separadas (Firestore nao tem OR cross-field facil).
+      const filtrarTransfer = (campo) => eventoId
+        ? query(collection(db, 'transferencias_saldo'), where(campo, '==', id), where('eventoId', '==', eventoId), orderBy('criadoEm', 'desc'), limit(50))
+        : query(collection(db, 'transferencias_saldo'), where(campo, '==', id), orderBy('criadoEm', 'desc'), limit(50));
+
+      // Buscar movimentações de saldo (recargas), vendas, ajustes manuais e transferencias
+      const [movSnap, vendasSnap, ajustesSnap, transfOrigemSnap, transfDestinoSnap] = await Promise.all([
+        getDocs(filtrarPorEvento('movimentacoes_saldo')),
+        getDocs(filtrarPorEvento('vendas')),
+        getDocs(filtrarPorEvento('ajustes_saldo')),
+        getDocs(filtrarTransfer('origemId')),
+        getDocs(filtrarTransfer('destinoId')),
+      ]);
 
       // Montar lista unificada
       const movimentos = [];
@@ -142,22 +178,70 @@
         movimentos.push({
           quando: m.criadoEm?.toDate?.() || new Date(0),
           tipo: 'recarga',
-          detalhe: `Via ${m.forma || '—'}`,
+          detalhe: `Via ${esc(m.forma || '—')}${m.caixaNome ? ` · caixa ${esc(m.caixaNome)}` : ''}`,
           valor: m.valor,
-          positivo: true
+          positivo: true,
+          cor: 'var(--verde)'
         });
       });
 
+      vendasPorId.clear();
       vendasSnap.forEach(d => {
         const v = d.data();
         totalGasto += v.total || 0;
-        const itens = (v.itens || []).map(i => `${i.qtd}× ${i.nome}`).join(', ');
+        const itens = (v.itens || []).map(i => `${i.qtd}× ${esc(i.nome)}`).join(', ');
+        vendasPorId.set(d.id, { ...v, _id: d.id });
         movimentos.push({
           quando: v.criadoEm?.toDate?.() || new Date(0),
           tipo: 'venda',
           detalhe: itens,
           valor: v.total,
-          positivo: false
+          positivo: false,
+          cor: 'var(--vermelho)',
+          vendaId: d.id,
+        });
+      });
+
+      ajustesSnap.forEach(d => {
+        const a = d.data();
+        const v = a.valor || 0;
+        movimentos.push({
+          quando: a.criadoEm?.toDate?.() || new Date(0),
+          tipo: 'ajuste',
+          detalhe: `${esc(a.motivo || '—')}${a.adminNome ? ` · por ${esc(a.adminNome)}` : ''}`,
+          valor: Math.abs(v),
+          positivo: v >= 0,
+          cor: 'var(--amarelo-acento)'
+        });
+      });
+
+      // Transferencias — duas pernas. Origem perde, destino ganha.
+      // Nao entram em totalRecarga/totalGasto porque nao movimentam dinheiro
+      // de fato — so realocam saldo entre clientes.
+      transfOrigemSnap.forEach(d => {
+        const t = d.data();
+        const para = t.destinoNome ? `${esc(t.destinoId)} (${esc(t.destinoNome)})` : esc(t.destinoId);
+        const quem = esc(t.usuarioNome || t.usuarioEmail || '—');
+        movimentos.push({
+          quando: t.criadoEm?.toDate?.() || new Date(0),
+          tipo: 'transfer ↗',
+          detalhe: `Enviado para ${para}${t.motivo ? ` · ${esc(t.motivo)}` : ''} · por ${quem}`,
+          valor: t.valor || 0,
+          positivo: false,
+          cor: 'var(--azul)'
+        });
+      });
+      transfDestinoSnap.forEach(d => {
+        const t = d.data();
+        const de = t.origemNome ? `${esc(t.origemId)} (${esc(t.origemNome)})` : esc(t.origemId);
+        const quem = esc(t.usuarioNome || t.usuarioEmail || '—');
+        movimentos.push({
+          quando: t.criadoEm?.toDate?.() || new Date(0),
+          tipo: 'transfer ↙',
+          detalhe: `Recebido de ${de}${t.motivo ? ` · ${esc(t.motivo)}` : ''} · por ${quem}`,
+          valor: t.valor || 0,
+          positivo: true,
+          cor: 'var(--azul)'
         });
       });
 
@@ -172,22 +256,62 @@
         tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state">${icon('inbox', { size: 32 })}<p>Sem movimentações.</p></div></td></tr>`;
       } else {
         movimentos.forEach(m => {
-          const cor = m.positivo ? 'var(--verde)' : 'var(--vermelho)';
+          const corValor = m.positivo ? 'var(--verde)' : 'var(--vermelho)';
           const sinal = m.positivo ? '+' : '-';
+          const clicavel = m.vendaId ? `data-venda-id="${m.vendaId}" style="cursor:pointer;"` : '';
+          const dica = m.vendaId ? ' title="Ver detalhes"' : '';
           tbody.innerHTML += `
-            <tr>
+            <tr ${clicavel}${dica}>
               <td>${m.quando.toLocaleString('pt-BR')}</td>
-              <td><span style="background:${cor};color:white;padding:2px 8px;border-radius:999px;font-size:0.8rem;">${m.tipo}</span></td>
+              <td><span style="background:${m.cor};color:white;padding:2px 8px;border-radius:999px;font-size:0.8rem;">${m.tipo}</span></td>
               <td style="font-size:0.875rem;">${m.detalhe}</td>
-              <td style="font-weight:700;color:${cor};">${sinal} ${fmtBRL(m.valor)}</td>
+              <td style="font-weight:700;color:${corValor};">${sinal} ${fmtBRL(m.valor)}</td>
             </tr>
           `;
         });
       }
+      // Listener delegado: clicar numa linha de venda abre detalhes
+      tbody.onclick = (e) => {
+        const tr = e.target.closest('tr[data-venda-id]');
+        if (!tr) return;
+        const v = vendasPorId.get(tr.dataset.vendaId);
+        if (v) abrirDetalheVenda(v);
+      };
 
       $('resultado').classList.remove('hidden');
+      } finally {
+        $('btn-buscar').disabled = false;
+      }
     }
 
+    function abrirDetalheVenda(v) {
+      const quando = v.criadoEm?.toDate?.()?.toLocaleString('pt-BR') || '—';
+      const itensHtml = (v.itens || []).map(i => `
+        <div class="item">
+          <div><span class="qtd">${i.qtd}×</span>${i.nome}</div>
+          <div>${fmtBRL(i.subtotal ?? (i.qtd * i.preco))}</div>
+        </div>
+      `).join('');
+      const corpo = `
+        <div class="meta">
+          ${quando}
+          ${v.eventoNome ? ` · <strong>${v.eventoNome}</strong>` : ''}
+          ${v.operadorNome ? ` · operador: ${v.operadorNome}` : ''}
+        </div>
+        <div style="font-size:0.85rem;color:var(--cinza);">Cliente</div>
+        <div style="font-weight:600;margin-bottom:0.5rem;">${v.clienteNome || ''} <span style="color:var(--cinza);font-weight:400;">(${v.clienteId})</span></div>
+        <div class="itens">
+          ${itensHtml || '<p class="text-muted" style="padding:0.5rem 0;">Sem itens registrados.</p>'}
+        </div>
+        <div class="total">
+          <span>Total</span>
+          <span>${fmtBRL(v.total)}</span>
+        </div>
+      `;
+      abrirDetalhe({ titulo: `${icon('shopping-cart', { size: 20 })} Venda`, corpo });
+    }
+
+    carregarEventos();
     carregarClientes();
   </script>
 </body>

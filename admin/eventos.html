@@ -27,20 +27,82 @@
       </div>
     </div>
 
+    <div id="categorias-box" class="card hidden">
+      <h3 class="card-title" style="display:inline-flex;align-items:center;gap:0.5rem;"><span data-icon="ticket" data-size="18"></span> Categorias de ingresso</h3>
+      <p style="font-size:0.85rem;color:var(--cinza);margin-bottom:0.75rem;">Defina os tipos de convite (ex.: adulto, idoso, criança) com preço antecipado, preço na porta e estoque pra venda na porta.</p>
+
+      <div class="table-wrapper" data-no-enhance>
+        <table>
+          <thead><tr><th>Nome</th><th>Antecipado</th><th>Porta</th><th>Estoque porta</th><th></th></tr></thead>
+          <tbody id="tbl-categorias"><tr><td colspan="5" class="text-center text-muted">Nenhuma categoria cadastrada.</td></tr></tbody>
+        </table>
+      </div>
+
+      <h4 style="margin:1rem 0 0.5rem;font-size:0.95rem;color:var(--cinza-escuro);" id="cat-form-titulo">Adicionar categoria</h4>
+      <input type="hidden" id="cat-id">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.75rem;">
+        <div class="form-group">
+          <label for="cat-nome">Nome</label>
+          <input type="text" id="cat-nome" placeholder="Adulto">
+        </div>
+        <div class="form-group">
+          <label for="cat-preco-ant">Preço antecipado (R$)</label>
+          <input type="number" id="cat-preco-ant" step="0.50" min="0" placeholder="30.00">
+        </div>
+        <div class="form-group">
+          <label for="cat-preco-porta">Preço na porta (R$)</label>
+          <input type="number" id="cat-preco-porta" step="0.50" min="0" placeholder="50.00">
+        </div>
+        <div class="form-group">
+          <label for="cat-qtd-porta">Estoque porta</label>
+          <input type="number" id="cat-qtd-porta" min="0" step="1" placeholder="20">
+        </div>
+      </div>
+      <div id="alerta-cat" class="alert hidden"></div>
+      <div style="display:flex;gap:0.5rem;">
+        <button id="btn-salvar-cat" class="btn btn-primary" style="max-width:220px;">Salvar categoria</button>
+        <button id="btn-cancelar-cat" class="btn btn-secondary hidden" style="max-width:160px;">Cancelar</button>
+      </div>
+    </div>
+
     <div class="card">
       <h3 class="card-title">Criar novo evento</h3>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;">
         <div class="form-group">
-          <label>Nome do evento</label>
+          <label for="ev-nome">Nome do evento</label>
           <input type="text" id="ev-nome" placeholder="Ex: Festa Junina 2025">
         </div>
         <div class="form-group">
-          <label>Data</label>
+          <label for="ev-data">Data</label>
           <input type="date" id="ev-data">
         </div>
       </div>
       <div id="alerta" class="alert hidden"></div>
       <button id="btn-criar" class="btn btn-primary" style="max-width:220px;">Criar e ativar evento</button>
+    </div>
+
+    <div class="card" style="border-left:4px solid var(--laranja,#f97316);">
+      <h3 class="card-title" style="display:inline-flex;align-items:center;gap:0.5rem;"><span data-icon="refresh-cw" data-size="18"></span> Preparar para novo evento</h3>
+      <p style="font-size:0.85rem;color:var(--cinza);margin-bottom:0.75rem;">
+        Zera os saldos de todos os clientes, apaga todos os produtos e limpa convites antecipados e vendas na porta.<br>
+        <strong>O histórico de vendas e movimentações fica preservado.</strong>
+      </p>
+      <div id="alerta-preparar" class="alert hidden"></div>
+      <div style="display:flex;justify-content:flex-end;">
+        <button id="btn-preparar" class="btn btn-danger" style="max-width:260px;">Zerar dados para novo evento</button>
+      </div>
+    </div>
+
+    <div class="card" style="border-left:4px solid var(--vermelho,#ef4444);">
+      <h3 class="card-title" style="display:inline-flex;align-items:center;gap:0.5rem;"><span data-icon="users-x" data-size="18"></span> Excluir todos os clientes</h3>
+      <p style="font-size:0.85rem;color:var(--cinza);margin-bottom:0.75rem;">
+        Remove permanentemente todos os cadastros de clientes.<br>
+        <strong>Ação irreversível. Use só quando quiser começar do zero.</strong>
+      </p>
+      <div id="alerta-excluir-clientes" class="alert hidden"></div>
+      <div style="display:flex;justify-content:flex-end;">
+        <button id="btn-excluir-clientes" class="btn btn-danger" style="max-width:260px;">Excluir todos os clientes</button>
+      </div>
     </div>
 
     <h3 style="color:var(--azul);margin:1.5rem 0 0.75rem;">Histórico de eventos</h3>
@@ -53,21 +115,66 @@
   </main>
 
   <script type="module">
-    import { montarNav, fmtBRL } from "./_nav.js";
+    import { montarNav } from "./_nav.js";
+    import { fmtBRL, esc } from "../js/helpers.js";
     import {
       db, collection, doc, setDoc, getDoc, updateDoc, getDocs, deleteDoc,
-      addDoc, onSnapshot, query, orderBy, where, serverTimestamp
+      addDoc, onSnapshot, query, orderBy, where, serverTimestamp, writeBatch
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
-    import { confirmarAsync } from "../js/ui.js";
+    import { confirmarAsync, toast } from "../js/ui.js";
 
     montarNav('eventos.html');
     renderIcons();
     const $ = id => document.getElementById(id);
+
+    function pedirTextoAsync(mensagem, valorInicial = '') {
+      return new Promise(resolve => {
+        const backdrop = document.createElement('div');
+        backdrop.className = 'confirm-backdrop';
+        backdrop.innerHTML = `
+          <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="pedirtexto-msg">
+            <p id="pedirtexto-msg" class="confirm-msg"></p>
+            <div class="form-group" style="margin-bottom:0.75rem;">
+              <input type="text" id="pedirtexto-input" style="width:100%;padding:0.6rem;border:1px solid var(--cinza-claro);border-radius:8px;font-size:0.95rem;">
+            </div>
+            <div class="confirm-acoes">
+              <button type="button" class="btn btn-secondary" data-acao="cancelar">Cancelar</button>
+              <button type="button" class="btn btn-primary" data-acao="ok">Salvar</button>
+            </div>
+          </div>
+        `;
+        backdrop.querySelector('#pedirtexto-msg').textContent = mensagem;
+        const input = backdrop.querySelector('#pedirtexto-input');
+        input.value = valorInicial;
+        document.body.appendChild(backdrop);
+        input.focus();
+        input.select();
+        const fechar = (valor) => {
+          document.removeEventListener('keydown', onKey);
+          backdrop.remove();
+          resolve(valor);
+        };
+        const onKey = (e) => {
+          if (e.key === 'Escape') fechar(null);
+          if (e.key === 'Enter') { e.preventDefault(); fechar(input.value); }
+        };
+        document.addEventListener('keydown', onKey);
+        backdrop.addEventListener('click', (e) => {
+          if (e.target === backdrop) fechar(null);
+          const acao = e.target.closest('[data-acao]')?.dataset.acao;
+          if (acao === 'ok') fechar(input.value);
+          if (acao === 'cancelar') fechar(null);
+        });
+      });
+    }
+
     const alerta = $('alerta');
 
     // Data padrão = hoje
     $('ev-data').value = new Date().toISOString().slice(0, 10);
+
+    let eventoAtivoId = null;
 
     async function carregarAtivo() {
       const snap = await getDoc(doc(db, 'config', 'eventoAtivo'));
@@ -75,12 +182,121 @@
         const ev = await getDoc(doc(db, 'eventos', snap.data().id));
         if (ev.exists()) {
           const d = ev.data();
+          eventoAtivoId = ev.id;
           $('nome-ativo').textContent = d.nome;
           $('data-ativo').textContent = d.data ? new Date(d.data + 'T12:00').toLocaleDateString('pt-BR') : '—';
           $('evento-ativo-box').classList.remove('hidden');
+          $('categorias-box').classList.remove('hidden');
+          renderCategorias(d.categoriasIngresso || []);
+          return;
         }
       }
+      eventoAtivoId = null;
+      $('categorias-box').classList.add('hidden');
     }
+
+    // ----- Categorias de ingresso (subcampo do evento ativo) -----
+    function novaIdCategoria() {
+      return 'c_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    }
+
+    function renderCategorias(lista) {
+      const tbody = $('tbl-categorias');
+      if (!lista || lista.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Nenhuma categoria cadastrada.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = lista.map(c => `
+        <tr>
+          <td><strong>${c.nome}</strong></td>
+          <td>${c.precoAntecipado != null ? fmtBRL(c.precoAntecipado) : '—'}</td>
+          <td>${c.precoPorta != null ? fmtBRL(c.precoPorta) : '—'}</td>
+          <td>${c.qtdPorta != null ? c.qtdPorta : '—'}</td>
+          <td>
+            <div style="display:flex;gap:0.35rem;justify-content:flex-end;flex-wrap:wrap;">
+              <button class="btn btn-secondary" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" data-edit-cat="${c.id}">Editar</button>
+              <button class="btn btn-danger" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" data-del-cat="${c.id}">Excluir</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+      tbody.querySelectorAll('[data-edit-cat]').forEach(b => b.onclick = () => editarCategoria(b.dataset.editCat));
+      tbody.querySelectorAll('[data-del-cat]').forEach(b => b.onclick = () => excluirCategoria(b.dataset.delCat));
+    }
+
+    async function carregarCategoriasAtivo() {
+      if (!eventoAtivoId) return [];
+      const ev = await getDoc(doc(db, 'eventos', eventoAtivoId));
+      return ev.exists() ? (ev.data().categoriasIngresso || []) : [];
+    }
+
+    function resetCategoriaForm() {
+      $('cat-id').value = '';
+      $('cat-nome').value = '';
+      $('cat-preco-ant').value = '';
+      $('cat-preco-porta').value = '';
+      $('cat-qtd-porta').value = '';
+      $('cat-form-titulo').textContent = 'Adicionar categoria';
+      $('btn-cancelar-cat').classList.add('hidden');
+      $('alerta-cat').classList.add('hidden');
+    }
+    $('btn-cancelar-cat').onclick = resetCategoriaForm;
+
+    async function editarCategoria(id) {
+      const lista = await carregarCategoriasAtivo();
+      const c = lista.find(x => x.id === id);
+      if (!c) return;
+      $('cat-id').value = c.id;
+      $('cat-nome').value = c.nome || '';
+      $('cat-preco-ant').value = c.precoAntecipado != null ? c.precoAntecipado : '';
+      $('cat-preco-porta').value = c.precoPorta != null ? c.precoPorta : '';
+      $('cat-qtd-porta').value = c.qtdPorta != null ? c.qtdPorta : '';
+      $('cat-form-titulo').textContent = `Editando "${c.nome}"`;
+      $('btn-cancelar-cat').classList.remove('hidden');
+      $('cat-nome').focus();
+    }
+
+    async function excluirCategoria(id) {
+      const lista = await carregarCategoriasAtivo();
+      const c = lista.find(x => x.id === id);
+      if (!c) return;
+      if (!(await confirmarAsync(`Excluir categoria "${c.nome}"?`, { destrutivo: true, textoOk: 'Excluir' }))) return;
+      const nova = lista.filter(x => x.id !== id);
+      await updateDoc(doc(db, 'eventos', eventoAtivoId), { categoriasIngresso: nova });
+      renderCategorias(nova);
+    }
+
+    $('btn-salvar-cat').onclick = async () => {
+      if (!eventoAtivoId) return;
+      const alertaCat = $('alerta-cat');
+      const nome = $('cat-nome').value.trim();
+      const precoAnt = parseFloat($('cat-preco-ant').value);
+      const precoPorta = parseFloat($('cat-preco-porta').value);
+      const qtdPorta = parseInt($('cat-qtd-porta').value);
+      if (!nome) {
+        alertaCat.textContent = 'Digite o nome da categoria.';
+        alertaCat.className = 'alert alert-warning';
+        return;
+      }
+      const dados = {
+        id: $('cat-id').value || novaIdCategoria(),
+        nome,
+        precoAntecipado: !isNaN(precoAnt) && precoAnt >= 0 ? precoAnt : null,
+        precoPorta: !isNaN(precoPorta) && precoPorta >= 0 ? precoPorta : null,
+        qtdPorta: !isNaN(qtdPorta) && qtdPorta >= 0 ? qtdPorta : null,
+      };
+      const lista = await carregarCategoriasAtivo();
+      const idx = lista.findIndex(x => x.id === dados.id);
+      let nova;
+      if (idx >= 0) nova = lista.map((x, i) => i === idx ? dados : x);
+      else nova = [...lista, dados];
+      await updateDoc(doc(db, 'eventos', eventoAtivoId), { categoriasIngresso: nova });
+      renderCategorias(nova);
+      resetCategoriaForm();
+      alertaCat.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} Categoria salva.</span>`;
+      alertaCat.className = 'alert alert-success';
+      setTimeout(() => alertaCat.classList.add('hidden'), 2500);
+    };
 
     $('btn-criar').onclick = async () => {
       const nome = $('ev-nome').value.trim();
@@ -100,9 +316,10 @@
         });
         await setDoc(doc(db, 'config', 'eventoAtivo'), { id: ref.id, nome, data });
         $('ev-nome').value = '';
-        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} Evento "${nome}" criado e ativado!</span>`;
+        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} Evento "${esc(nome)}" criado e ativado!</span>`;
         alerta.className = 'alert alert-success';
         $('evento-ativo-box').classList.add('hidden');
+      $('categorias-box').classList.add('hidden');
         carregarAtivo();
       } catch (err) {
         alerta.textContent = `Erro: ${err.message}`;
@@ -118,7 +335,7 @@
       const evSnap = await getDoc(doc(db, 'eventos', id));
       if (!evSnap.exists()) return;
       const atual = evSnap.data();
-      const novoNome = prompt('Novo nome do evento:', atual.nome);
+      const novoNome = await pedirTextoAsync('Novo nome do evento:', atual.nome);
       if (novoNome === null) return;
       const nome = novoNome.trim();
       if (!nome) return;
@@ -135,11 +352,12 @@
       }
       await setDoc(doc(db, 'config', 'eventoAtivo'), { id: null, nome: null });
       $('evento-ativo-box').classList.add('hidden');
+      $('categorias-box').classList.add('hidden');
     };
 
     // Editar nome de evento do histórico
     async function editarEvento(id, nomeAtual) {
-      const novo = prompt('Novo nome do evento:', nomeAtual);
+      const novo = await pedirTextoAsync('Novo nome do evento:', nomeAtual);
       if (novo === null) return;
       const nome = novo.trim();
       if (!nome || nome === nomeAtual) return;
@@ -155,7 +373,7 @@
     // Excluir evento
     async function excluirEvento(id, nome, totalVendas) {
       if (totalVendas > 0) {
-        alert(`Não é possível excluir "${nome}": existem ${totalVendas} venda(s) vinculadas. Apague as vendas primeiro ou mantenha o evento como histórico.`);
+        toast(`Não é possível excluir "${nome}": existem ${totalVendas} venda(s) vinculadas. Mantenha como histórico.`, { tipo: 'erro', duracao: 5000 });
         return;
       }
       if (!(await confirmarAsync(`Excluir definitivamente "${nome}"? Esta ação não pode ser desfeita.`, { destrutivo: true, textoOk: 'Excluir' }))) return;
@@ -164,6 +382,7 @@
       if (cfgSnap.exists() && cfgSnap.data().id === id) {
         await setDoc(doc(db, 'config', 'eventoAtivo'), { id: null, nome: null });
         $('evento-ativo-box').classList.add('hidden');
+      $('categorias-box').classList.add('hidden');
       }
     }
 
@@ -198,7 +417,7 @@
     limparOrfaos();
 
     let renderGen = 0;
-    onSnapshot(query(collection(db, 'eventos'), orderBy('criadoEm', 'desc')), async (snap) => {
+    const unsub = onSnapshot(query(collection(db, 'eventos'), orderBy('criadoEm', 'desc')), async (snap) => {
       const myGen = ++renderGen;
       const tbody = $('tbl');
       if (snap.empty) {
@@ -216,29 +435,110 @@
         const badge = ev.status === 'ativo'
           ? `<span style="background:var(--verde);color:white;padding:2px 8px;border-radius:999px;font-size:0.8rem;">Ativo</span>`
           : `<span style="background:var(--cinza);color:white;padding:2px 8px;border-radius:999px;font-size:0.8rem;">Encerrado</span>`;
-        const nomeEsc = ev.nome.replace(/'/g, "\\'");
         linhas.push(`
           <tr>
-            <td><strong>${ev.nome}</strong></td>
+            <td><strong>${esc(ev.nome)}</strong></td>
             <td>${dataFmt}</td>
             <td>${badge}</td>
             <td>${vendasSnap.size}</td>
             <td>${fmtBRL(receita)}</td>
             <td>
               <div style="display:flex;gap:0.35rem;justify-content:flex-end;flex-wrap:wrap;">
-                ${ev.status !== 'ativo' ? `<button class="btn btn-secondary" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" onclick="window._ativar('${ev.id}','${nomeEsc}','${ev.data||''}')">Reativar</button>` : ''}
-                <button class="btn btn-secondary" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" onclick="window._editar('${ev.id}','${nomeEsc}')">Editar</button>
-                <button class="btn btn-danger" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" onclick="window._excluir('${ev.id}','${nomeEsc}',${vendasSnap.size})">Excluir</button>
+                ${ev.status !== 'ativo' ? `<button class="btn btn-secondary" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" data-acao="ativar" data-id="${esc(ev.id)}" data-nome="${esc(ev.nome)}" data-data="${ev.data||''}">Reativar</button>` : ''}
+                <button class="btn btn-secondary" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" data-acao="editar" data-id="${esc(ev.id)}" data-nome="${esc(ev.nome)}">Editar</button>
+                <button class="btn btn-danger" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" data-acao="excluir" data-id="${esc(ev.id)}" data-nome="${esc(ev.nome)}" data-vendas="${vendasSnap.size}">Excluir</button>
               </div>
             </td>
           </tr>`);
       }
       if (myGen !== renderGen) return;
       tbody.innerHTML = linhas.join('');
-      window._ativar = ativarEvento;
-      window._editar = editarEvento;
-      window._excluir = excluirEvento;
     });
+
+    $('tbl').addEventListener('click', async (e) => {
+      const btn = e.target.closest('button[data-acao]');
+      if (!btn) return;
+      const { acao, id, nome, data: evData, vendas } = btn.dataset;
+      if (acao === 'ativar') await ativarEvento(id, nome, evData);
+      if (acao === 'editar') await editarEvento(id, nome);
+      if (acao === 'excluir') await excluirEvento(id, nome, parseInt(vendas, 10));
+    });
+
+    $('btn-preparar').onclick = async () => {
+      const ok = await confirmarAsync(
+        'Isso vai zerar os saldos de todos os clientes, apagar todos os produtos, limpar o historico de entradas de estoque, convites antecipados e vendas na porta. O historico de vendas fica preservado. Confirmar?',
+        { destrutivo: true, textoOk: 'Zerar dados' }
+      );
+      if (!ok) return;
+
+      const btn = $('btn-preparar');
+      const alerta = $('alerta-preparar');
+      btn.disabled = true;
+      alerta.textContent = 'Preparando...';
+      alerta.className = 'alert alert-warning';
+
+      try {
+        async function deletarColecao(nome) {
+          const snap = await getDocs(collection(db, nome));
+          for (let i = 0; i < snap.docs.length; i += 499) {
+            const batch = writeBatch(db);
+            snap.docs.slice(i, i + 499).forEach(d => batch.delete(d.ref));
+            await batch.commit();
+          }
+          return snap.docs.length;
+        }
+
+        const clientesSnap = await getDocs(collection(db, 'clientes'));
+        for (let i = 0; i < clientesSnap.docs.length; i += 499) {
+          const batch = writeBatch(db);
+          clientesSnap.docs.slice(i, i + 499).forEach(d => batch.update(d.ref, { saldo: 0 }));
+          await batch.commit();
+        }
+
+        const qtdProdutos  = await deletarColecao('produtos');
+        const qtdCompras   = await deletarColecao('compras');
+        const qtdConvites  = await deletarColecao('convites_antecipados');
+        const qtdPorta     = await deletarColecao('vendas_porta');
+
+        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} Pronto! ${clientesSnap.docs.length} saldo(s) zerado(s), ${qtdProdutos} produto(s) removido(s), ${qtdCompras} entrada(s) de estoque removida(s), ${qtdConvites} convite(s) removido(s), ${qtdPorta} venda(s) na porta removida(s).</span>`;
+        alerta.className = 'alert alert-success';
+      } catch (err) {
+        alerta.textContent = `Erro: ${err.message}`;
+        alerta.className = 'alert alert-danger';
+      }
+      btn.disabled = false;
+    };
+
+    $('btn-excluir-clientes').onclick = async () => {
+      const ok = await confirmarAsync(
+        'Isso vai EXCLUIR permanentemente todos os cadastros de clientes. Essa ação não pode ser desfeita. Confirmar?',
+        { destrutivo: true, textoOk: 'Excluir tudo' }
+      );
+      if (!ok) return;
+
+      const btn = $('btn-excluir-clientes');
+      const alerta = $('alerta-excluir-clientes');
+      btn.disabled = true;
+      alerta.textContent = 'Excluindo...';
+      alerta.className = 'alert alert-warning';
+
+      try {
+        const snap = await getDocs(collection(db, 'clientes'));
+        for (let i = 0; i < snap.docs.length; i += 499) {
+          const batch = writeBatch(db);
+          snap.docs.slice(i, i + 499).forEach(d => batch.delete(d.ref));
+          await batch.commit();
+        }
+        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} Pronto! ${snap.docs.length} cliente(s) excluído(s).</span>`;
+        alerta.className = 'alert alert-success';
+      } catch (err) {
+        alerta.textContent = `Erro: ${esc(err.message)}`;
+        alerta.className = 'alert alert-danger';
+      }
+      btn.disabled = false;
+    };
+
+    window.addEventListener('pagehide', () => unsub());
 
     carregarAtivo();
   </script>

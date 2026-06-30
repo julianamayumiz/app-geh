@@ -1,7 +1,11 @@
 {
   "projects": {
     "default": "app-geh-cc577",
+<<<<<<< HEAD
     "prod": "app-geh-cc577",
     "dev": "app-geh-dev"
+=======
+    "prod": "app-geh-cc577"
+>>>>>>> 9bf69ef8c85ddfdc4a7d07f92bae193ae334a660
   }
 }

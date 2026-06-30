@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fechamento de caixa — Admin GEH</title>
+  <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    /* Cabeçalho impresso (escondido na tela) */
+    #print-header { display: none; }
+
+    .fc-secao { margin-top: 1.25rem; }
+    .fc-secao h3 {
+      color: var(--azul);
+      font-size: 1rem;
+      margin: 0 0 0.5rem;
+      padding-bottom: 0.25rem;
+      border-bottom: 1px solid var(--cinza-claro);
+    }
+    .fc-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.75rem; }
+    .fc-kpi { padding: 0.75rem 1rem; border: 1px solid var(--cinza-claro); border-radius: 8px; background: var(--fundo-card, #fff); }
+    .fc-kpi .lbl { font-size: 0.75rem; color: var(--cinza); text-transform: uppercase; letter-spacing: 0.03em; }
+    .fc-kpi .val { font-size: 1.4rem; font-weight: 700; margin-top: 0.15rem; }
+
+    .fc-destaque {
+      background: linear-gradient(135deg, rgba(30,58,138,0.08), rgba(34,197,94,0.05));
+      border-left: 4px solid var(--verde);
+      padding: 0.85rem 1rem;
+      border-radius: 6px;
+      margin: 0.5rem 0 0.25rem;
+    }
+    .fc-destaque .lbl { font-size: 0.78rem; color: var(--cinza); text-transform: uppercase; }
+    .fc-destaque .val { font-size: 1.6rem; font-weight: 700; color: var(--verde); }
+    .fc-destaque .obs { font-size: 0.78rem; color: var(--cinza); margin-top: 0.25rem; }
+
+    .fc-assinaturas {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      margin-top: 2.5rem;
+      page-break-inside: avoid;
+    }
+    .fc-assinaturas .linha {
+      border-top: 1px solid #333;
+      padding-top: 0.4rem;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--cinza);
+    }
+
+    @media print {
+      @page { margin: 1.2cm; }
+      nav, .header, .sidebar, .sidebar-backdrop, .btn,
+      select, label, #fc-controles, #btn-print, #btn-csv { display: none !important; }
+      body { background: white; }
+      body.has-sidebar main.admin { margin-left: 0 !important; padding: 0 !important; max-width: 100% !important; }
+      .card { box-shadow: none; border: 1px solid #ddd; }
+      .table-wrapper { box-shadow: none; }
+      table { font-size: 0.82rem; }
+      #print-header { display: block !important; }
+      .fc-secao { page-break-inside: avoid; }
+      .fc-kpi { border: 1px solid #999; }
+      .fc-destaque { border-left-color: #1E3A8A; background: #f5f7fb; }
+      .fc-destaque .val { color: #1E3A8A; }
+    }
+
+    #print-header {
+      text-align: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 2px solid #1E3A8A;
+    }
+    #print-header img { width: 70px; margin-bottom: 0.4rem; }
+    #print-header h1 { color: #1E3A8A; font-size: 1.4rem; margin: 0; }
+    #print-header .sub { color: #444; font-size: 1rem; margin-top: 0.25rem; font-weight: 600; }
+    #print-header .meta { color: #666; font-size: 0.8rem; margin-top: 0.25rem; }
+  </style>
+  <link rel="manifest" href="../manifest.json">
+  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+</head>
+<body>
+  <main class="admin">
+    <div id="print-header">
+      <img src="../assets/logo.png" alt="GEH" onerror="this.style.display='none'">
+      <h1>Grupo Escoteiro Hokkaido</h1>
+      <div class="sub">Relatório de Fechamento de Caixa</div>
+      <div class="sub" id="ph-evento">—</div>
+      <div class="meta" id="ph-meta">—</div>
+    </div>
+
+    <h2 style="color:var(--azul);margin-bottom:1rem;display:inline-flex;align-items:center;gap:0.5rem;">
+      <span data-icon="file-text" data-size="24"></span> Fechamento de caixa
+    </h2>
+    <p style="color:var(--cinza);margin-top:-0.5rem;margin-bottom:1rem;font-size:0.9rem;">
+      Resumo do evento pronto para imprimir ou salvar em PDF — use ao final do evento para conferir o caixa.
+    </p>
+
+    <div class="card" id="fc-controles" style="margin-bottom:1rem;">
+      <div style="display:grid;grid-template-columns:1fr auto auto;gap:0.75rem;align-items:end;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label for="sel-evento">Evento</label>
+          <select id="sel-evento"></select>
+        </div>
+        <button class="btn btn-secondary" id="btn-csv" style="width:auto;padding:0.6rem 1rem;">
+          <span data-icon="download" data-size="16"></span> CSV
+        </button>
+        <button class="btn btn-primary" id="btn-print" style="width:auto;padding:0.6rem 1rem;">
+          <span data-icon="printer" data-size="16"></span> Imprimir / PDF
+        </button>
+      </div>
+    </div>
+
+    <div id="fc-conteudo">
+      <!-- 1) DINHEIRO RECEBIDO POR FORMA DE PAGAMENTO (núcleo do fechamento) -->
+      <div class="fc-secao">
+        <h3>1. Dinheiro recebido por forma de pagamento</h3>
+        <p style="font-size:0.82rem;color:var(--cinza);margin:0 0 0.5rem;">
+          Estes são os valores que devem ter sido recebidos no caixa em cada modalidade — confira contra o dinheiro físico, comprovantes PIX e relatório da maquininha.
+        </p>
+        <div class="table-wrapper" data-no-enhance>
+          <table>
+            <thead><tr><th>Forma</th><th style="text-align:right;">Qtd. recargas</th><th style="text-align:right;">Total</th></tr></thead>
+            <tbody id="tbl-pagto"><tr><td colspan="3" class="text-center text-muted">Carregando…</td></tr></tbody>
+            <tfoot><tr style="font-weight:700;background:var(--cinza-claro);">
+              <td>TOTAL</td><td style="text-align:right;" id="tot-recargas-qtd">0</td><td style="text-align:right;" id="tot-recargas">R$ 0,00</td>
+            </tr></tfoot>
+          </table>
+        </div>
+        <div class="fc-destaque">
+          <div class="lbl">Total a conferir no caixa</div>
+          <div class="val" id="conferir-caixa">R$ 0,00</div>
+          <div class="obs">Soma de todas as recargas registradas durante o evento.</div>
+        </div>
+      </div>
+
+      <!-- 2) RESUMO FINANCEIRO -->
+      <div class="fc-secao">
+        <h3>2. Resumo financeiro do evento</h3>
+        <div class="fc-kpis">
+          <div class="fc-kpi">
+            <div class="lbl">Receita (consumo)</div>
+            <div class="val" style="color:var(--verde);" id="receita">R$ 0,00</div>
+          </div>
+          <div class="fc-kpi">
+            <div class="lbl">Ticket médio</div>
+            <div class="val" style="color:var(--azul);" id="ticket-medio">R$ 0,00</div>
+          </div>
+          <div class="fc-kpi">
+            <div class="lbl">Clientes compraram</div>
+            <div class="val" style="color:var(--azul);" id="clientes-compraram">0</div>
+          </div>
+          <div class="fc-kpi">
+            <div class="lbl">Saldo em circulação</div>
+            <div class="val" style="color:var(--amarelo);" id="saldo-circ">R$ 0,00</div>
+          </div>
+        </div>
+        <p style="font-size:0.78rem;color:var(--cinza);margin-top:0.5rem;">
+          <strong>Receita</strong>: total consumido pelos clientes nas barracas durante o evento.
+          <strong>Ticket médio</strong>: receita dividida pelo número de vendas.
+          <strong>Clientes compraram</strong>: quantidade de clientes distintos com pelo menos uma venda.
+          <strong>Saldo em circulação</strong>: soma do saldo atual de todos os clientes (passivo — pode ser solicitado em devolução).
+        </p>
+      </div>
+
+      <!-- 3) PRODUTOS VENDIDOS -->
+      <div class="fc-secao">
+        <h3>3. Produtos vendidos</h3>
+        <div class="table-wrapper" data-no-enhance>
+          <table>
+            <thead><tr><th>Produto</th><th style="text-align:right;">Qtd</th><th style="text-align:right;">Receita</th></tr></thead>
+            <tbody id="tbl-mais"><tr><td colspan="3" class="text-center text-muted">Carregando…</td></tr></tbody>
+            <tfoot><tr style="font-weight:700;background:var(--cinza-claro);">
+              <td>TOTAL</td><td style="text-align:right;" id="tot-vendas-qtd">0</td><td style="text-align:right;" id="tot-vendas">R$ 0,00</td>
+            </tr></tfoot>
+          </table>
+        </div>
+      </div>
+
+      <!-- 4) TRANSFERENCIAS DE SALDO -->
+      <div class="fc-secao">
+        <h3>4. Transferências de saldo</h3>
+        <div class="fc-kpis">
+          <div class="fc-kpi"><div class="lbl">Qtd. transferências</div><div class="val" style="color:var(--azul);font-size:1.1rem;" id="transf-qtd">0</div></div>
+          <div class="fc-kpi"><div class="lbl">Volume transferido</div><div class="val" style="color:var(--azul);font-size:1.1rem;" id="transf-vol">R$ 0,00</div></div>
+        </div>
+        <p style="font-size:0.78rem;color:var(--cinza);margin-top:0.5rem;">
+          Transferências entre clientes registradas durante o evento — apenas para referência de auditoria.
+        </p>
+      </div>
+
+      <!-- 5) AJUSTES MANUAIS -->
+      <div class="fc-secao">
+        <h3>5. Ajustes manuais (Diretoria)</h3>
+        <div class="fc-kpis">
+          <div class="fc-kpi"><div class="lbl">Adicionado</div><div class="val" style="color:var(--verde);font-size:1.1rem;" id="aj-pos">R$ 0,00</div></div>
+          <div class="fc-kpi"><div class="lbl">Retirado</div><div class="val" style="color:var(--vermelho);font-size:1.1rem;" id="aj-neg">R$ 0,00</div></div>
+          <div class="fc-kpi"><div class="lbl">Líquido</div><div class="val" style="font-size:1.1rem;" id="aj-net">R$ 0,00</div></div>
+          <div class="fc-kpi"><div class="lbl">Qtd. ajustes</div><div class="val" style="font-size:1.1rem;" id="aj-qtd">0</div></div>
+        </div>
+        <div class="table-wrapper" data-no-enhance style="margin-top:0.5rem;">
+          <table>
+            <thead><tr><th>Data</th><th>Cliente</th><th style="text-align:right;">Valor</th><th>Motivo</th><th>Responsável</th></tr></thead>
+            <tbody id="tbl-ajustes"><tr><td colspan="5" class="text-center text-muted">—</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 5) ASSINATURAS -->
+      <div class="fc-assinaturas">
+        <div class="linha">Caixa / Operador responsável</div>
+        <div class="linha">Diretoria / Tesouraria</div>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { montarNav } from "./_nav.js";
+    import { fmtBRL, esc } from "../js/helpers.js";
+    import { db, collection, getDocs, getDoc, doc, query, where, orderBy } from "../js/firebase-config.js";
+    import { renderIcons } from "../js/icons.js";
+
+    montarNav('fechamento.html');
+    renderIcons();
+
+    const $ = (id) => document.getElementById(id);
+
+    let eventosCache = [];
+    let dadosUltimo = null;
+
+    async function carregarEventos() {
+      const [snap, ativoSnap] = await Promise.all([
+        getDocs(collection(db, 'eventos')),
+        getDoc(doc(db, 'config', 'eventoAtivo'))
+      ]);
+      eventosCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      eventosCache.sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+
+      const sel = $('sel-evento');
+      sel.innerHTML = '';
+      eventosCache.forEach(ev => {
+        const opt = document.createElement('option');
+        opt.value = ev.id;
+        const status = ev.status === 'ativo' ? ' (ativo)' : '';
+        opt.textContent = `${ev.nome}${ev.data ? ' — ' + ev.data : ''}${status}`;
+        sel.appendChild(opt);
+      });
+
+      const ativoId = ativoSnap.exists() ? ativoSnap.data().id : null;
+      if (ativoId && eventosCache.some(e => e.id === ativoId)) sel.value = ativoId;
+      else if (eventosCache.length) sel.value = eventosCache[0].id;
+
+      sel.onchange = carregar;
+      carregar();
+    }
+
+    async function carregar() {
+      const eventoId = $('sel-evento').value;
+      if (!eventoId) return;
+      const evento = eventosCache.find(e => e.id === eventoId);
+
+      const vendasQ   = query(collection(db, 'vendas'), where('eventoId', '==', eventoId));
+      const movQ      = query(collection(db, 'movimentacoes_saldo'), where('eventoId', '==', eventoId));
+      const ajustesQ  = query(collection(db, 'ajustes_saldo'), where('eventoId', '==', eventoId));
+      const transfQ   = query(collection(db, 'transferencias_saldo'), where('eventoId', '==', eventoId));
+
+      const [vendasSnap, clientesSnap, movSnap, ajustesSnap, transfSnap] = await Promise.all([
+        getDocs(vendasQ),
+        getDocs(collection(db, 'clientes')),
+        getDocs(movQ),
+        getDocs(ajustesQ),
+        getDocs(transfQ)
+      ]);
+
+      // Vendas → receita + por produto + clientes unicos
+      let receita = 0;
+      let qtdVendas = 0;
+      const clientesCompraram = new Set();
+      const porProduto = new Map();
+      let totalVendasQtd = 0;
+      vendasSnap.forEach(d => {
+        const v = d.data();
+        receita += v.total || 0;
+        qtdVendas += 1;
+        if (v.clienteId) clientesCompraram.add(v.clienteId);
+        (v.itens || []).forEach(i => {
+          const a = porProduto.get(i.nome) || { qtd: 0, total: 0 };
+          a.qtd += i.qtd || 0;
+          a.total += i.subtotal || 0;
+          totalVendasQtd += i.qtd || 0;
+          porProduto.set(i.nome, a);
+        });
+      });
+
+      // Saldo em circulação (passivo) — global
+      let saldoCirc = 0;
+      clientesSnap.forEach(d => saldoCirc += d.data().saldo || 0);
+
+      // Recargas por forma
+      const porForma = new Map();
+      let totalRecargas = 0, totalRecargasQtd = 0;
+      movSnap.forEach(d => {
+        const m = d.data();
+        if (m.tipo !== 'recarga') return;
+        const forma = m.forma || '—';
+        const a = porForma.get(forma) || { qtd: 0, total: 0 };
+        a.qtd += 1;
+        a.total += m.valor || 0;
+        totalRecargas += m.valor || 0;
+        totalRecargasQtd += 1;
+        porForma.set(forma, a);
+      });
+
+      // Transferencias
+      let transfQtd = 0, transfVol = 0;
+      transfSnap.forEach(d => {
+        const t = d.data();
+        transfQtd += 1;
+        transfVol += t.valor || 0;
+      });
+
+      // Ajustes
+      let ajPos = 0, ajNeg = 0;
+      const ajustesArr = [];
+      ajustesSnap.forEach(d => {
+        const a = d.data();
+        ajustesArr.push(a);
+        const v = a.valor || 0;
+        if (v >= 0) ajPos += v; else ajNeg += Math.abs(v);
+      });
+      ajustesArr.sort((x, y) => {
+        const tx = x.criadoEm?.toMillis?.() || 0;
+        const ty = y.criadoEm?.toMillis?.() || 0;
+        return ty - tx;
+      });
+
+      // Render — KPIs
+      $('receita').textContent          = fmtBRL(receita);
+      $('ticket-medio').textContent     = qtdVendas > 0 ? fmtBRL(receita / qtdVendas) : 'R$ 0,00';
+      $('clientes-compraram').textContent = clientesCompraram.size;
+      $('saldo-circ').textContent       = fmtBRL(saldoCirc);
+
+      // Render — Transferencias
+      $('transf-qtd').textContent = transfQtd;
+      $('transf-vol').textContent = fmtBRL(transfVol);
+
+      // Render — Recargas
+      const tblPagto = $('tbl-pagto');
+      tblPagto.innerHTML = '';
+      if (porForma.size === 0) {
+        tblPagto.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Sem recargas registradas.</td></tr>';
+      } else {
+        Array.from(porForma.entries())
+          .sort((a, b) => b[1].total - a[1].total)
+          .forEach(([forma, v]) => {
+            tblPagto.innerHTML += `<tr><td>${forma}</td><td style="text-align:right;">${v.qtd}</td><td style="text-align:right;">${fmtBRL(v.total)}</td></tr>`;
+          });
+      }
+      $('tot-recargas-qtd').textContent = totalRecargasQtd;
+      $('tot-recargas').textContent     = fmtBRL(totalRecargas);
+      $('conferir-caixa').textContent   = fmtBRL(totalRecargas);
+
+      // Render — Produtos
+      const tblMais = $('tbl-mais');
+      tblMais.innerHTML = '';
+      const ordenados = Array.from(porProduto.entries()).sort((a, b) => b[1].qtd - a[1].qtd);
+      if (ordenados.length === 0) {
+        tblMais.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Sem vendas registradas.</td></tr>';
+      } else {
+        ordenados.forEach(([nome, v]) => {
+          tblMais.innerHTML += `<tr><td>${esc(nome)}</td><td style="text-align:right;">${v.qtd}</td><td style="text-align:right;">${fmtBRL(v.total)}</td></tr>`;
+        });
+      }
+      $('tot-vendas-qtd').textContent = totalVendasQtd;
+      $('tot-vendas').textContent     = fmtBRL(receita);
+
+      // Render — Ajustes
+      $('aj-pos').textContent = fmtBRL(ajPos);
+      $('aj-neg').textContent = fmtBRL(ajNeg);
+      $('aj-net').textContent = fmtBRL(ajPos - ajNeg);
+      $('aj-qtd').textContent = ajustesArr.length;
+      const tblAj = $('tbl-ajustes');
+      if (ajustesArr.length === 0) {
+        tblAj.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Nenhum ajuste manual.</td></tr>';
+      } else {
+        tblAj.innerHTML = '';
+        ajustesArr.forEach(a => {
+          const dt = a.criadoEm?.toDate?.()?.toLocaleString('pt-BR') || '—';
+          const v = a.valor || 0;
+          const cor = v >= 0 ? 'var(--verde)' : 'var(--vermelho)';
+          const sinal = v >= 0 ? '+' : '';
+          tblAj.innerHTML += `<tr>
+            <td>${dt}</td>
+            <td>${a.clienteNome || a.clienteId || '—'}</td>
+            <td style="text-align:right;color:${cor};font-weight:600;">${sinal}${fmtBRL(v)}</td>
+            <td>${a.motivo || '—'}</td>
+            <td>${a.adminNome || a.adminEmail || '—'}</td>
+          </tr>`;
+        });
+      }
+
+      // Cabeçalho de impressão
+      $('ph-evento').textContent = evento ? evento.nome : '—';
+      const dataEv = evento?.data ? new Date(evento.data + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
+      $('ph-meta').textContent = `Data do evento: ${dataEv}  •  Gerado em: ${new Date().toLocaleString('pt-BR')}`;
+
+      dadosUltimo = { evento, porForma, porProduto, ajustesArr, receita, qtdVendas, clientesCompraram, saldoCirc, totalRecargas, transfQtd, transfVol };
+    }
+
+    $('btn-print').onclick = () => window.print();
+
+    $('btn-csv').onclick = () => {
+      if (!dadosUltimo) return;
+      const { evento, porForma, porProduto, ajustesArr, receita, qtdVendas, clientesCompraram, saldoCirc, totalRecargas, transfQtd, transfVol } = dadosUltimo;
+      const linhas = [];
+      linhas.push(['Fechamento de caixa']);
+      linhas.push(['Evento', evento?.nome || '']);
+      linhas.push(['Data evento', evento?.data || '']);
+      linhas.push(['Gerado em', new Date().toLocaleString('pt-BR')]);
+      linhas.push([]);
+      linhas.push(['Recargas por forma de pagamento']);
+      linhas.push(['Forma', 'Qtd', 'Total']);
+      porForma.forEach((v, forma) => linhas.push([forma, v.qtd, v.total.toFixed(2)]));
+      linhas.push(['TOTAL A CONFERIR', '', totalRecargas.toFixed(2)]);
+      linhas.push([]);
+      linhas.push(['Resumo financeiro']);
+      linhas.push(['Receita', receita.toFixed(2)]);
+      linhas.push(['Ticket medio', qtdVendas > 0 ? (receita / qtdVendas).toFixed(2) : '0.00']);
+      linhas.push(['Clientes que compraram', clientesCompraram.size]);
+      linhas.push(['Saldo em circulacao', saldoCirc.toFixed(2)]);
+      linhas.push([]);
+      linhas.push(['Transferencias de saldo']);
+      linhas.push(['Qtd. transferencias', transfQtd]);
+      linhas.push(['Volume transferido', transfVol.toFixed(2)]);
+      linhas.push([]);
+      linhas.push(['Produtos vendidos']);
+      linhas.push(['Produto', 'Qtd', 'Receita']);
+      Array.from(porProduto.entries())
+        .sort((a, b) => b[1].qtd - a[1].qtd)
+        .forEach(([nome, v]) => linhas.push([nome, v.qtd, v.total.toFixed(2)]));
+      linhas.push([]);
+      linhas.push(['Ajustes manuais']);
+      linhas.push(['Data', 'Cliente', 'Valor', 'Motivo', 'Responsável']);
+      ajustesArr.forEach(a => {
+        const dt = a.criadoEm?.toDate?.()?.toLocaleString('pt-BR') || '';
+        linhas.push([dt, a.clienteNome || a.clienteId || '', (a.valor || 0).toFixed(2), a.motivo || '', a.adminNome || a.adminEmail || '']);
+      });
+
+      const csv = linhas.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\n');
+      const blob = new Blob(["﻿" + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const slug = (evento?.nome || 'evento').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+      a.href = url;
+      a.download = `fechamento-${slug}-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    carregarEventos();
+  </script>
+</body>
+</html>

@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Predição — Admin GEH</title>
+  <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    dialog {
+      border: none;
+      border-radius: var(--radius);
+      padding: 0;
+      max-width: 700px;
+      width: 95vw;
+      box-shadow: var(--sombra);
+      background: var(--branco);
+    }
+    dialog::backdrop { background: rgba(0,0,0,.45); }
+    .modal-body { padding: 1.5rem; }
+    .modal-body h3 { margin: 0 0 1rem; color: var(--azul); display:flex; align-items:center; gap:.5rem; }
+
+    .tbl-imp { width:100%; border-collapse:collapse; }
+    .tbl-imp th { text-align:left; font-size:.8rem; color:var(--cinza); padding:.25rem .4rem; border-bottom:1px solid var(--cinza-claro); }
+    .tbl-imp td { padding:.25rem .4rem; }
+    .tbl-imp input { width:100%; box-sizing:border-box; }
+
+    .fator-wrap { display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; }
+    .fator-badge {
+      display:inline-flex; align-items:center;
+      background:var(--azul); color:#fff;
+      border-radius:999px; padding:.2rem .85rem;
+      font-size:.85rem; font-weight:700; min-width:52px; justify-content:center;
+    }
+    .fonte-app  { color:var(--verde);          font-size:.78rem; }
+    .fonte-hist { color:var(--amarelo-acento);  font-size:.78rem; }
+    .dev-ok  { color:var(--cinza); }
+    .dev-alto { color:var(--vermelho); }
+    .dev-baixo { color:var(--verde); }
+  </style>
+  <link rel="manifest" href="../manifest.json">
+  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+</head>
+<body>
+  <main class="admin">
+    <h2 style="color:var(--azul);margin-bottom:.35rem;display:inline-flex;align-items:center;gap:.5rem;">
+      <span data-icon="sparkles" data-size="24"></span> Predição de Demanda
+    </h2>
+    <p style="color:var(--cinza);font-size:.9rem;margin-bottom:1.5rem;">
+      Estima a quantidade de cada produto a preparar na próxima edição com base no histórico de vendas.
+    </p>
+
+    <!-- Controles -->
+    <div class="card" style="margin-bottom:1.25rem;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;align-items:end;">
+        <div class="form-group" style="margin:0;">
+          <label for="sel-edicoes">Considerar últimas edições</label>
+          <select id="sel-edicoes">
+            <option value="3">3 edições</option>
+            <option value="5" selected>5 edições</option>
+            <option value="10">10 edições</option>
+            <option value="0">Todas as edições</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label for="inp-fator">Fator de crescimento</label>
+          <div class="fator-wrap">
+            <input type="range" id="inp-fator-range" min="0.5" max="2" step="0.05" value="1" style="flex:1;min-width:80px;">
+            <input type="number" id="inp-fator" min="0.1" max="5" step="0.05" value="1" style="width:80px;">
+            <span class="fator-badge" id="fator-label">1.00×</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:1.5rem;">
+      <div class="card">
+        <div class="text-muted">Edições analisadas</div>
+        <div style="font-size:1.75rem;font-weight:700;color:var(--azul);" id="kpi-edicoes">—</div>
+      </div>
+      <div class="card">
+        <div class="text-muted">Receita média/edição</div>
+        <div style="font-size:1.75rem;font-weight:700;color:var(--verde);" id="kpi-media">—</div>
+      </div>
+      <div class="card">
+        <div class="text-muted">Receita projetada</div>
+        <div style="font-size:1.75rem;font-weight:700;color:var(--amarelo-acento);" id="kpi-proj">—</div>
+      </div>
+    </div>
+
+    <!-- Estimativa -->
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;margin-bottom:.75rem;">
+      <h3 style="color:var(--azul);margin:0;">Estimativa para a próxima edição</h3>
+      <button class="btn btn-secondary" id="btn-export" style="font-size:.85rem;">
+        <span data-icon="download" data-size="16"></span> Exportar CSV
+      </button>
+    </div>
+    <div class="table-wrapper mb-2" data-no-enhance>
+      <table>
+        <thead>
+          <tr>
+            <th>Produto</th>
+            <th title="Media de unidades vendidas por edicao">Média/edição</th>
+            <th>Fator</th>
+            <th title="Qtd sugerida = media x fator, arredondado pra cima">Qtd sugerida</th>
+            <th>Preço atual</th>
+            <th>Receita esperada</th>
+          </tr>
+        </thead>
+        <tbody id="tbl-predicao">
+          <tr><td colspan="6" class="text-center text-muted">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Histórico de edições -->
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;margin-top:2rem;margin-bottom:.75rem;">
+      <h3 style="color:var(--azul);margin:0;">Histórico de edições</h3>
+      <button class="btn btn-primary" id="btn-importar" style="font-size:.85rem;">
+        <span data-icon="upload" data-size="16"></span> Importar fechamento
+      </button>
+    </div>
+    <p style="color:var(--cinza);font-size:.85rem;margin-bottom:.75rem;">
+      Edições encerradas no app aparecem automaticamente. Edições anteriores ao app podem ser importadas para enriquecer o modelo.
+    </p>
+    <div class="table-wrapper mb-2" data-no-enhance>
+      <table>
+        <thead>
+          <tr><th>Edição</th><th>Data</th><th>Fonte</th><th>Qtd produtos</th><th>Receita total</th><th></th></tr>
+        </thead>
+        <tbody id="tbl-historico">
+          <tr><td colspan="6" class="text-center text-muted">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Avaliação retroativa do modelo -->
+    <h3 style="color:var(--azul);margin-top:2rem;margin-bottom:.5rem;">Avaliação do modelo</h3>
+    <p style="color:var(--cinza);font-size:.85rem;margin-bottom:.75rem;">
+      Selecione uma edição encerrada para ver quanto o modelo teria previsto versus o que foi vendido de verdade (retroalimentação).
+    </p>
+    <div class="card" style="margin-bottom:1rem;">
+      <div class="form-group" style="margin:0;">
+        <label for="sel-comparativo">Edição para avaliar</label>
+        <select id="sel-comparativo">
+          <option value="">— Selecione —</option>
+        </select>
+      </div>
+    </div>
+    <div class="table-wrapper mb-2" id="tbl-comp-wrapper" style="display:none;" data-no-enhance>
+      <table>
+        <thead>
+          <tr><th>Produto</th><th title="Com base nas edicoes anteriores a esta">Previsto</th><th>Real</th><th>Desvio</th></tr>
+        </thead>
+        <tbody id="tbl-comparativo"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <!-- Modal de importação -->
+  <dialog id="modal-importar">
+    <div class="modal-body">
+      <h3><span data-icon="upload" data-size="20"></span> Importar fechamento histórico</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+        <div class="form-group" style="margin:0;">
+          <label for="imp-nome">Nome da edição *</label>
+          <input type="text" id="imp-nome" placeholder="Ex: Noite Escoteira Nov/2024" maxlength="80">
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label for="imp-data">Data do evento *</label>
+          <input type="date" id="imp-data">
+        </div>
+      </div>
+      <p style="font-size:.85rem;color:var(--cinza);margin-bottom:.6rem;">Totais de venda por produto nessa edição:</p>
+      <div style="overflow-x:auto;">
+        <table class="tbl-imp">
+          <thead>
+            <tr>
+              <th>Produto</th>
+              <th style="width:110px;">Qtd vendida</th>
+              <th style="width:130px;">Receita total (R$)</th>
+              <th style="width:40px;"></th>
+            </tr>
+          </thead>
+          <tbody id="imp-itens-body"></tbody>
+        </table>
+      </div>
+      <button class="btn btn-secondary" id="btn-add-item" style="margin-top:.5rem;font-size:.85rem;">
+        <span data-icon="plus" data-size="16"></span> Adicionar produto
+      </button>
+      <div style="display:flex;gap:.75rem;margin-top:1.25rem;justify-content:flex-end;">
+        <button class="btn btn-secondary" id="btn-cancelar-imp">Cancelar</button>
+        <button class="btn btn-primary" id="btn-salvar-imp">
+          <span data-icon="check" data-size="16"></span> Salvar
+        </button>
+      </div>
+    </div>
+  </dialog>
+
+  <script type="module">
+    import { montarNav } from "./_nav.js";
+    import { fmtBRL, esc } from "../js/helpers.js";
+    import {
+      db, auth, collection, getDocs, addDoc, deleteDoc, doc,
+      query, orderBy, serverTimestamp
+    } from "../js/firebase-config.js";
+    import { renderIcons } from "../js/icons.js";
+    import { toast, confirmarAsync } from "../js/ui.js";
+
+    montarNav('predicao.html');
+    renderIcons();
+
+    const $ = (id) => document.getElementById(id);
+
+    // Estado
+    let todasEdicoes = []; // [{id, nome, data, fonte:'app'|'historico', itensCache}]
+    let precosProdutos = new Map(); // nome -> preco atual
+    const cacheVendas = new Map(); // edicao.id -> [{nome, qtd, receita}]
+
+    // ── Carregamento inicial ─────────────────────────────────────
+
+    async function carregarTudo() {
+      const [eventosSnap, historicosSnap, produtosSnap] = await Promise.all([
+        getDocs(query(collection(db, 'eventos'), orderBy('data', 'desc'))),
+        getDocs(query(collection(db, 'fechamentos_historicos'), orderBy('data', 'desc'))),
+        getDocs(collection(db, 'produtos'))
+      ]);
+
+      produtosSnap.forEach(d => {
+        const p = d.data();
+        precosProdutos.set(p.nome, p.promocao ? (p.precoPromo ?? p.preco) : p.preco);
+      });
+
+      const edicoesApp = [];
+      eventosSnap.forEach(d => {
+        const ev = d.data();
+        if (ev.status !== 'encerrado') return;
+        edicoesApp.push({
+          id: d.id,
+          nome: ev.nome,
+          data: ev.data?.toDate ? ev.data.toDate() : new Date(ev.data),
+          fonte: 'app'
+        });
+      });
+
+      const edicoesHist = [];
+      historicosSnap.forEach(d => {
+        const h = d.data();
+        edicoesHist.push({
+          id: d.id,
+          nome: h.nome,
+          data: h.data?.toDate ? h.data.toDate() : new Date(h.data),
+          fonte: 'historico',
+          itensCache: h.itens || []
+        });
+      });
+
+      todasEdicoes = [...edicoesApp, ...edicoesHist].sort((a, b) => b.data - a.data);
+
+      todasEdicoes.forEach(e => {
+        const opt = document.createElement('option');
+        opt.value = e.id;
+        opt.textContent = `${e.nome} (${e.data.toLocaleDateString('pt-BR')})`;
+        $('sel-comparativo').appendChild(opt);
+      });
+
+      await calcularPredicao();
+      await renderHistorico();
+    }
+
+    // ── Vendas por edição (com cache) ────────────────────────────
+
+    async function carregarVendas(edicao) {
+      if (cacheVendas.has(edicao.id)) return cacheVendas.get(edicao.id);
+
+      let itens;
+      if (edicao.fonte === 'historico') {
+        itens = (edicao.itensCache || []).map(i => ({
+          nome: i.nome,
+          qtd: i.qtd || 0,
+          receita: i.receitaTotal || 0
+        }));
+      } else {
+        const { where } = await import('../js/firebase-config.js');
+        const snap = await getDocs(query(
+          collection(db, 'vendas'),
+          where('eventoId', '==', edicao.id)
+        ));
+        const por = new Map();
+        snap.forEach(d => {
+          (d.data().itens || []).forEach(i => {
+            const a = por.get(i.nome) || { qtd: 0, receita: 0 };
+            a.qtd += i.qtd;
+            a.receita += i.subtotal || 0;
+            por.set(i.nome, a);
+          });
+        });
+        itens = Array.from(por.entries()).map(([nome, v]) => ({ nome, ...v }));
+      }
+
+      cacheVendas.set(edicao.id, itens);
+      return itens;
+    }
+
+    // ── Cálculo da predição ──────────────────────────────────────
+
+    async function calcularPredicao() {
+      const qtd = parseInt($('sel-edicoes').value) || 0;
+      const fator = parseFloat($('inp-fator').value) || 1;
+      const selecionadas = qtd === 0 ? todasEdicoes : todasEdicoes.slice(0, qtd);
+
+      if (selecionadas.length === 0) {
+        $('tbl-predicao').innerHTML = '<tr><td colspan="6" class="text-center text-muted">Nenhuma edição encerrada encontrada. Importe fechamentos históricos para começar.</td></tr>';
+        $('kpi-edicoes').textContent = '0';
+        $('kpi-media').textContent = '—';
+        $('kpi-proj').textContent = '—';
+        return;
+      }
+
+      const vendasPorEdicao = await Promise.all(selecionadas.map(e => carregarVendas(e)));
+
+      // Agrega por produto: soma qtd/receita e conta em quantas edicoes apareceu
+      const agr = new Map();
+      vendasPorEdicao.forEach(itens => {
+        itens.forEach(({ nome, qtd: q, receita: r }) => {
+          const a = agr.get(nome) || { somaQtd: 0, somaReceita: 0, cont: 0 };
+          a.somaQtd += q;
+          a.somaReceita += r;
+          a.cont += 1;
+          agr.set(nome, a);
+        });
+      });
+
+      const linhas = Array.from(agr.entries())
+        .map(([nome, { somaQtd, somaReceita, cont }]) => {
+          const mediaQtd = somaQtd / cont;
+          const qtdSug = Math.ceil(mediaQtd * fator);
+          // preco: usa catálogo atual; fallback na média histórica
+          const preco = precosProdutos.get(nome) ?? (somaQtd > 0 ? somaReceita / somaQtd : 0);
+          return { nome, mediaQtd, qtdSug, preco, receitaEsp: qtdSug * preco, cont };
+        })
+        .sort((a, b) => b.qtdSug - a.qtdSug);
+
+      const receitasEdicoes = vendasPorEdicao.map(its => its.reduce((s, i) => s + i.receita, 0));
+      const mediaReceita = receitasEdicoes.reduce((s, r) => s + r, 0) / selecionadas.length;
+      const receitaProj = linhas.reduce((s, l) => s + l.receitaEsp, 0);
+
+      $('kpi-edicoes').textContent = selecionadas.length;
+      $('kpi-media').textContent = fmtBRL(mediaReceita);
+      $('kpi-proj').textContent = fmtBRL(receitaProj);
+
+      const tbody = $('tbl-predicao');
+      if (linhas.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Sem dados de vendas nas edições selecionadas.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = linhas.map(l => `
+        <tr>
+          <td>${esc(l.nome)}</td>
+          <td>${l.mediaQtd.toFixed(1)}</td>
+          <td>${fator.toFixed(2)}×</td>
+          <td><strong>${l.qtdSug}</strong></td>
+          <td>${fmtBRL(l.preco)}</td>
+          <td>${fmtBRL(l.receitaEsp)}</td>
+        </tr>
+      `).join('');
+
+      $('btn-export').onclick = () => exportarCSV(linhas, fator);
+    }
+
+    // ── Histórico ────────────────────────────────────────────────
+
+    async function renderHistorico() {
+      const tbody = $('tbl-historico');
+
+      if (todasEdicoes.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Nenhuma edição registrada.</td></tr>';
+        return;
+      }
+
+      const vendasPorEdicao = await Promise.all(todasEdicoes.map(e => carregarVendas(e)));
+
+      tbody.innerHTML = todasEdicoes.map((e, i) => {
+        const itens = vendasPorEdicao[i];
+        const receita = itens.reduce((s, it) => s + it.receita, 0);
+        const fonteBadge = e.fonte === 'app'
+          ? '<span class="fonte-app">app</span>'
+          : '<span class="fonte-hist">importado</span>';
+        const btnDel = e.fonte === 'historico'
+          ? `<button class="btn btn-secondary" style="padding:.2rem .5rem;font-size:.8rem;" data-del="${esc(e.id)}" aria-label="Excluir fechamento">
+               <span data-icon="trash-2" data-size="14"></span>
+             </button>`
+          : '';
+        return `
+          <tr>
+            <td>${esc(e.nome)}</td>
+            <td>${e.data.toLocaleDateString('pt-BR')}</td>
+            <td>${fonteBadge}</td>
+            <td>${itens.length}</td>
+            <td>${fmtBRL(receita)}</td>
+            <td>${btnDel}</td>
+          </tr>
+        `;
+      }).join('');
+
+      renderIcons();
+
+      tbody.querySelectorAll('[data-del]').forEach(btn => {
+        btn.onclick = async () => {
+          const id = btn.dataset.del;
+          const ok = await confirmarAsync('Excluir este fechamento histórico? Os dados serão removidos do modelo.');
+          if (!ok) return;
+          await deleteDoc(doc(db, 'fechamentos_historicos', id));
+          cacheVendas.delete(id);
+          todasEdicoes = todasEdicoes.filter(e => e.id !== id);
+
+          // Remove do select de comparativo
+          const opt = $('sel-comparativo').querySelector(`option[value="${id}"]`);
+          if (opt) opt.remove();
+
+          await calcularPredicao();
+          await renderHistorico();
+          toast('Fechamento removido.', 'success');
+        };
+      });
+    }
+
+    // ── Avaliação retroativa ─────────────────────────────────────
+
+    $('sel-comparativo').onchange = async () => {
+      const idAlvo = $('sel-comparativo').value;
+      const wrap = $('tbl-comp-wrapper');
+      if (!idAlvo) { wrap.style.display = 'none'; return; }
+
+      const idx = todasEdicoes.findIndex(e => e.id === idAlvo);
+      if (idx === -1) return;
+
+      // Edições que existiam ANTES desta — base do modelo naquele momento
+      const anteriores = todasEdicoes.slice(idx + 1);
+      const qtdRef = parseInt($('sel-edicoes').value) || 0;
+      const base = qtdRef === 0 ? anteriores : anteriores.slice(0, qtdRef);
+
+      wrap.style.display = 'block';
+
+      if (base.length === 0) {
+        $('tbl-comparativo').innerHTML = '<tr><td colspan="4" class="text-center text-muted">Sem edições anteriores suficientes para calcular a estimativa.</td></tr>';
+        return;
+      }
+
+      const [vendasAlvo, ...vendasBase] = await Promise.all([
+        carregarVendas(todasEdicoes[idx]),
+        ...base.map(e => carregarVendas(e))
+      ]);
+
+      // Agrega base
+      const agr = new Map();
+      vendasBase.forEach(itens => {
+        itens.forEach(({ nome, qtd }) => {
+          const a = agr.get(nome) || { soma: 0, cont: 0 };
+          a.soma += qtd;
+          a.cont += 1;
+          agr.set(nome, a);
+        });
+      });
+
+      const alvoMap = new Map(vendasAlvo.map(i => [i.nome, i.qtd]));
+      const todosProd = new Set([...agr.keys(), ...alvoMap.keys()]);
+
+      const linhas = Array.from(todosProd)
+        .map(nome => {
+          const ag = agr.get(nome);
+          const previsto = ag ? Math.ceil(ag.soma / ag.cont) : 0;
+          const real = alvoMap.get(nome) ?? 0;
+          const desvio = previsto > 0 ? ((real - previsto) / previsto * 100) : null;
+          return { nome, previsto, real, desvio };
+        })
+        .sort((a, b) => b.real - a.real);
+
+      $('tbl-comparativo').innerHTML = linhas.map(l => {
+        let devHtml;
+        if (l.desvio === null) {
+          devHtml = '<span class="dev-alto">produto novo</span>';
+        } else {
+          const sinal = l.desvio >= 0 ? '+' : '';
+          const cls = Math.abs(l.desvio) <= 15 ? 'dev-ok' : l.desvio > 0 ? 'dev-alto' : 'dev-baixo';
+          devHtml = `<span class="${cls}">${sinal}${l.desvio.toFixed(0)}%</span>`;
+        }
+        return `
+          <tr>
+            <td>${esc(l.nome)}</td>
+            <td>${l.previsto}</td>
+            <td>${l.real}</td>
+            <td>${devHtml}</td>
+          </tr>
+        `;
+      }).join('');
+    };
+
+    // ── Modal de importação ──────────────────────────────────────
+
+    function novaLinha() {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="text" class="imp-nome-prod" placeholder="Nome do produto" maxlength="80"></td>
+        <td><input type="number" class="imp-qtd" min="0" step="1" value="0" style="text-align:right;"></td>
+        <td><input type="number" class="imp-receita" min="0" step="0.01" value="0" style="text-align:right;"></td>
+        <td>
+          <button type="button" class="btn btn-secondary btn-del-linha" style="padding:.2rem .45rem;" aria-label="Remover linha">
+            <span data-icon="x" data-size="14"></span>
+          </button>
+        </td>
+      `;
+      tr.querySelector('.btn-del-linha').onclick = () => tr.remove();
+      $('imp-itens-body').appendChild(tr);
+      renderIcons();
+    }
+
+    $('btn-add-item').onclick = novaLinha;
+
+    $('btn-importar').onclick = () => {
+      $('imp-nome').value = '';
+      $('imp-data').value = new Date().toISOString().slice(0, 10);
+      $('imp-itens-body').innerHTML = '';
+      novaLinha();
+      $('modal-importar').showModal();
+      renderIcons();
+    };
+
+    $('btn-cancelar-imp').onclick = () => $('modal-importar').close();
+
+    $('btn-salvar-imp').onclick = async () => {
+      const nome = $('imp-nome').value.trim();
+      const dataStr = $('imp-data').value;
+      if (!nome) { toast('Informe o nome da edição.', 'error'); return; }
+      if (!dataStr) { toast('Informe a data do evento.', 'error'); return; }
+
+      const itens = [];
+      $('imp-itens-body').querySelectorAll('tr').forEach(tr => {
+        const nomeProd = tr.querySelector('.imp-nome-prod').value.trim();
+        const qtd = parseFloat(tr.querySelector('.imp-qtd').value) || 0;
+        const receitaTotal = parseFloat(tr.querySelector('.imp-receita').value) || 0;
+        if (nomeProd) itens.push({ nome: nomeProd, qtd, receitaTotal });
+      });
+
+      if (itens.length === 0) { toast('Adicione pelo menos um produto.', 'error'); return; }
+
+      const btn = $('btn-salvar-imp');
+      btn.disabled = true;
+      try {
+        const dataEvento = new Date(dataStr + 'T12:00:00');
+        const ref = await addDoc(collection(db, 'fechamentos_historicos'), {
+          nome,
+          data: dataEvento,
+          itens,
+          criadoEm: serverTimestamp(),
+          criadoPor: auth.currentUser?.uid || ''
+        });
+
+        const novaEdicao = { id: ref.id, nome, data: dataEvento, fonte: 'historico', itensCache: itens };
+        todasEdicoes.push(novaEdicao);
+        todasEdicoes.sort((a, b) => b.data - a.data);
+
+        // Adiciona ao select de comparativo na posição correta
+        const idx = todasEdicoes.findIndex(e => e.id === ref.id);
+        const opt = document.createElement('option');
+        opt.value = ref.id;
+        opt.textContent = `${nome} (${dataEvento.toLocaleDateString('pt-BR')})`;
+        const opts = $('sel-comparativo').options;
+        // +1 porque a option[0] é o placeholder "— Selecione —"
+        if (idx + 1 < opts.length) {
+          $('sel-comparativo').insertBefore(opt, opts[idx + 1]);
+        } else {
+          $('sel-comparativo').appendChild(opt);
+        }
+
+        $('modal-importar').close();
+        await calcularPredicao();
+        await renderHistorico();
+        toast(`"${nome}" importado com sucesso.`, 'success');
+      } catch (e) {
+        console.error(e);
+        toast('Erro ao salvar. Tente novamente.', 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    };
+
+    // ── Export CSV ───────────────────────────────────────────────
+
+    function exportarCSV(linhas, fator) {
+      const header = ['Produto', 'Media por edicao', 'Fator', 'Qtd sugerida', 'Preco atual (R$)', 'Receita esperada (R$)'];
+      const rows = linhas.map(l => [
+        l.nome,
+        l.mediaQtd.toFixed(1),
+        fator.toFixed(2),
+        l.qtdSug,
+        l.preco.toFixed(2),
+        l.receitaEsp.toFixed(2)
+      ]);
+      const csv = [header, ...rows]
+        .map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(';'))
+        .join('\n');
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `predicao-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // ── Sincronização slider ↔ input ─────────────────────────────
+
+    $('inp-fator-range').oninput = () => {
+      const v = $('inp-fator-range').value;
+      $('inp-fator').value = v;
+      $('fator-label').textContent = parseFloat(v).toFixed(2) + '×';
+    };
+    $('inp-fator').oninput = () => {
+      const v = $('inp-fator').value;
+      $('inp-fator-range').value = v;
+      $('fator-label').textContent = (parseFloat(v) || 1).toFixed(2) + '×';
+    };
+
+    // Recalcula ao mudar filtros — sem novo fetch (usa cache)
+    $('sel-edicoes').onchange = calcularPredicao;
+    $('inp-fator').onchange = calcularPredicao;
+    $('inp-fator-range').onchange = calcularPredicao;
+
+    carregarTudo();
+  </script>
+</body>
+</html>

@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1E3A8A">
+  <meta name="theme-color" content="#0F172A" media="(prefers-color-scheme: dark)">
+  <title>Transferir saldo — App GEH</title>
+  <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="manifest" href="../manifest.json">
+  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+  <script src="../js/vendor/html5-qrcode.min.js"></script>
+  <style>
+    .lado-cliente {
+      border: 1px solid var(--cinza-claro);
+      border-radius: 12px;
+      padding: 0.85rem;
+      background: var(--cinza-fundo);
+    }
+    .lado-cliente.origem { border-left: 4px solid var(--vermelho); }
+    .lado-cliente.destino { border-left: 4px solid var(--verde); }
+    .lado-titulo {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--cinza);
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+    }
+    .lado-cliente.origem .lado-titulo { color: var(--vermelho); }
+    .lado-cliente.destino .lado-titulo { color: var(--verde); }
+    .selecionado {
+      background: var(--branco);
+      border-radius: 8px;
+      padding: 0.5rem 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-top: 0.4rem;
+      border: 1px solid var(--cinza-claro);
+    }
+    .selecionado .info { display: flex; flex-direction: column; min-width: 0; }
+    .selecionado .nome-cli { font-weight: 700; color: var(--cinza-escuro); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .selecionado .saldo-cli { font-size: 0.85rem; color: var(--cinza); }
+    .selecionado .saldo-cli strong { color: var(--cinza-escuro); }
+    .selecionado button.trocar {
+      background: none;
+      border: none;
+      color: var(--azul);
+      font-size: 0.82rem;
+      cursor: pointer;
+      padding: 0.25rem 0.5rem;
+      border-radius: 6px;
+      flex-shrink: 0;
+    }
+    .selecionado button.trocar:hover { background: rgba(30,58,138,0.08); }
+    [data-theme="dark"] .selecionado button.trocar:hover { background: rgba(96,165,250,0.18); }
+    .selecionado button.trocar:active { transform: scale(0.96); }
+    .btn-ver-mais {
+      width: auto !important;
+      display: block;
+      margin: 0.6rem auto 0;
+      font-size: 0.85rem;
+    }
+    .chips-clientes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      max-height: 110px;
+      overflow-y: auto;
+      padding: 0.25rem;
+      margin-top: 0.4rem;
+    }
+    .chip-cliente {
+      background: var(--branco);
+      border: 1px solid var(--cinza-claro);
+      color: var(--cinza-escuro);
+      padding: 0.5rem 0.85rem;
+      min-height: 28px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 0.78rem;
+      transition: transform 0.08s ease, background 0.12s ease, border-color 0.12s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .chip-cliente:hover { background: var(--azul); color: white; border-color: var(--azul); }
+    .chip-cliente:active { transform: scale(0.94); background: var(--azul); color: white; border-color: var(--azul); }
+    .preview-tx {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 0.5rem;
+      align-items: center;
+      padding: 0.75rem;
+      background: var(--cinza-fundo);
+      border-radius: 12px;
+      margin-top: 0.5rem;
+    }
+    .preview-tx .col { text-align: center; }
+    .preview-tx .label { font-size: 0.7rem; color: var(--cinza); text-transform: uppercase; letter-spacing: 0.05em; }
+    .preview-tx .id-cli { font-size: 0.78rem; color: var(--cinza-escuro); margin-top: 0.1rem; font-weight: 600; }
+    .preview-tx .saldos { font-size: 0.85rem; margin-top: 0.25rem; color: var(--cinza); }
+    .preview-tx .saldos strong { display: block; font-size: 1rem; color: var(--cinza-escuro); }
+    .preview-tx .seta { color: var(--azul); }
+    .preview-tx .col.origem .saldos strong.depois { color: var(--vermelho); }
+    .preview-tx .col.destino .saldos strong.depois { color: var(--verde); }
+
+    /* Modal de confirmacao */
+    .tx-modal {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.55);
+      display: flex; align-items: center; justify-content: center;
+      padding: 1rem; z-index: 1000;
+      animation: tx-modal-fade 0.18s ease-out;
+    }
+    .tx-modal.hidden { display: none; }
+    @keyframes tx-modal-fade { from { opacity: 0 } to { opacity: 1 } }
+    .tx-modal-card {
+      background: var(--branco);
+      border-radius: 14px;
+      padding: 1.25rem;
+      width: 100%; max-width: 380px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+      animation: tx-modal-pop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    @keyframes tx-modal-pop {
+      from { opacity: 0; transform: scale(0.92) translateY(8px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .tx-modal-card h3 {
+      margin: 0 0 0.25rem; color: var(--azul);
+      font-size: 1.1rem;
+      display: inline-flex; align-items: center; gap: 0.4rem;
+    }
+    .tx-modal-valor {
+      font-size: 1.8rem; font-weight: 700;
+      text-align: center; color: var(--azul);
+      margin: 0.6rem 0;
+    }
+    .tx-modal-fluxo {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 0.5rem; align-items: center;
+      background: var(--cinza-fundo);
+      border-radius: 10px;
+      padding: 0.75rem;
+      margin: 0.25rem 0 0.6rem;
+    }
+    .tx-modal-lado {
+      display: flex; flex-direction: column; align-items: center;
+      text-align: center; min-width: 0; gap: 0.15rem;
+    }
+    .tx-modal-label {
+      font-size: 0.68rem; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--cinza); font-weight: 700;
+    }
+    .tx-modal-lado.origem .tx-modal-label  { color: var(--vermelho); }
+    .tx-modal-lado.destino .tx-modal-label { color: var(--verde); }
+    .tx-modal-cli {
+      font-weight: 600; color: var(--cinza-escuro);
+      font-size: 0.82rem; word-break: break-word; line-height: 1.25;
+    }
+    .tx-modal-seta { color: var(--azul); display: inline-flex; }
+    .tx-modal-aviso {
+      font-size: 0.78rem; color: var(--cinza);
+      text-align: center; margin: 0 0 0.9rem;
+    }
+    .tx-modal-acoes { display: flex; gap: 0.5rem; }
+    .tx-modal-acoes .btn { flex: 1; width: auto; }
+
+    /* Acoes vazio (Escanear / Buscar) */
+    .acoes-vazio {
+      display: grid; gap: 0.4rem; margin-top: 0.5rem;
+    }
+    .acao-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      gap: 0.5rem; width: 100%;
+    }
+    .busca-bloco { margin-top: 0.5rem; }
+    .link-cancelar {
+      background: none; border: none;
+      color: var(--cinza); font-size: 0.78rem;
+      cursor: pointer; padding: 0.4rem 0;
+      text-decoration: underline;
+      display: block; margin-top: 0.25rem;
+    }
+    .link-cancelar:hover { color: var(--cinza-escuro); }
+
+    /* Scanner overlay full-screen */
+    .scanner-overlay {
+      position: fixed; inset: 0;
+      background: #000;
+      z-index: 2000;
+      display: flex; flex-direction: column;
+    }
+    .scanner-overlay.hidden { display: none; }
+    .scanner-overlay-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.75rem 1rem;
+      color: white;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 2;
+    }
+    .scanner-overlay-titulo {
+      font-weight: 700; font-size: 1.05rem;
+      display: inline-flex; align-items: center; gap: 0.4rem;
+    }
+    .scanner-overlay-sub {
+      font-size: 0.78rem; opacity: 0.75; margin-top: 0.15rem;
+    }
+    .scanner-overlay-fechar {
+      background: rgba(255,255,255,0.15);
+      border: none; color: white;
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; flex-shrink: 0;
+    }
+    .scanner-overlay-fechar:active { transform: scale(0.94); }
+    .scanner-overlay-corpo {
+      flex: 1;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 1rem; gap: 0.75rem;
+      color: white;
+      overflow: hidden;
+    }
+    .scanner-overlay-status {
+      font-size: 0.9rem; opacity: 0.85;
+      text-align: center; min-height: 1.2em;
+    }
+    #reader-tx { width: 100%; max-width: 480px; }
+    .scanner-overlay-rodape {
+      padding: 0.75rem 1rem 1.25rem;
+      display: flex; justify-content: center;
+    }
+    .scanner-overlay-rodape .btn {
+      width: auto;
+      background: rgba(255,255,255,0.12);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.25);
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <a href="#" id="btn-voltar" class="back" aria-label="Voltar"><span data-icon="arrow-left" data-size="24"></span></a>
+    <h1 style="display:inline-flex;align-items:center;gap:0.5rem;"><span data-icon="arrow-right-left" data-size="22"></span> Transferir saldo</h1>
+  </header>
+
+  <main>
+    <div class="card" style="background:rgba(30,58,138,0.06);border:1px dashed rgba(30,58,138,0.25);">
+      <p style="margin:0;font-size:0.85rem;color:var(--cinza-escuro);">
+        Move saldo de um QR pra outro — útil pra família juntar crédito de 2 pulseiras numa compra só.
+        A operação é atômica (ou os dois mudam, ou nenhum) e fica registrada pra auditoria.
+      </p>
+    </div>
+
+    <div class="card">
+      <div class="lado-cliente origem">
+        <div class="lado-titulo"><span data-icon="arrow-up-right" data-size="14"></span> De (origem) — vai sair saldo</div>
+
+        <div id="acoes-origem" class="acoes-vazio">
+          <button type="button" class="btn btn-primary acao-btn" data-acao="scan" data-lado="origem">
+            <span data-icon="qr-code" data-size="20"></span> Escanear QR
+          </button>
+          <button type="button" class="btn btn-secondary acao-btn" data-acao="buscar" data-lado="origem">
+            <span data-icon="search" data-size="18"></span> Buscar por ID/nome
+          </button>
+        </div>
+
+        <div id="busca-origem-bloco" class="busca-bloco hidden">
+          <input type="text" id="busca-origem" placeholder="ID ou nome do cliente" autocomplete="off">
+          <div id="chips-origem" class="chips-clientes"></div>
+          <button type="button" class="link-cancelar" data-cancelar="origem">Cancelar busca</button>
+        </div>
+
+        <div id="sel-origem" class="selecionado hidden">
+          <div class="info">
+            <span class="nome-cli" id="origem-nome">—</span>
+            <span class="saldo-cli">Saldo: <strong id="origem-saldo">R$ 0,00</strong></span>
+          </div>
+          <button type="button" class="trocar" id="btn-trocar-origem">Trocar</button>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:center;margin:0.6rem 0;">
+        <button type="button" id="btn-inverter" class="btn btn-secondary" style="width:auto;padding:0.4rem 0.9rem;font-size:0.85rem;">
+          <span data-icon="arrow-down-up" data-size="16"></span> Inverter origem ↔ destino
+        </button>
+      </div>
+
+      <div class="lado-cliente destino">
+        <div class="lado-titulo"><span data-icon="arrow-down-right" data-size="14"></span> Para (destino) — vai receber saldo</div>
+
+        <div id="acoes-destino" class="acoes-vazio">
+          <button type="button" class="btn btn-primary acao-btn" data-acao="scan" data-lado="destino">
+            <span data-icon="qr-code" data-size="20"></span> Escanear QR
+          </button>
+          <button type="button" class="btn btn-secondary acao-btn" data-acao="buscar" data-lado="destino">
+            <span data-icon="search" data-size="18"></span> Buscar por ID/nome
+          </button>
+        </div>
+
+        <div id="busca-destino-bloco" class="busca-bloco hidden">
+          <input type="text" id="busca-destino" placeholder="ID ou nome do cliente" autocomplete="off">
+          <div id="chips-destino" class="chips-clientes"></div>
+          <button type="button" class="link-cancelar" data-cancelar="destino">Cancelar busca</button>
+        </div>
+
+        <div id="sel-destino" class="selecionado hidden">
+          <div class="info">
+            <span class="nome-cli" id="destino-nome">—</span>
+            <span class="saldo-cli">Saldo: <strong id="destino-saldo">R$ 0,00</strong></span>
+          </div>
+          <button type="button" class="trocar" id="btn-trocar-destino">Trocar</button>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-top:1rem;">
+        <label for="valor">Valor a transferir (R$)</label>
+        <div style="display:flex;gap:0.5rem;align-items:stretch;">
+          <input type="text" id="valor" placeholder="Ex: 15,00" inputmode="decimal" autocomplete="off" style="flex:1;">
+          <button type="button" id="btn-tudo" class="btn btn-secondary" style="width:auto;padding:0 1rem;font-size:0.85rem;white-space:nowrap;">
+            Tudo
+          </button>
+        </div>
+        <small style="color:var(--cinza);font-size:0.78rem;">Origem precisa ter esse valor disponível.</small>
+      </div>
+
+      <div class="form-group">
+        <label for="motivo">Motivo / observação <span style="color:var(--cinza);font-weight:400;">(opcional)</span></label>
+        <input type="text" id="motivo" placeholder="Ex: família juntando saldo pra compra única" maxlength="200">
+      </div>
+
+      <div id="preview" class="preview-tx hidden">
+        <div class="col origem">
+          <div class="label">De</div>
+          <div class="id-cli" id="prev-origem-id">—</div>
+          <div class="saldos">
+            <span id="prev-origem-antes">R$ 0,00</span>
+            <strong class="depois" id="prev-origem-depois">R$ 0,00</strong>
+          </div>
+        </div>
+        <div class="seta" data-icon="arrow-right" data-size="22"></div>
+        <div class="col destino">
+          <div class="label">Para</div>
+          <div class="id-cli" id="prev-destino-id">—</div>
+          <div class="saldos">
+            <span id="prev-destino-antes">R$ 0,00</span>
+            <strong class="depois" id="prev-destino-depois">R$ 0,00</strong>
+          </div>
+        </div>
+      </div>
+
+      <div id="alerta" class="alert hidden" style="margin-top:0.75rem;"></div>
+
+      <button id="btn-confirmar" class="btn btn-primary" style="margin-top:0.75rem;" disabled>
+        <span data-icon="check" data-size="16"></span> Confirmar transferência
+      </button>
+    </div>
+
+    <h3 style="color:var(--azul);margin:1.5rem 0 0.75rem;display:inline-flex;align-items:center;gap:0.5rem;">
+      <span data-icon="clock" data-size="20"></span> Últimas transferências
+    </h3>
+    <div id="lista-tx" class="hist-list" aria-busy="true">
+      <div class="skel-hist-item"><div class="row"><span class="skel skel-pill"></span><span class="skel skel-text" style="width:30%"></span><span class="skel skel-num grow" style="margin-left:auto;width:80px"></span></div><span class="skel skel-text" style="width:75%"></span></div>
+      <div class="skel-hist-item"><div class="row"><span class="skel skel-pill"></span><span class="skel skel-text" style="width:25%"></span><span class="skel skel-num grow" style="margin-left:auto;width:70px"></span></div><span class="skel skel-text" style="width:65%"></span></div>
+      <div class="skel-hist-item"><div class="row"><span class="skel skel-pill"></span><span class="skel skel-text" style="width:32%"></span><span class="skel skel-num grow" style="margin-left:auto;width:90px"></span></div><span class="skel skel-text" style="width:80%"></span></div>
+    </div>
+  </main>
+
+  <div id="scanner-overlay" class="scanner-overlay hidden" role="dialog" aria-modal="true" aria-label="Escanear QR code">
+    <header class="scanner-overlay-header">
+      <div>
+        <div class="scanner-overlay-titulo">
+          <span data-icon="qr-code" data-size="20"></span> Escanear QR
+        </div>
+        <div class="scanner-overlay-sub" id="scanner-sub">Selecionando origem</div>
+      </div>
+      <button id="btn-fechar-scanner" type="button" class="scanner-overlay-fechar" aria-label="Fechar">
+        <span data-icon="x" data-size="22"></span>
+      </button>
+    </header>
+    <div class="scanner-overlay-corpo">
+      <div id="scanner-status" class="scanner-overlay-status">Inicializando câmera…</div>
+      <div id="reader-tx"></div>
+    </div>
+    <div class="scanner-overlay-rodape">
+      <button id="btn-scanner-manual" type="button" class="btn">
+        <span data-icon="keyboard" data-size="18"></span> Digitar ID manualmente
+      </button>
+    </div>
+  </div>
+
+  <div id="modal-confirmar" class="tx-modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-titulo">
+    <div class="tx-modal-card">
+      <h3 id="modal-titulo">
+        <span data-icon="arrow-right-left" data-size="20"></span> Confirmar transferência?
+      </h3>
+      <div class="tx-modal-valor" id="modal-valor">R$ 0,00</div>
+      <div class="tx-modal-fluxo">
+        <div class="tx-modal-lado origem">
+          <span class="tx-modal-label">De</span>
+          <span class="tx-modal-cli" id="modal-origem">—</span>
+        </div>
+        <span class="tx-modal-seta" data-icon="arrow-right" data-size="20"></span>
+        <div class="tx-modal-lado destino">
+          <span class="tx-modal-label">Para</span>
+          <span class="tx-modal-cli" id="modal-destino">—</span>
+        </div>
+      </div>
+      <p class="tx-modal-aviso">Esta ação fica registrada pra auditoria.</p>
+      <div class="tx-modal-acoes">
+        <button type="button" id="modal-cancel" class="btn btn-secondary">Cancelar</button>
+        <button type="button" id="modal-ok" class="btn btn-primary">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="../js/icons.js"></script>
+  <script type="module">
+    import {
+      db, collection, doc, getDoc, getDocs, query, orderBy, limit,
+      onSnapshot, runTransaction, serverTimestamp
+    } from "../js/firebase-config.js";
+    import { icon, renderIcons } from "../js/icons.js";
+    import { requireAuth } from "../js/auth-guard.js";
+    import { iniciarScanner } from "../js/scanner.js";
+    import { fmtBRL } from "../js/helpers.js";
+
+    const { perfil } = await requireAuth({ papel: ['caixa', 'operador'] });
+
+    const fmtInput = (v) => Number(v || 0).toFixed(2).replace('.', ',');
+    const $ = (id) => document.getElementById(id);
+    const alerta = $('alerta');
+
+    // Escapa HTML pra evitar injecao via campos vindos do Firestore
+    // (nome de cliente, motivo, etc). Cadastro e interno mas a defesa
+    // e barata e elimina a classe inteira de bug.
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+
+    // Aceita "15,00", "15.00", "1.234,56" — input type=number rejeita
+    // virgula em alguns Androids, entao usamos type=text + parser proprio.
+    function parseDecimal(s) {
+      if (s == null) return NaN;
+      const t = String(s).trim();
+      if (!t) return NaN;
+      // Se tem virgula, presumimos formato BR (ponto = milhar, virgula = decimal)
+      const norm = t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t;
+      return parseFloat(norm);
+    }
+
+    function abrirConfirmacao({ valor, origem, destino }) {
+      return new Promise((resolve) => {
+        const modal = $('modal-confirmar');
+        $('modal-valor').textContent = fmtBRL(valor);
+        $('modal-origem').textContent  = origem.nome ? `${origem.id} — ${origem.nome}`   : origem.id;
+        $('modal-destino').textContent = destino.nome ? `${destino.id} — ${destino.nome}` : destino.id;
+        modal.classList.remove('hidden');
+        renderIcons(modal);
+
+        const fechar = (ok) => {
+          modal.classList.add('hidden');
+          $('modal-ok').onclick = null;
+          $('modal-cancel').onclick = null;
+          modal.onclick = null;
+          document.removeEventListener('keydown', onKey);
+          resolve(ok);
+        };
+        const onKey = (e) => {
+          if (e.key === 'Escape') fechar(false);
+          else if (e.key === 'Enter') fechar(true);
+        };
+        document.addEventListener('keydown', onKey);
+        $('modal-ok').onclick     = () => fechar(true);
+        $('modal-cancel').onclick = () => fechar(false);
+        // Clique no backdrop (fora do card) cancela
+        modal.onclick = (e) => { if (e.target === modal) fechar(false); };
+        // Foco no botao primario pra teclado
+        setTimeout(() => $('modal-ok').focus(), 0);
+      });
+    }
+
+    function showAlerta(msg, tipo = 'info') {
+      alerta.textContent = msg;
+      alerta.className = `alert alert-${tipo}`;
+      alerta.classList.remove('hidden');
+    }
+
+    // Botão voltar — usa history.back() porque a página é alcançada
+    // de vários hubs (caixa, operador, recepção, admin).
+    $('btn-voltar').onclick = (e) => {
+      e.preventDefault();
+      if (window.history.length > 1) window.history.back();
+      else window.location.href = '../index.html';
+    };
+
+    let todosClientes = [];
+    let origem = null;
+    let destino = null;
+    let scannerHandle = null;
+    let scannerLado = null;
+
+    // Estados por lado: 'vazio' (acoes) | 'buscando' (input + chips) | 'selecionado'
+    function setEstado(lado, estado) {
+      const acoes = $(`acoes-${lado}`);
+      const busca = $(`busca-${lado}-bloco`);
+      const sel   = $(`sel-${lado}`);
+      acoes.classList.toggle('hidden', estado !== 'vazio');
+      busca.classList.toggle('hidden', estado !== 'buscando');
+      sel.classList.toggle('hidden',   estado !== 'selecionado');
+      if (estado === 'buscando') {
+        renderChips(lado, '');
+        setTimeout(() => $(`busca-${lado}`).focus(), 0);
+      }
+    }
+
+    async function carregarClientes() {
+      try {
+        const snap = await getDocs(collection(db, 'clientes'));
+        todosClientes = [];
+        snap.forEach(d => todosClientes.push({ id: d.id, ...d.data() }));
+        todosClientes.sort((a, b) => a.id.localeCompare(b.id));
+        renderChips('origem', '');
+        renderChips('destino', '');
+      } catch (e) {
+        console.error('[transferir] falha ao carregar clientes:', e);
+        showAlerta(`Erro ao carregar clientes: ${e.message}. Recarregue a página.`, 'danger');
+      }
+    }
+
+    function renderChips(lado, filtro) {
+      const f = (filtro || '').toLowerCase();
+      const outroSelecionado = lado === 'origem' ? destino?.id : origem?.id;
+      const lista = (f
+        ? todosClientes.filter(c => c.id.toLowerCase().includes(f) || (c.nome || '').toLowerCase().includes(f))
+        : todosClientes
+      ).filter(c => c.id !== outroSelecionado);
+
+      const chips = $(`chips-${lado}`);
+      chips.innerHTML = '';
+      lista.slice(0, 24).forEach(c => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'chip-cliente';
+        const saldo = Number(c.saldo || 0);
+        btn.textContent = `${c.id}${c.nome ? ' — ' + c.nome : ''} · ${fmtBRL(saldo)}`;
+        btn.onclick = () => selecionar(lado, c.id);
+        chips.appendChild(btn);
+      });
+      if (lista.length > 24) {
+        chips.insertAdjacentHTML('beforeend',
+          `<span class="text-muted" style="font-size:0.75rem;align-self:center;">+${lista.length - 24}…</span>`);
+      }
+      if (lista.length === 0) {
+        if (f) {
+          chips.innerHTML = `<span class="text-muted" style="font-size:0.82rem;">Nenhum cliente bate com "${esc(filtro)}". <button type="button" class="link-cancelar" style="display:inline;margin-top:0;padding:0;">Limpar filtro</button></span>`;
+          chips.querySelector('button').onclick = () => {
+            $(`busca-${lado}`).value = '';
+            renderChips(lado, '');
+          };
+        } else {
+          chips.innerHTML = '<span class="text-muted" style="font-size:0.82rem;">Nenhum cliente.</span>';
+        }
+      }
+    }
+
+    async function selecionar(lado, id) {
+      // Recarrega o doc do cliente pra ter saldo atualizado.
+      const snap = await getDoc(doc(db, 'clientes', id));
+      if (!snap.exists()) return showAlerta('Cliente não encontrado.', 'danger');
+      const dados = { id, ...snap.data() };
+
+      if (lado === 'origem') {
+        if (destino?.id === id) return showAlerta('Origem e destino não podem ser o mesmo cliente.', 'warning');
+        origem = dados;
+        $('origem-nome').textContent = dados.nome ? `${id} — ${dados.nome}` : id;
+        $('origem-saldo').textContent = fmtBRL(dados.saldo || 0);
+        $('busca-origem').value = '';
+        setEstado('origem', 'selecionado');
+        // Re-renderiza o outro lado pra excluir o cliente recem-selecionado
+        if (!$('busca-destino-bloco').classList.contains('hidden')) {
+          renderChips('destino', $('busca-destino').value);
+        }
+      } else {
+        if (origem?.id === id) return showAlerta('Origem e destino não podem ser o mesmo cliente.', 'warning');
+        destino = dados;
+        $('destino-nome').textContent = dados.nome ? `${id} — ${dados.nome}` : id;
+        $('destino-saldo').textContent = fmtBRL(dados.saldo || 0);
+        $('busca-destino').value = '';
+        setEstado('destino', 'selecionado');
+        if (!$('busca-origem-bloco').classList.contains('hidden')) {
+          renderChips('origem', $('busca-origem').value);
+        }
+      }
+      alerta.classList.add('hidden');
+      atualizarPreview();
+      atualizarBotao();
+    }
+
+    function limpar(lado) {
+      if (lado === 'origem')  origem  = null;
+      else                    destino = null;
+      setEstado(lado, 'vazio');
+      // Atualiza chips do outro lado caso esteja em busca
+      const outro = lado === 'origem' ? 'destino' : 'origem';
+      if (!$(`busca-${outro}-bloco`).classList.contains('hidden')) {
+        renderChips(outro, $(`busca-${outro}`).value);
+      }
+      atualizarPreview();
+      atualizarBotao();
+    }
+
+    function inverter() {
+      if (!origem && !destino) return;
+      [origem, destino] = [destino, origem];
+      // Repintar ambos os lados.
+      if (origem) {
+        $('origem-nome').textContent = origem.nome ? `${origem.id} — ${origem.nome}` : origem.id;
+        $('origem-saldo').textContent = fmtBRL(origem.saldo || 0);
+        setEstado('origem', 'selecionado');
+      } else setEstado('origem', 'vazio');
+      if (destino) {
+        $('destino-nome').textContent = destino.nome ? `${destino.id} — ${destino.nome}` : destino.id;
+        $('destino-saldo').textContent = fmtBRL(destino.saldo || 0);
+        setEstado('destino', 'selecionado');
+      } else setEstado('destino', 'vazio');
+      atualizarPreview();
+      atualizarBotao();
+    }
+
+    function atualizarPreview() {
+      const valor = parseDecimal($('valor').value);
+      if (!origem || !destino || !Number.isFinite(valor) || valor <= 0) {
+        $('preview').classList.add('hidden');
+        return;
+      }
+      const ao = origem.saldo || 0;
+      const ad = destino.saldo || 0;
+      $('prev-origem-id').textContent = origem.id;
+      $('prev-destino-id').textContent = destino.id;
+      $('prev-origem-antes').textContent = fmtBRL(ao);
+      $('prev-origem-depois').textContent = fmtBRL(ao - valor);
+      $('prev-destino-antes').textContent = fmtBRL(ad);
+      $('prev-destino-depois').textContent = fmtBRL(ad + valor);
+      $('preview').classList.remove('hidden');
+      renderIcons($('preview'));
+    }
+
+    function atualizarBotao() {
+      const valor = parseDecimal($('valor').value);
+      const ok = origem && destino && Number.isFinite(valor) && valor > 0;
+      $('btn-confirmar').disabled = !ok;
+    }
+
+    $('busca-origem').oninput = () => renderChips('origem', $('busca-origem').value);
+    $('busca-destino').oninput = () => renderChips('destino', $('busca-destino').value);
+    $('btn-trocar-origem').onclick = () => limpar('origem');
+    $('btn-trocar-destino').onclick = () => limpar('destino');
+    $('btn-inverter').onclick = inverter;
+
+    // Botoes [Escanear] / [Buscar] e cancelar busca
+    document.querySelectorAll('.acao-btn').forEach(btn => {
+      btn.onclick = () => {
+        const lado = btn.dataset.lado;
+        const acao = btn.dataset.acao;
+        if (acao === 'scan') abrirScanner(lado);
+        else if (acao === 'buscar') setEstado(lado, 'buscando');
+      };
+    });
+    document.querySelectorAll('[data-cancelar]').forEach(btn => {
+      btn.onclick = () => {
+        const lado = btn.dataset.cancelar;
+        $(`busca-${lado}`).value = '';
+        setEstado(lado, 'vazio');
+      };
+    });
+
+    // ---- Scanner ----
+    async function abrirScanner(lado) {
+      scannerLado = lado;
+      $('scanner-sub').textContent = lado === 'origem' ? 'Selecionando origem' : 'Selecionando destino';
+      $('scanner-status').textContent = 'Inicializando câmera…';
+      $('scanner-status').style.color = '';
+      $('scanner-overlay').classList.remove('hidden');
+      renderIcons($('scanner-overlay'));
+      try {
+        scannerHandle = await iniciarScanner({
+          elementId: 'reader-tx',
+          onDetected: (texto) => tratarScan(texto),
+          onReady: () => {
+            $('scanner-status').textContent = 'Câmera pronta — aproxime o QR code';
+            $('scanner-status').style.color = '#93c5fd';
+          }
+        });
+      } catch (err) {
+        console.error('Erro scanner:', err);
+        $('scanner-status').textContent = 'Câmera indisponível — use o botão abaixo pra digitar o ID';
+        $('scanner-status').style.color = '#fca5a5';
+      }
+    }
+
+    function fecharScanner() {
+      try { scannerHandle?.stop?.(); } catch (_) {}
+      scannerHandle = null;
+      // O botao de troca de camera tem id fixo dentro do reader; remove
+      // pra que a proxima abertura recrie com closures novos.
+      document.getElementById('btn-trocar-camera')?.remove();
+      $('scanner-overlay').classList.add('hidden');
+      scannerLado = null;
+    }
+
+    async function tratarScan(texto) {
+      const lado = scannerLado;
+      const id = (texto || '').trim();
+      if (!id) {
+        showAlerta('QR vazio. Tenta de novo.', 'warning');
+        fecharScanner();
+        return;
+      }
+      // Conflito direto: mesmo cliente nos dois lados
+      const outro = lado === 'origem' ? destino : origem;
+      if (outro && outro.id === id) {
+        $('scanner-status').textContent = 'Esse cliente já está do outro lado.';
+        $('scanner-status').style.color = '#fca5a5';
+        setTimeout(() => {
+          // Reabre scanner sem fechar o overlay (re-roda iniciarScanner)
+          fecharScanner();
+        }, 1500);
+        return;
+      }
+      try {
+        const snap = await getDoc(doc(db, 'clientes', id));
+        if (!snap.exists()) {
+          $('scanner-status').textContent = `Cliente ${id} não cadastrado.`;
+          $('scanner-status').style.color = '#fca5a5';
+          setTimeout(fecharScanner, 1500);
+          return;
+        }
+        try { navigator.vibrate?.(40); } catch (_) {}
+        fecharScanner();
+        await selecionar(lado, id);
+      } catch (err) {
+        console.error(err);
+        $('scanner-status').textContent = `Erro: ${err.message}`;
+        $('scanner-status').style.color = '#fca5a5';
+        setTimeout(fecharScanner, 2000);
+      }
+    }
+
+    $('btn-fechar-scanner').onclick = fecharScanner;
+    $('btn-scanner-manual').onclick = () => {
+      const lado = scannerLado;
+      fecharScanner();
+      setEstado(lado, 'buscando');
+    };
+    // ESC fecha o scanner
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !$('scanner-overlay').classList.contains('hidden')) {
+        fecharScanner();
+      }
+    });
+    $('valor').addEventListener('input', () => { atualizarPreview(); atualizarBotao(); });
+    $('btn-tudo').onclick = () => {
+      if (!origem) return showAlerta('Selecione a origem primeiro.', 'warning');
+      $('valor').value = fmtInput(origem.saldo || 0);
+      atualizarPreview();
+      atualizarBotao();
+    };
+
+    // Permite Enter no busca-origem/destino selecionar match único exato (por ID)
+    [['busca-origem', 'origem'], ['busca-destino', 'destino']].forEach(([elId, lado]) => {
+      $(elId).addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        const v = e.target.value.trim();
+        if (!v) return;
+        const exato = todosClientes.find(c => c.id.toLowerCase() === v.toLowerCase());
+        if (exato) selecionar(lado, exato.id);
+      });
+    });
+
+    // Evento ativo — await garante que o valor esta pronto antes do primeiro clique
+    const eventoAtivoPromise = getDoc(doc(db, 'config', 'eventoAtivo'))
+      .then(s => s.exists() ? s.data() : null)
+      .catch(e => { console.warn('[transferir] falha ao ler eventoAtivo:', e); return null; });
+    let eventoAtivo = await eventoAtivoPromise;
+
+    $('btn-confirmar').onclick = async () => {
+      if (!origem || !destino) return showAlerta('Selecione origem e destino.', 'warning');
+      if (origem.id === destino.id) return showAlerta('Origem e destino não podem ser iguais.', 'warning');
+
+      const valor = parseDecimal($('valor').value);
+      if (!Number.isFinite(valor) || valor <= 0) return showAlerta('Digite um valor maior que zero.', 'warning');
+
+      const motivo = $('motivo').value.trim();
+
+      const ok = await abrirConfirmacao({ valor, origem, destino });
+      if (!ok) return;
+
+      $('btn-confirmar').disabled = true;
+      $('btn-confirmar').innerHTML = '<div class="loader"></div> Processando…';
+      const timerLento = setTimeout(() => {
+        $('btn-confirmar').innerHTML = '<div class="loader"></div> Conexão lenta — aguardando servidor…';
+      }, 5000);
+
+      let txIdGerado = null;
+      let saldosFinal = null;
+
+      try {
+        await runTransaction(db, async (tx) => {
+          const refO = doc(db, 'clientes', origem.id);
+          const refD = doc(db, 'clientes', destino.id);
+          const [snapO, snapD] = await Promise.all([tx.get(refO), tx.get(refD)]);
+          if (!snapO.exists()) throw new Error('Cliente origem não existe.');
+          if (!snapD.exists()) throw new Error('Cliente destino não existe.');
+
+          const saldoO = snapO.data().saldo || 0;
+          const saldoD = snapD.data().saldo || 0;
+          if (saldoO < valor) {
+            throw new Error(`Saldo insuficiente na origem (tem ${fmtBRL(saldoO)}, precisa ${fmtBRL(valor)}).`);
+          }
+
+          const novoO = saldoO - valor;
+          const novoD = saldoD + valor;
+          tx.update(refO, { saldo: novoO });
+          tx.update(refD, { saldo: novoD });
+
+          const txRef = doc(collection(db, 'transferencias_saldo'));
+          txIdGerado = txRef.id;
+          tx.set(txRef, {
+            origemId: origem.id,
+            origemNome: origem.nome || null,
+            origemSaldoAntes: saldoO,
+            origemSaldoDepois: novoO,
+            destinoId: destino.id,
+            destinoNome: destino.nome || null,
+            destinoSaldoAntes: saldoD,
+            destinoSaldoDepois: novoD,
+            valor,
+            motivo: motivo || null,
+            eventoId: eventoAtivo?.id || null,
+            eventoNome: eventoAtivo?.nome || null,
+            usuarioId: perfil.uid,
+            usuarioEmail: perfil.email || null,
+            usuarioNome: perfil.nome || null,
+            usuarioPapel: perfil.papel || null,
+            criadoEm: serverTimestamp()
+          });
+          saldosFinal = { origem: novoO, destino: novoD };
+        });
+
+        clearTimeout(timerLento);
+        try { navigator.vibrate?.([40, 60, 40, 60, 80]); } catch (_) {}
+        const idCurto = (txIdGerado || '').slice(-6).toUpperCase();
+        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 18 })} Transferência #${esc(idCurto)} feita — ${fmtBRL(valor)} de ${esc(origem.id)} pra ${esc(destino.id)}.</span>`;
+        alerta.className = 'alert alert-success';
+        alerta.classList.remove('hidden');
+
+        // Atualiza saldos exibidos e zera valor/motivo pra próxima.
+        origem = { ...origem, saldo: saldosFinal.origem };
+        destino = { ...destino, saldo: saldosFinal.destino };
+        $('origem-saldo').textContent = fmtBRL(origem.saldo);
+        $('destino-saldo').textContent = fmtBRL(destino.saldo);
+        $('valor').value = '';
+        $('motivo').value = '';
+        $('preview').classList.add('hidden');
+      } catch (err) {
+        clearTimeout(timerLento);
+        try { navigator.vibrate?.([100, 50, 100]); } catch (_) {}
+        const eContencao = err.code === 'failed-precondition'
+                       || err.code === 'aborted'
+                       || /stored version/i.test(err.message || '');
+        const msg = eContencao
+          ? 'Conflito com outra operação simultânea. Nada foi transferido — tente de novo.'
+          : `Erro: ${err.message}`;
+        showAlerta(msg, 'danger');
+      } finally {
+        atualizarBotao();
+        $('btn-confirmar').innerHTML = `${icon('check', { size: 16 })} Confirmar transferência`;
+      }
+    };
+
+    // Últimas transferências (live)
+    let todosTx = [];
+    let mostrarN = 10;
+    const LOTE = 10;
+
+    function renderHistorico() {
+      const lista = $('lista-tx');
+      if (todosTx.length === 0) {
+        lista.innerHTML = `<div class="empty-state">${icon('inbox', { size: 32 })}<p>Nenhuma transferência registrada ainda.</p></div>`;
+        renderIcons(lista);
+        return;
+      }
+      const exibir = todosTx.slice(0, mostrarN);
+      const linhas = exibir.map(t => {
+        const dt = t.criadoEm?.toDate?.() || new Date(0);
+        const quando = dt.toLocaleString('pt-BR');
+        const quem = esc(t.usuarioNome || t.usuarioEmail || '—');
+        const papel = t.usuarioPapel ? ` (${esc(t.usuarioPapel)})` : '';
+        const motivo = t.motivo ? `<div class="hist-detalhe">${esc(t.motivo)}</div>` : '';
+        return `
+          <div class="hist-item">
+            <div class="hist-row">
+              <span class="hist-badge" style="background:var(--azul);">transfer</span>
+              <span class="hist-quando">${esc(quando)}</span>
+              <span class="hist-valor" style="color:var(--azul);">${fmtBRL(t.valor)}</span>
+            </div>
+            <div class="hist-detalhe">
+              <strong>${esc(t.origemId)}</strong>${t.origemNome ? ' (' + esc(t.origemNome) + ')' : ''}
+              → <strong>${esc(t.destinoId)}</strong>${t.destinoNome ? ' (' + esc(t.destinoNome) + ')' : ''}
+              · por ${quem}${papel}
+            </div>
+            ${motivo}
+          </div>
+        `;
+      }).join('');
+      const restantes = todosTx.length - mostrarN;
+      const verMais = restantes > 0
+        ? `<button type="button" id="btn-ver-mais" class="btn btn-secondary btn-ver-mais">
+             Mostrar mais ${Math.min(LOTE, restantes)} (${restantes} restantes)
+           </button>`
+        : '';
+      lista.innerHTML = linhas + verMais;
+      $('btn-ver-mais')?.addEventListener('click', () => {
+        mostrarN += LOTE;
+        renderHistorico();
+      });
+    }
+
+    const unsub = onSnapshot(
+      query(collection(db, 'transferencias_saldo'), orderBy('criadoEm', 'desc'), limit(50)),
+      (snap) => {
+        todosTx = snap.docs.map(d => d.data());
+        renderHistorico();
+      },
+      (err) => {
+        $('lista-tx').innerHTML = `<div class="alert alert-danger">Erro ao carregar histórico: ${err.message}</div>`;
+      }
+    );
+
+    window.addEventListener('pagehide', () => unsub());
+
+    carregarClientes();
+  </script>
+</body>
+</html>

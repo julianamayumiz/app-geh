@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Comparativo de eventos — Admin GEH</title>
+  <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="manifest" href="../manifest.json">
+  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <style>
+    .cmp-kpis {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .cmp-kpi {
+      background: var(--branco);
+      border-radius: var(--radius);
+      padding: 0.9rem 1rem;
+      box-shadow: var(--sombra);
+      border-left: 3px solid var(--azul);
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    .cmp-kpi.verde   { border-left-color: var(--verde); }
+    .cmp-kpi.amarelo { border-left-color: var(--amarelo); }
+    .cmp-kpi.roxo    { border-left-color: #7C3AED; }
+    .cmp-kpi .lbl {
+      font-size: 0.7rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      font-weight: 600;
+      color: var(--cinza);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .cmp-kpi .val {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.6rem;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      font-variant-numeric: tabular-nums;
+    }
+    .cmp-kpi .sub {
+      font-size: 0.78rem;
+      color: var(--cinza);
+    }
+    .cmp-kpi.verde   .val { color: var(--verde); }
+    .cmp-kpi.amarelo .val { color: #B45309; }
+    :root[data-theme="dark"] .cmp-kpi.amarelo .val { color: var(--amarelo); }
+    .cmp-kpi.roxo    .val { color: #7C3AED; }
+    :root[data-theme="dark"] .cmp-kpi.roxo .val { color: #A78BFA; }
+
+    .cmp-graficos {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0 1.5rem;
+    }
+    .cmp-destaques {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+    .cmp-destaque {
+      border-radius: var(--radius);
+      padding: 1rem 1.1rem;
+      color: #fff;
+      box-shadow: var(--sombra);
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    .cmp-destaque .lbl {
+      font-size: 0.72rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      font-weight: 600;
+      opacity: 0.85;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .cmp-destaque .nome {
+      font-weight: 700;
+      font-size: 1.05rem;
+      line-height: 1.15;
+    }
+    .cmp-destaque .val {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.4rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .cmp-d1 { background: linear-gradient(135deg, var(--azul) 0%, var(--azul-escuro) 100%); }
+    .cmp-d2 { background: linear-gradient(135deg, #16A34A 0%, #14532D 100%); }
+    .cmp-d3 { background: linear-gradient(135deg, #F59E0B 0%, #B45309 100%); }
+    .cmp-d4 { background: linear-gradient(135deg, #7C3AED 0%, #4C1D95 100%); }
+
+    .cmp-lucro-pos { color: var(--verde); font-weight: 700; }
+    .cmp-lucro-neg { color: var(--vermelho); font-weight: 700; }
+    .cmp-mini-bar {
+      display: inline-block;
+      height: 6px;
+      background: var(--azul);
+      border-radius: 3px;
+      vertical-align: middle;
+      margin-right: 0.4rem;
+      min-width: 2px;
+    }
+  </style>
+</head>
+<body>
+  <main class="admin">
+    <h2 style="color:var(--azul);margin-bottom:0.25rem;display:inline-flex;align-items:center;gap:0.5rem;">
+      <span data-icon="git-compare" data-size="22"></span> Comparativo de eventos
+    </h2>
+    <p style="color:var(--cinza);margin-bottom:1rem;">Veja qual evento rendeu mais, ticket médio, lucro e ranking entre todos.</p>
+
+    <div id="vazio" class="alert alert-warning hidden" style="display:flex;align-items:center;gap:0.5rem;">
+      <span data-icon="alert-triangle" data-size="20"></span>
+      <span>Ainda não há eventos com vendas para comparar.</span>
+    </div>
+
+    <!-- KPIs gerais -->
+    <div class="cmp-kpis">
+      <div class="cmp-kpi">
+        <span class="lbl"><span data-icon="calendar" data-size="13"></span> Eventos analisados</span>
+        <div class="val" id="kpi-num-eventos">0</div>
+        <div class="sub" id="kpi-num-eventos-sub">—</div>
+      </div>
+      <div class="cmp-kpi verde">
+        <span class="lbl"><span data-icon="trending-up" data-size="13"></span> Receita total</span>
+        <div class="val" id="kpi-receita">R$ 0,00</div>
+        <div class="sub" id="kpi-receita-sub">—</div>
+      </div>
+      <div class="cmp-kpi amarelo">
+        <span class="lbl"><span data-icon="shopping-cart" data-size="13"></span> Ticket médio geral</span>
+        <div class="val" id="kpi-ticket">R$ 0,00</div>
+        <div class="sub" id="kpi-ticket-sub">—</div>
+      </div>
+      <div class="cmp-kpi roxo">
+        <span class="lbl"><span data-icon="dollar-sign" data-size="13"></span> Lucro acumulado</span>
+        <div class="val" id="kpi-lucro">R$ 0,00</div>
+        <div class="sub" id="kpi-lucro-sub">receita − despesas</div>
+      </div>
+    </div>
+
+    <!-- Destaques (campeões por categoria) -->
+    <div id="destaques" class="cmp-destaques hidden"></div>
+
+    <!-- Gráficos -->
+    <div id="graficos" class="cmp-graficos hidden">
+      <div class="card">
+        <h3 class="card-title" style="display:inline-flex;align-items:center;gap:0.5rem;">
+          <span data-icon="bar-chart" data-size="18"></span> Receita por evento
+        </h3>
+        <div style="position:relative;height:260px;">
+          <canvas id="chart-receita"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <h3 class="card-title" style="display:inline-flex;align-items:center;gap:0.5rem;">
+          <span data-icon="shopping-cart" data-size="18"></span> Ticket médio por evento
+        </h3>
+        <div style="position:relative;height:260px;">
+          <canvas id="chart-ticket"></canvas>
+        </div>
+      </div>
+      <div class="card" style="grid-column:1/-1;">
+        <h3 class="card-title" style="display:inline-flex;align-items:center;gap:0.5rem;">
+          <span data-icon="dollar-sign" data-size="18"></span> Receita × Despesas × Lucro
+        </h3>
+        <div style="position:relative;height:300px;">
+          <canvas id="chart-lucro"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabela completa -->
+    <h3 style="color:var(--azul);margin:1.5rem 0 0.75rem;">Detalhamento por evento</h3>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Evento</th>
+            <th>Data</th>
+            <th>Vendas</th>
+            <th>Receita</th>
+            <th>Ticket médio</th>
+            <th>Clientes</th>
+            <th>Despesas</th>
+            <th>Lucro</th>
+            <th>Top produto</th>
+          </tr>
+        </thead>
+        <tbody id="tbl"><tr><td colspan="9" class="text-center text-muted">Carregando...</td></tr></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script type="module">
+    import { montarNav } from "./_nav.js";
+    import { fmtBRL } from "../js/helpers.js";
+    import { icon } from "../js/icons.js";
+    import {
+      db, collection, getDocs, query, orderBy
+    } from "../js/firebase-config.js";
+
+    montarNav('comparativo.html');
+
+    const $ = id => document.getElementById(id);
+    const dark = document.documentElement.dataset.theme === 'dark';
+    const COR = {
+      azul:     dark ? '#3B82F6' : '#1E3A8A',
+      azulFill: dark ? '#3B82F6BB' : '#1E3A8ABB',
+      verde:    dark ? '#22C55E' : '#16A34A',
+      verdeFill:dark ? '#22C55EBB' : '#16A34ABB',
+      vermelho: dark ? '#F87171' : '#DC2626',
+      amarelo:  '#F59E0B',
+      texto:    dark ? '#94A3B8' : '#6B7280',
+      grid:     dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)',
+    };
+    Chart.defaults.font.family = "'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    Chart.defaults.font.size   = 12;
+    Chart.defaults.color       = COR.texto;
+
+    const PALETA = ['#1E3A8A','#16A34A','#F59E0B','#7C3AED','#DC2626','#0891B2','#DB2777','#65A30D','#EA580C','#4F46E5','#0D9488','#B45309'];
+
+    (async function init() {
+      // 1) Carrega tudo em paralelo
+      const [evSnap, vdSnap, dpSnap, vpSnap] = await Promise.all([
+        getDocs(query(collection(db, 'eventos'), orderBy('criadoEm', 'asc'))),
+        getDocs(collection(db, 'vendas')),
+        getDocs(collection(db, 'despesas')),
+        getDocs(collection(db, 'vendas_porta')),
+      ]);
+
+      const eventos = evSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const vendas  = vdSnap.docs.map(d => d.data());
+      const despesas = dpSnap.docs.map(d => d.data());
+      const vendasPorta = vpSnap.docs.map(d => d.data());
+
+      // 2) Agrupa por evento
+      const stats = eventos.map(ev => {
+        const vs = vendas.filter(v => v.eventoId === ev.id);
+        const ds = despesas.filter(d => d.eventoId === ev.id);
+        const vp = vendasPorta.filter(v => v.eventoId === ev.id);
+        let receita = 0;
+        const clientes = new Set();
+        const produtos = {};
+        let primeira = null, ultima = null;
+        vs.forEach(v => {
+          receita += v.total || 0;
+          if (v.clienteId) clientes.add(v.clienteId);
+          (v.itens || []).forEach(it => {
+            const n = it.nome || '?';
+            produtos[n] = (produtos[n] || 0) + (it.qtd || 1);
+          });
+          const t = v.criadoEm?.toDate?.();
+          if (t) {
+            if (!primeira || t < primeira) primeira = t;
+            if (!ultima   || t > ultima)   ultima   = t;
+          }
+        });
+        let receitaPorta = 0;
+        vp.forEach(v => {
+          receitaPorta += v.preco || 0;
+          const t = v.criadoEm?.toDate?.() || v.checkInEm?.toDate?.();
+          if (t) {
+            if (!primeira || t < primeira) primeira = t;
+            if (!ultima   || t > ultima)   ultima   = t;
+          }
+        });
+        receita += receitaPorta;
+        const desp = ds.reduce((s, d) => {
+          const v = (d.valor || 0);
+          // tipo "receita" = doação, soma como redução de despesa
+          return s + (d.tipo === 'receita' ? -v : v);
+        }, 0);
+        const top = Object.entries(produtos).sort((a, b) => b[1] - a[1])[0];
+        return {
+          id: ev.id,
+          nome: ev.nome,
+          data: ev.data,
+          status: ev.status,
+          numVendas: vs.length + vp.length,
+          numVendasPorta: vp.length,
+          receitaPorta,
+          receita,
+          ticket: (vs.length + vp.length) ? receita / (vs.length + vp.length) : 0,
+          clientes: clientes.size,
+          despesas: desp,
+          lucro: receita - desp,
+          topProduto: top ? `${top[0]} (${top[1]})` : '—',
+          duracaoH: (primeira && ultima) ? Math.max(1, Math.round((ultima - primeira) / 36e5)) : 0,
+        };
+      });
+
+      const ativos = stats.filter(s => s.numVendas > 0);
+
+      if (eventos.length === 0 || ativos.length === 0) {
+        $('vazio').classList.remove('hidden');
+        $('tbl').innerHTML = '<tr><td colspan="9" class="text-center text-muted">Nenhum evento com vendas ainda.</td></tr>';
+        return;
+      }
+
+      // 3) KPIs gerais
+      const totReceita  = ativos.reduce((s, e) => s + e.receita, 0);
+      const totVendas   = ativos.reduce((s, e) => s + e.numVendas, 0);
+      const totDespesas = ativos.reduce((s, e) => s + e.despesas, 0);
+      const totLucro    = totReceita - totDespesas;
+      const ticketGeral = totVendas ? totReceita / totVendas : 0;
+      const mediaPorEvento = ativos.length ? totReceita / ativos.length : 0;
+
+      $('kpi-num-eventos').textContent = ativos.length;
+      $('kpi-num-eventos-sub').textContent =
+        `${eventos.length - ativos.length} sem vendas` + (eventos.length === ativos.length ? '' : '');
+      if (eventos.length === ativos.length) $('kpi-num-eventos-sub').textContent = `${totVendas} vendas no total`;
+      $('kpi-receita').textContent = fmtBRL(totReceita);
+      $('kpi-receita-sub').textContent = `Média ${fmtBRL(mediaPorEvento)} / evento`;
+      $('kpi-ticket').textContent = fmtBRL(ticketGeral);
+      $('kpi-ticket-sub').textContent = `${totVendas} vendas`;
+      $('kpi-lucro').textContent = fmtBRL(totLucro);
+      $('kpi-lucro-sub').textContent = `Despesas ${fmtBRL(totDespesas)}`;
+
+      // 4) Destaques (campeões)
+      const maisReceita = [...ativos].sort((a, b) => b.receita - a.receita)[0];
+      const maiorTicket = [...ativos].sort((a, b) => b.ticket - a.ticket)[0];
+      const maisLucro   = [...ativos].sort((a, b) => b.lucro - a.lucro)[0];
+      const maisVendas  = [...ativos].sort((a, b) => b.numVendas - a.numVendas)[0];
+
+      const destaqueHTML = (cls, iconeNome, lbl, ev, valor) => `
+        <div class="cmp-destaque ${cls}">
+          <span class="lbl">${icon(iconeNome, { size: 13 })} ${lbl}</span>
+          <div class="nome">${ev.nome}</div>
+          <div class="val">${valor}</div>
+        </div>`;
+      $('destaques').innerHTML =
+        destaqueHTML('cmp-d1', 'trending-up', 'Mais receita',  maisReceita, fmtBRL(maisReceita.receita)) +
+        destaqueHTML('cmp-d2', 'dollar-sign', 'Maior lucro',   maisLucro,   fmtBRL(maisLucro.lucro)) +
+        destaqueHTML('cmp-d3', 'award',       'Maior ticket',  maiorTicket, fmtBRL(maiorTicket.ticket)) +
+        destaqueHTML('cmp-d4', 'shopping-cart','Mais vendas',  maisVendas,  `${maisVendas.numVendas} vendas`);
+      $('destaques').classList.remove('hidden');
+
+      // 5) Gráficos — ordena por receita pra leitura mais fácil
+      const ordem = [...ativos].sort((a, b) => b.receita - a.receita);
+      const labels = ordem.map(e => e.nome);
+      const escalaBase = { grid: { color: COR.grid }, ticks: { color: COR.texto } };
+
+      $('graficos').classList.remove('hidden');
+
+      new Chart($('chart-receita'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Receita',
+            data: ordem.map(e => e.receita),
+            backgroundColor: ordem.map((_, i) => PALETA[i % PALETA.length] + 'CC'),
+            borderColor: ordem.map((_, i) => PALETA[i % PALETA.length]),
+            borderWidth: 2,
+            borderRadius: 6,
+          }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: ctx => ` ${fmtBRL(ctx.parsed.y)}` } },
+          },
+          scales: {
+            x: { ...escalaBase },
+            y: { ...escalaBase, beginAtZero: true,
+                 ticks: { ...escalaBase.ticks, callback: v => `R$ ${Number(v).toFixed(0)}` } },
+          },
+        },
+      });
+
+      new Chart($('chart-ticket'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Ticket médio',
+            data: ordem.map(e => e.ticket),
+            backgroundColor: COR.verdeFill,
+            borderColor: COR.verde,
+            borderWidth: 2,
+            borderRadius: 6,
+          }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: ctx => ` ${fmtBRL(ctx.parsed.y)}` } },
+          },
+          scales: {
+            x: { ...escalaBase },
+            y: { ...escalaBase, beginAtZero: true,
+                 ticks: { ...escalaBase.ticks, callback: v => `R$ ${Number(v).toFixed(2)}` } },
+          },
+        },
+      });
+
+      new Chart($('chart-lucro'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Receita',  data: ordem.map(e => e.receita),  backgroundColor: COR.verdeFill, borderColor: COR.verde, borderWidth: 2, borderRadius: 4 },
+            { label: 'Despesas', data: ordem.map(e => e.despesas), backgroundColor: COR.vermelho + 'BB', borderColor: COR.vermelho, borderWidth: 2, borderRadius: 4 },
+            { label: 'Lucro',    data: ordem.map(e => e.lucro),    backgroundColor: COR.azulFill, borderColor: COR.azul, borderWidth: 2, borderRadius: 4 },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { color: COR.texto } },
+            tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmtBRL(ctx.parsed.y)}` } },
+          },
+          scales: {
+            x: { ...escalaBase },
+            y: { ...escalaBase, beginAtZero: true,
+                 ticks: { ...escalaBase.ticks, callback: v => `R$ ${Number(v).toFixed(0)}` } },
+          },
+        },
+      });
+
+      // 6) Tabela detalhada (mesma ordem dos gráficos)
+      const maxReceita = Math.max(...ordem.map(e => e.receita), 1);
+      $('tbl').innerHTML = ordem.map(e => {
+        const dataFmt = e.data ? new Date(e.data + 'T12:00').toLocaleDateString('pt-BR') : '—';
+        const lucroCls = e.lucro >= 0 ? 'cmp-lucro-pos' : 'cmp-lucro-neg';
+        const barW = Math.round((e.receita / maxReceita) * 80);
+        return `
+          <tr>
+            <td><strong>${e.nome}</strong>${e.status === 'ativo' ? ' <span style="background:var(--verde);color:#fff;padding:1px 6px;border-radius:999px;font-size:0.7rem;">ativo</span>' : ''}</td>
+            <td>${dataFmt}</td>
+            <td>${e.numVendas}</td>
+            <td><span class="cmp-mini-bar" style="width:${barW}px;"></span>${fmtBRL(e.receita)}</td>
+            <td>${fmtBRL(e.ticket)}</td>
+            <td>${e.clientes}</td>
+            <td>${fmtBRL(e.despesas)}</td>
+            <td class="${lucroCls}">${fmtBRL(e.lucro)}</td>
+            <td>${e.topProduto}</td>
+          </tr>`;
+      }).join('');
+    })();
+  </script>
+</body>
+</html>

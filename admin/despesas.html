@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Despesas — Admin GEH</title>
+  <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="manifest" href="../manifest.json">
+  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+  <style>
+    .dp-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
+    .dp-kpi { padding: 0.85rem 1rem; border: 1px solid var(--cinza-claro); border-radius: 10px; background: var(--fundo-card, #fff); }
+    .dp-kpi .lbl { font-size: 0.72rem; color: var(--cinza); text-transform: uppercase; letter-spacing: 0.04em; }
+    .dp-kpi .val { font-size: 1.4rem; font-weight: 700; margin-top: 0.2rem; color: var(--cinza-escuro); }
+    .dp-kpi .sub { font-size: 0.78rem; color: var(--cinza); margin-top: 0.15rem; }
+
+    .dp-grafico { display: flex; flex-direction: column; gap: 0.5rem; }
+    .dp-bar-row { display: grid; grid-template-columns: 140px 1fr auto; gap: 0.6rem; align-items: center; font-size: 0.85rem; }
+    .dp-bar-row .nome { color: var(--cinza-escuro); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dp-bar-track { background: var(--cinza-claro); border-radius: 6px; height: 18px; overflow: hidden; }
+    .dp-bar-fill { height: 100%; background: linear-gradient(90deg, var(--azul-claro), var(--azul)); border-radius: 6px; transition: width 0.35s ease; }
+    .dp-bar-row .valor { font-variant-numeric: tabular-nums; color: var(--cinza-escuro); font-weight: 600; min-width: 90px; text-align: right; }
+    .dp-vazio { text-align: center; padding: 1.25rem; color: var(--cinza); font-size: 0.9rem; }
+
+    .dp-acao-btn { width:auto; padding:0.35rem 0.7rem; font-size:0.82rem; }
+    .dp-filtros-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; align-items: end; }
+
+    .dp-radio-group { display:flex; gap:0.5rem; }
+    .dp-radio-group label {
+      flex:1; cursor:pointer; padding:0.55rem 0.8rem; border:1px solid var(--cinza-claro);
+      border-radius:8px; text-align:center; font-size:0.88rem; transition:all 0.15s;
+      display:inline-flex; align-items:center; justify-content:center; gap:0.35rem;
+    }
+    .dp-radio-group input[type="radio"] { display:none; }
+    .dp-radio-group input[type="radio"]:checked + span {
+      color:white;
+    }
+    .dp-radio-group label:has(input:checked) { background: var(--azul); border-color:var(--azul); color:white; }
+    .dp-radio-group label:has(input[value="doacao"]:checked) { background: var(--verde); border-color:var(--verde); }
+
+    .badge-doacao {
+      display:inline-block; padding:1px 7px; border-radius:999px;
+      font-size:0.68rem; font-weight:700; letter-spacing:0.04em;
+      background: rgba(22,163,74,0.15); color: var(--verde); margin-left:4px;
+    }
+    .valor-doacao { color: var(--verde); text-decoration: line-through; opacity: 0.75; font-weight:500; }
+  </style>
+</head>
+<body>
+  <main class="admin">
+    <h2 style="color:var(--azul);margin-bottom:0.25rem;display:inline-flex;align-items:center;gap:0.5rem;">
+      <span data-icon="dollar-sign" data-size="24"></span> Despesas
+    </h2>
+    <p class="text-muted mb-2">Controle de gastos do grupo — matérias-primas, embalagens, serviços e qualquer saída financeira.</p>
+
+    <!-- KPIs -->
+    <div class="dp-kpis">
+      <div class="dp-kpi">
+        <div class="lbl">Total do mês</div>
+        <div class="val" id="kpi-mes" style="color:var(--vermelho);">R$ 0,00</div>
+        <div class="sub" id="kpi-mes-sub">—</div>
+      </div>
+      <div class="dp-kpi">
+        <div class="lbl">Maior categoria (mês)</div>
+        <div class="val" id="kpi-cat" style="font-size:1.1rem;">—</div>
+        <div class="sub" id="kpi-cat-sub">—</div>
+      </div>
+      <div class="dp-kpi">
+        <div class="lbl">Total geral</div>
+        <div class="val" id="kpi-total">R$ 0,00</div>
+        <div class="sub" id="kpi-total-sub">0 lançamentos</div>
+      </div>
+    </div>
+
+    <!-- Form -->
+    <div class="card">
+      <h3 class="card-title" id="form-titulo">Nova despesa</h3>
+      <input type="hidden" id="dp-id">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;">
+        <div class="form-group">
+          <label for="dp-data">Data</label>
+          <input type="date" id="dp-data">
+        </div>
+        <div class="form-group">
+          <label for="dp-valor">Valor (R$)</label>
+          <input type="number" id="dp-valor" step="0.01" min="0" inputmode="decimal">
+        </div>
+        <div class="form-group">
+          <label for="dp-forma">Forma de pagamento</label>
+          <select id="dp-forma">
+            <option value="pix">PIX</option>
+            <option value="dinheiro">Dinheiro</option>
+            <option value="cartao_debito">Cartão débito</option>
+            <option value="cartao_credito">Cartão crédito</option>
+            <option value="boleto">Boleto</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;">
+        <div class="form-group">
+          <label for="dp-categoria">Categoria</label>
+          <input type="text" id="dp-categoria" list="lista-categorias" placeholder="Ex: Matéria-prima" autocomplete="off">
+          <datalist id="lista-categorias"></datalist>
+        </div>
+        <div class="form-group">
+          <label for="dp-insumo">Insumo <span style="color:var(--cinza);font-weight:400;">(opcional)</span></label>
+          <div style="display:flex;gap:0.4rem;">
+            <select id="dp-insumo" style="flex:1;">
+              <option value="">— nenhum —</option>
+            </select>
+            <button type="button" id="btn-novo-insumo" class="btn btn-secondary" style="width:auto;padding:0.55rem 0.7rem;white-space:nowrap;" title="Cadastrar novo insumo">+ novo</button>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <span class="form-label" id="dp-tipo-label" style="display:block;font-weight:600;margin-bottom:0.35rem;">Tipo</span>
+        <div class="dp-radio-group" role="radiogroup" aria-labelledby="dp-tipo-label">
+          <label><input type="radio" name="dp-tipo" value="compra" checked><span data-icon="shopping-cart" data-size="14"></span> Compra</label>
+          <label><input type="radio" name="dp-tipo" value="doacao"><span data-icon="heart" data-size="14"></span> Doação</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label id="dp-resp-label" for="dp-responsavel">Pago por</label>
+        <input type="text" id="dp-responsavel" placeholder="Nome de quem realizou a compra" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label for="dp-descricao">Descrição</label>
+        <input type="text" id="dp-descricao" placeholder="Ex: Compra de chocolate granulado para brigadeiro">
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:0.5rem;">
+        <input type="checkbox" id="dp-vincular-evento" style="width:20px;height:20px;cursor:pointer;" checked>
+        <label for="dp-vincular-evento" style="cursor:pointer;margin-bottom:0;">
+          Vincular ao evento ativo (<span id="dp-evento-nome" style="color:var(--azul);font-weight:600;">—</span>)
+        </label>
+      </div>
+      <div id="alerta" class="alert hidden"></div>
+      <div style="display:flex;gap:0.5rem;">
+        <button id="btn-salvar" class="btn btn-primary">Salvar</button>
+        <button id="btn-cancelar" class="btn btn-secondary hidden">Cancelar</button>
+      </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card">
+      <h3 class="card-title" style="display:inline-flex;align-items:center;gap:0.4rem;"><span data-icon="filter" data-size="18"></span> Filtros</h3>
+      <div class="dp-filtros-grid">
+        <div class="form-group" style="margin-bottom:0;">
+          <label for="f-categoria">Categoria</label>
+          <select id="f-categoria"><option value="">Todas</option></select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label for="f-de">De</label>
+          <input type="date" id="f-de">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label for="f-ate">Até</label>
+          <input type="date" id="f-ate">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label for="f-forma">Forma pgto</label>
+          <select id="f-forma">
+            <option value="">Todas</option>
+            <option value="pix">PIX</option>
+            <option value="dinheiro">Dinheiro</option>
+            <option value="cartao_debito">Cartão débito</option>
+            <option value="cartao_credito">Cartão crédito</option>
+            <option value="boleto">Boleto</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label for="f-tipo">Tipo</label>
+          <select id="f-tipo">
+            <option value="">Todos</option>
+            <option value="compra">Compras</option>
+            <option value="doacao">Doações</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <button id="btn-limpar" class="btn btn-secondary" style="padding:0.55rem 0.9rem;">Limpar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gráfico -->
+    <div class="card">
+      <h3 class="card-title" style="display:inline-flex;align-items:center;gap:0.4rem;"><span data-icon="bar-chart" data-size="18"></span> Despesas por categoria</h3>
+      <div id="grafico" class="dp-grafico">
+        <div class="dp-vazio">Sem dados para os filtros atuais.</div>
+      </div>
+    </div>
+
+    <!-- Importação em lote -->
+    <div class="card">
+      <h3 class="card-title" style="display:inline-flex;align-items:center;gap:0.4rem;"><span data-icon="upload" data-size="18"></span> Importar em lote (CSV / Excel)</h3>
+      <p class="text-muted" style="font-size:0.85rem;margin-bottom:0.75rem;">
+        Uma despesa por linha:
+        <code style="background:var(--cinza-claro);padding:2px 6px;border-radius:4px;">Data, Descrição, Valor, Categoria, Forma, Tipo, Responsável, Insumo</code><br>
+        <strong>Data</strong> aceita <code>AAAA-MM-DD</code> ou <code>DD/MM/AAAA</code>.
+        <strong>Valor</strong> aceita ponto ou vírgula.
+        <strong>Forma</strong>: pix, dinheiro, debito, credito, boleto, outro.
+        <strong>Tipo</strong>: compra (padrão) ou doacao.
+        <strong>Insumo</strong> e <strong>Responsável</strong> são opcionais.
+      </p>
+      <pre style="background:var(--cinza-claro);padding:0.75rem;border-radius:8px;font-size:0.8rem;margin-bottom:0.75rem;">2026-04-15, Granulado de chocolate, 45.00, Matéria-prima, pix, compra, Maria, Brigadeiro
+16/04/2026, Caixinhas de papel, 30,00, Embalagem, dinheiro, doacao, João,
+2026-04-17, "Aluguel de barraca, evento abril", 200, Serviços, pix, compra, Diretoria,</pre>
+      <div class="form-group">
+        <label for="lote-despesas">Cole o CSV aqui</label>
+        <textarea id="lote-despesas" rows="8" style="font-family:monospace;font-size:0.875rem;" placeholder="Data, Descrição, Valor, Categoria, Forma, Tipo, Responsável, Insumo"></textarea>
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:0.5rem;">
+        <input type="checkbox" id="lote-vincular-evento" style="width:20px;height:20px;cursor:pointer;" checked>
+        <label for="lote-vincular-evento" style="cursor:pointer;margin-bottom:0;">
+          Vincular tudo ao evento ativo (<span id="lote-evento-nome" style="color:var(--azul);font-weight:600;">—</span>)
+        </label>
+      </div>
+      <div id="alerta-lote" class="alert hidden"></div>
+      <button id="btn-lote" class="btn btn-primary" style="max-width:240px;">Importar lote</button>
+    </div>
+
+    <!-- Tabela -->
+    <h3 style="color:var(--azul);margin:1.5rem 0 0.75rem;">Lançamentos <span id="tbl-contador" style="color:var(--cinza);font-size:0.85rem;font-weight:400;"></span></h3>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Descrição</th>
+            <th>Categoria</th>
+            <th>Insumo</th>
+            <th>Responsável</th>
+            <th>Forma</th>
+            <th style="text-align:right;">Valor</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tbl"><tr><td colspan="8" class="text-center text-muted">Carregando...</td></tr></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script type="module">
+    import { montarNav } from "./_nav.js";
+    import { fmtBRL } from "../js/helpers.js";
+    import {
+      db, collection, doc, getDoc, addDoc, updateDoc, deleteDoc, onSnapshot,
+      query, orderBy, serverTimestamp, writeBatch
+    } from "../js/firebase-config.js";
+    import { icon, renderIcons } from "../js/icons.js";
+    import { confirmarAsync } from "../js/ui.js";
+
+    montarNav('despesas.html');
+    renderIcons();
+
+    const $ = (id) => document.getElementById(id);
+    const alerta = $('alerta');
+
+    const FORMAS_LABEL = {
+      pix: 'PIX',
+      dinheiro: 'Dinheiro',
+      cartao_debito: 'Cartão débito',
+      cartao_credito: 'Cartão crédito',
+      boleto: 'Boleto',
+      outro: 'Outro'
+    };
+
+    let despesas = [];
+    let insumos = [];
+    let eventoAtivo = null;
+
+    // Data padrão = hoje
+    function hojeISO() {
+      const d = new Date();
+      const off = d.getTimezoneOffset();
+      return new Date(d.getTime() - off * 60000).toISOString().slice(0, 10);
+    }
+    $('dp-data').value = hojeISO();
+
+    // Evento ativo
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, 'config', 'eventoAtivo'));
+        if (snap.exists()) {
+          eventoAtivo = snap.data();
+          const nome = eventoAtivo.nome || eventoAtivo.id || '—';
+          $('dp-evento-nome').textContent = nome;
+          $('lote-evento-nome').textContent = nome;
+        } else {
+          $('dp-evento-nome').textContent = 'nenhum';
+          $('lote-evento-nome').textContent = 'nenhum';
+          $('dp-vincular-evento').checked = false;
+          $('dp-vincular-evento').disabled = true;
+          $('lote-vincular-evento').checked = false;
+          $('lote-vincular-evento').disabled = true;
+        }
+      } catch (e) {
+        console.warn('[despesas] falha ao ler eventoAtivo:', e);
+      }
+    })();
+
+    // Tipo: troca label do "responsável" e cor do bloco
+    function atualizarLabelResponsavel() {
+      const tipo = document.querySelector('input[name="dp-tipo"]:checked')?.value || 'compra';
+      $('dp-resp-label').textContent = tipo === 'doacao' ? 'Doado por' : 'Pago por';
+      $('dp-responsavel').placeholder = tipo === 'doacao' ? 'Nome de quem doou' : 'Nome de quem realizou a compra';
+    }
+    document.querySelectorAll('input[name="dp-tipo"]').forEach(r => r.addEventListener('change', atualizarLabelResponsavel));
+
+    // Insumos — onSnapshot
+    const unsub1 = onSnapshot(collection(db, 'insumos'), (snap) => {
+      insumos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      insumos.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+      atualizarSelectInsumos();
+    });
+
+    function atualizarSelectInsumos() {
+      const cat = $('dp-categoria').value.trim();
+      const sel = $('dp-insumo');
+      const valorAtual = sel.value;
+      sel.innerHTML = '<option value="">— nenhum —</option>';
+      const filtrados = cat
+        ? insumos.filter(i => (i.categoria || '').toLowerCase() === cat.toLowerCase())
+        : insumos;
+      filtrados.forEach(i => {
+        const opt = document.createElement('option');
+        opt.value = i.id;
+        opt.textContent = i.categoria ? `${i.nome} — ${i.categoria}` : i.nome;
+        sel.appendChild(opt);
+      });
+      sel.value = valorAtual;
+    }
+    $('dp-categoria').addEventListener('input', atualizarSelectInsumos);
+
+    // Novo insumo inline
+    $('btn-novo-insumo').onclick = async () => {
+      const cat = $('dp-categoria').value.trim();
+      if (!cat) {
+        alerta.textContent = 'Preencha a categoria antes de cadastrar um insumo.';
+        alerta.className = 'alert alert-warning';
+        return;
+      }
+      const nome = prompt(`Novo insumo na categoria "${cat}":`);
+      if (!nome || !nome.trim()) return;
+      try {
+        const ref = await addDoc(collection(db, 'insumos'), {
+          nome: nome.trim(),
+          categoria: cat,
+          ativo: true
+        });
+        // Aguarda o onSnapshot atualizar e seleciona
+        setTimeout(() => { $('dp-insumo').value = ref.id; }, 200);
+      } catch (err) {
+        alerta.textContent = `Erro ao criar insumo: ${err.message}`;
+        alerta.className = 'alert alert-danger';
+      }
+    };
+
+    // Despesas — onSnapshot
+    const unsub2 = onSnapshot(query(collection(db, 'despesas'), orderBy('data', 'desc')), (snap) => {
+      despesas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      atualizarCategorias();
+      renderizar();
+    });
+
+    function atualizarCategorias() {
+      const cats = Array.from(new Set(despesas.map(d => (d.categoria || '').trim()).filter(Boolean)))
+        .sort((a, b) => a.localeCompare(b));
+      // datalist do form
+      const dl = $('lista-categorias');
+      dl.innerHTML = cats.map(c => `<option value="${c}">`).join('');
+      // select do filtro
+      const fc = $('f-categoria');
+      const atual = fc.value;
+      fc.innerHTML = '<option value="">Todas</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+      fc.value = atual;
+    }
+
+    function aplicarFiltros(lista) {
+      const cat   = $('f-categoria').value.trim().toLowerCase();
+      const de    = $('f-de').value;
+      const ate   = $('f-ate').value;
+      const forma = $('f-forma').value;
+      const tipo  = $('f-tipo').value;
+      return lista.filter(d => {
+        const dTipo = d.tipo || 'compra';
+        if (cat && (d.categoria || '').toLowerCase() !== cat) return false;
+        if (de && (d.data || '') < de) return false;
+        if (ate && (d.data || '') > ate) return false;
+        if (forma && d.formaPagamento !== forma) return false;
+        if (tipo && dTipo !== tipo) return false;
+        return true;
+      });
+    }
+
+    // Doação não soma no custo (custo zero no final)
+    const custo = (d) => (d.tipo === 'doacao' ? 0 : (d.valor || 0));
+
+    function renderizar() {
+      const filtradas = aplicarFiltros(despesas);
+
+      // KPIs (mês corrente — sempre, ignora filtros). Doação = custo zero.
+      const hoje = new Date();
+      const ym = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+      const doMes = despesas.filter(d => (d.data || '').startsWith(ym));
+      const totalMes = doMes.reduce((s, d) => s + custo(d), 0);
+      const doacoesMes = doMes.filter(d => d.tipo === 'doacao').length;
+      $('kpi-mes').textContent = fmtBRL(totalMes);
+      $('kpi-mes-sub').textContent = `${doMes.length} lançamento${doMes.length === 1 ? '' : 's'}` +
+        (doacoesMes ? ` • ${doacoesMes} doação${doacoesMes === 1 ? '' : 'ões'}` : '');
+
+      const porCatMes = new Map();
+      doMes.forEach(d => {
+        const c = d.categoria || '—';
+        porCatMes.set(c, (porCatMes.get(c) || 0) + custo(d));
+      });
+      const maior = Array.from(porCatMes.entries()).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1])[0];
+      if (maior) {
+        $('kpi-cat').textContent = maior[0];
+        const pct = totalMes > 0 ? Math.round((maior[1] / totalMes) * 100) : 0;
+        $('kpi-cat-sub').textContent = `${fmtBRL(maior[1])} (${pct}% do mês)`;
+      } else {
+        $('kpi-cat').textContent = '—';
+        $('kpi-cat-sub').textContent = 'sem custos no mês';
+      }
+
+      const totalGeral = despesas.reduce((s, d) => s + custo(d), 0);
+      $('kpi-total').textContent = fmtBRL(totalGeral);
+      $('kpi-total-sub').textContent = `${despesas.length} lançamento${despesas.length === 1 ? '' : 's'}`;
+
+      // Gráfico — usa filtros, doações entram com custo zero
+      const porCat = new Map();
+      filtradas.forEach(d => {
+        const c = d.categoria || '—';
+        porCat.set(c, (porCat.get(c) || 0) + custo(d));
+      });
+      const ordenado = Array.from(porCat.entries()).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+      const totalFiltrado = ordenado.reduce((s, [, v]) => s + v, 0);
+      const maxVal = ordenado[0]?.[1] || 1;
+      const grafico = $('grafico');
+      if (ordenado.length === 0) {
+        grafico.innerHTML = '<div class="dp-vazio">Sem dados para os filtros atuais.</div>';
+      } else {
+        grafico.innerHTML = ordenado.map(([cat, val]) => {
+          const pct = (val / maxVal) * 100;
+          const pctTotal = totalFiltrado > 0 ? Math.round((val / totalFiltrado) * 100) : 0;
+          return `
+            <div class="dp-bar-row">
+              <div class="nome" title="${cat}">${cat}</div>
+              <div class="dp-bar-track"><div class="dp-bar-fill" style="width:${pct}%;"></div></div>
+              <div class="valor">${fmtBRL(val)} <span style="color:var(--cinza);font-weight:400;font-size:0.78rem;">${pctTotal}%</span></div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // Tabela
+      const totalFmt = fmtBRL(totalFiltrado);
+      $('tbl-contador').textContent = `(${filtradas.length} de ${despesas.length} • total ${totalFmt})`;
+      const tbody = $('tbl');
+      if (filtradas.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state">${icon('inbox', { size: 32 })}<p>Sem lançamentos.</p></div></td></tr>`;
+        return;
+      }
+      tbody.innerHTML = '';
+      filtradas.forEach(d => {
+        const dataFmt = d.data ? new Date(d.data + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
+        const ehDoacao = d.tipo === 'doacao';
+        const badge = ehDoacao ? `<span class="badge-doacao">DOAÇÃO</span>` : '';
+        const valorHtml = ehDoacao
+          ? `<span class="valor-doacao">${fmtBRL(d.valor)}</span>`
+          : `<span style="font-weight:600;">${fmtBRL(d.valor)}</span>`;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${dataFmt}</td>
+          <td>${d.descricao || '—'}${badge}</td>
+          <td>${d.categoria || '—'}</td>
+          <td>${d.insumoNome || '—'}</td>
+          <td>${d.responsavel || '—'}</td>
+          <td>${FORMAS_LABEL[d.formaPagamento] || d.formaPagamento || '—'}</td>
+          <td style="text-align:right;">${valorHtml}</td>
+          <td>
+            <button class="btn btn-secondary dp-acao-btn" data-edit="${d.id}">Editar</button>
+            <button class="btn btn-danger dp-acao-btn" data-del="${d.id}">Excluir</button>
+          </td>
+        `;
+        tr.querySelector('[data-edit]').onclick = () => editar(d);
+        tr.querySelector('[data-del]').onclick = async () => {
+          if (!(await confirmarAsync(`Excluir despesa "${d.descricao || 'sem descrição'}"?`, { destrutivo: true, textoOk: 'Excluir' }))) return;
+          await deleteDoc(doc(db, 'despesas', d.id));
+        };
+        tbody.appendChild(tr);
+      });
+    }
+
+    function editar(d) {
+      $('dp-id').value = d.id;
+      $('dp-data').value = d.data || hojeISO();
+      $('dp-valor').value = d.valor || '';
+      $('dp-forma').value = d.formaPagamento || 'pix';
+      $('dp-categoria').value = d.categoria || '';
+      atualizarSelectInsumos();
+      $('dp-insumo').value = d.insumoId || '';
+      $('dp-descricao').value = d.descricao || '';
+      const tipo = d.tipo || 'compra';
+      document.querySelector(`input[name="dp-tipo"][value="${tipo}"]`).checked = true;
+      atualizarLabelResponsavel();
+      $('dp-responsavel').value = d.responsavel || '';
+      $('dp-vincular-evento').checked = !!d.eventoId;
+      $('form-titulo').textContent = `Editando lançamento`;
+      $('btn-cancelar').classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function resetForm() {
+      $('dp-id').value = '';
+      $('dp-data').value = hojeISO();
+      $('dp-valor').value = '';
+      $('dp-forma').value = 'pix';
+      $('dp-categoria').value = '';
+      $('dp-insumo').innerHTML = '<option value="">— nenhum —</option>';
+      $('dp-descricao').value = '';
+      document.querySelector('input[name="dp-tipo"][value="compra"]').checked = true;
+      atualizarLabelResponsavel();
+      $('dp-responsavel').value = '';
+      $('dp-vincular-evento').checked = !!eventoAtivo;
+      $('form-titulo').textContent = 'Nova despesa';
+      $('btn-cancelar').classList.add('hidden');
+      alerta.classList.add('hidden');
+    }
+    $('btn-cancelar').onclick = resetForm;
+
+    $('btn-salvar').onclick = async () => {
+      const id = $('dp-id').value;
+      const data = $('dp-data').value;
+      const valor = parseFloat($('dp-valor').value) || 0;
+      const formaPagamento = $('dp-forma').value;
+      const categoria = $('dp-categoria').value.trim();
+      const insumoId = $('dp-insumo').value || null;
+      const descricao = $('dp-descricao').value.trim();
+      const vincular = $('dp-vincular-evento').checked && eventoAtivo;
+
+      if (!data || valor <= 0 || !categoria || !descricao) {
+        alerta.textContent = 'Preencha data, descrição, valor e categoria.';
+        alerta.className = 'alert alert-warning';
+        return;
+      }
+
+      const insumo = insumoId ? insumos.find(i => i.id === insumoId) : null;
+      const tipo = document.querySelector('input[name="dp-tipo"]:checked')?.value || 'compra';
+      const responsavel = $('dp-responsavel').value.trim();
+      const dados = {
+        data,
+        descricao,
+        valor,
+        formaPagamento,
+        categoria,
+        insumoId: insumoId || null,
+        insumoNome: insumo?.nome || null,
+        tipo,
+        responsavel: responsavel || null,
+        eventoId: vincular ? (eventoAtivo.id || null) : null,
+        eventoNome: vincular ? (eventoAtivo.nome || null) : null
+      };
+
+      try {
+        if (id) {
+          await updateDoc(doc(db, 'despesas', id), dados);
+        } else {
+          dados.criadoEm = serverTimestamp();
+          await addDoc(collection(db, 'despesas'), dados);
+        }
+        resetForm();
+        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} Salvo.</span>`;
+        alerta.className = 'alert alert-success';
+        setTimeout(() => alerta.classList.add('hidden'), 1800);
+      } catch (err) {
+        alerta.textContent = `Erro: ${err.message}`;
+        alerta.className = 'alert alert-danger';
+      }
+    };
+
+    // Filtros
+    ['f-categoria', 'f-de', 'f-ate', 'f-forma', 'f-tipo'].forEach(id => {
+      $(id).addEventListener('change', renderizar);
+    });
+    $('btn-limpar').onclick = () => {
+      $('f-categoria').value = '';
+      $('f-de').value = '';
+      $('f-ate').value = '';
+      $('f-forma').value = '';
+      $('f-tipo').value = '';
+      renderizar();
+    };
+
+    // ===== Importação em lote =====
+    const FORMAS_ALIAS = {
+      'pix': 'pix',
+      'dinheiro': 'dinheiro', 'cash': 'dinheiro', 'especie': 'dinheiro', 'espécie': 'dinheiro',
+      'debito': 'cartao_debito', 'débito': 'cartao_debito', 'cartao_debito': 'cartao_debito',
+      'cartão débito': 'cartao_debito', 'cartao debito': 'cartao_debito', 'cartão_débito': 'cartao_debito',
+      'credito': 'cartao_credito', 'crédito': 'cartao_credito', 'cartao_credito': 'cartao_credito',
+      'cartão crédito': 'cartao_credito', 'cartao credito': 'cartao_credito', 'cartão_crédito': 'cartao_credito',
+      'boleto': 'boleto',
+      'outro': 'outro', 'outros': 'outro'
+    };
+
+    function parseLinhaCSV(linha) {
+      const campos = [];
+      let atual = '', dentroAspas = false;
+      for (let i = 0; i < linha.length; i++) {
+        const c = linha[i];
+        if (c === '"') { dentroAspas = !dentroAspas; continue; }
+        if ((c === ',' || c === ';') && !dentroAspas) { campos.push(atual.trim()); atual = ''; continue; }
+        atual += c;
+      }
+      campos.push(atual.trim());
+      return campos;
+    }
+
+    function parseData(s) {
+      if (!s) return null;
+      const t = s.trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+      const m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+      return null;
+    }
+
+    $('btn-lote').onclick = async () => {
+      const texto = $('lote-despesas').value.trim();
+      const alertaLote = $('alerta-lote');
+      if (!texto) {
+        alertaLote.textContent = 'Cole pelo menos uma linha.';
+        alertaLote.className = 'alert alert-warning';
+        return;
+      }
+      const linhas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      const erros = [];
+      const validos = [];
+      const vincular = $('lote-vincular-evento').checked && eventoAtivo;
+
+      linhas.forEach((linha, i) => {
+        const p = parseLinhaCSV(linha);
+        const data = parseData(p[0]);
+        const descricao = p[1] || '';
+        const valor = parseFloat((p[2] || '').replace(',', '.'));
+        const categoria = p[3] || '';
+        const formaRaw = (p[4] || 'pix').toLowerCase();
+        const formaPagamento = FORMAS_ALIAS[formaRaw] || 'outro';
+        const tipoRaw = (p[5] || 'compra').toLowerCase().replace(/[çã]/g, m => m === 'ç' ? 'c' : 'a');
+        const tipo = tipoRaw.startsWith('doa') ? 'doacao' : 'compra';
+        const responsavel = (p[6] || '').trim() || null;
+        const insumoNomeBruto = (p[7] || '').trim();
+
+        const linhaErros = [];
+        if (!data) linhaErros.push('data inválida');
+        if (!descricao) linhaErros.push('descrição vazia');
+        if (isNaN(valor) || valor < 0) linhaErros.push('valor inválido');
+        if (!categoria) linhaErros.push('categoria vazia');
+        if (linhaErros.length) {
+          erros.push(`Linha ${i + 1}: ${linhaErros.join(', ')} — "${linha}"`);
+          return;
+        }
+
+        // Match de insumo por nome (mesma categoria, case-insensitive)
+        let insumoMatch = null;
+        if (insumoNomeBruto) {
+          insumoMatch = insumos.find(ins =>
+            (ins.nome || '').toLowerCase() === insumoNomeBruto.toLowerCase() &&
+            (ins.categoria || '').toLowerCase() === categoria.toLowerCase()
+          ) || null;
+        }
+
+        validos.push({
+          data, descricao, valor, categoria, formaPagamento, tipo, responsavel,
+          insumoId: insumoMatch?.id || null,
+          insumoNome: insumoMatch?.nome || (insumoNomeBruto || null),
+          eventoId: vincular ? (eventoAtivo.id || null) : null,
+          eventoNome: vincular ? (eventoAtivo.nome || null) : null
+        });
+      });
+
+      if (erros.length) {
+        alertaLote.innerHTML = `<strong>${erros.length} erro(s) — corrija antes de importar:</strong><br>${erros.join('<br>')}`;
+        alertaLote.className = 'alert alert-danger';
+        return;
+      }
+
+      if (!(await confirmarAsync(`Importar ${validos.length} despesa(s)?`, { textoOk: 'Importar' }))) return;
+
+      $('btn-lote').disabled = true;
+      $('btn-lote').innerHTML = '<div class="loader"></div> Importando...';
+
+      try {
+        // Firestore writeBatch limita 500 ops — particiona se passar
+        for (let i = 0; i < validos.length; i += 450) {
+          const fatia = validos.slice(i, i + 450);
+          const batch = writeBatch(db);
+          fatia.forEach(d => {
+            batch.set(doc(collection(db, 'despesas')), { ...d, criadoEm: serverTimestamp() });
+          });
+          await batch.commit();
+        }
+        $('lote-despesas').value = '';
+        alertaLote.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} ${validos.length} despesa(s) importada(s).</span>`;
+        alertaLote.className = 'alert alert-success';
+        setTimeout(() => alertaLote.classList.add('hidden'), 3500);
+      } catch (err) {
+        alertaLote.textContent = `Erro: ${err.message}`;
+        alertaLote.className = 'alert alert-danger';
+      } finally {
+        $('btn-lote').disabled = false;
+        $('btn-lote').innerHTML = 'Importar lote';
+      }
+    };
+    window.addEventListener('pagehide', () => { unsub1(); unsub2(); });
+  </script>
+</body>
+</html>

@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0F1D4D">
+  <title>Guia de uso — App GEH</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+  <link rel="icon" href="../assets/logo.png">
+  <style>
+    :root{
+      --azul:#1E3A8A; --azul-esc:#0F1D4D; --azul-claro:#3B5BC9;
+      --vermelho:#DC2626; --amarelo:#FBBF24;
+      --bg:#F7F8FB; --card:#FFFFFF; --border:#E5E8F0;
+      --text:#0F172A; --muted:#64748B; --soft:#F1F4FA;
+      --ok:#16A34A; --warn:#D97706;
+      --shadow:0 1px 2px rgba(15,29,77,.04), 0 8px 24px rgba(15,29,77,.06);
+      --radius:14px;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0}
+    body{
+      font-family:'Inter',system-ui,sans-serif;
+      background:var(--bg); color:var(--text);
+      font-size:15px; line-height:1.55;
+      -webkit-font-smoothing:antialiased;
+    }
+    a{color:var(--azul); text-decoration:none}
+    a:hover{text-decoration:underline}
+    code{background:var(--soft); padding:2px 6px; border-radius:6px; font-size:.88em; font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+
+    /* Layout */
+    .topbar{
+      position:sticky; top:0; z-index:20;
+      background:linear-gradient(135deg,var(--azul-esc),var(--azul));
+      color:#fff; padding:14px 24px;
+      display:flex; align-items:center; gap:14px;
+      box-shadow:0 2px 12px rgba(15,29,77,.18);
+    }
+    .topbar img{width:36px; height:36px; border-radius:8px; background:#fff; padding:3px}
+    .topbar h1{font-size:17px; margin:0; font-weight:700; letter-spacing:.2px}
+    .topbar small{opacity:.8; font-size:12px; display:block; font-weight:500}
+    .topbar .menu-btn{
+      margin-left:auto; background:rgba(255,255,255,.12); border:0; color:#fff;
+      width:40px; height:40px; border-radius:10px; cursor:pointer; font-size:20px;
+      display:none;
+    }
+
+    .layout{display:grid; grid-template-columns:280px 1fr; max-width:1280px; margin:0 auto}
+
+    aside{
+      position:sticky; top:64px; align-self:start;
+      height:calc(100vh - 64px); overflow-y:auto;
+      padding:24px 14px 40px; border-right:1px solid var(--border);
+      background:#fff;
+    }
+    aside h3{
+      font-size:11px; text-transform:uppercase; letter-spacing:1.2px;
+      color:var(--muted); margin:18px 12px 6px; font-weight:700;
+    }
+    aside h3:first-child{margin-top:0}
+    aside a{
+      display:flex; align-items:center; gap:10px;
+      padding:9px 12px; border-radius:10px;
+      color:var(--text); font-weight:500; font-size:14px;
+    }
+    aside a:hover{background:var(--soft); text-decoration:none}
+    aside a.active{background:var(--azul); color:#fff}
+    aside a .ico{
+      width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center;
+      font-size:14px;
+    }
+
+    main{padding:32px 40px 80px; max-width:880px}
+
+    /* Hero */
+    .hero{
+      background:linear-gradient(135deg,var(--azul-esc),var(--azul) 60%,var(--azul-claro));
+      color:#fff; border-radius:18px; padding:32px;
+      margin-bottom:32px; box-shadow:var(--shadow);
+      position:relative; overflow:hidden;
+    }
+    .hero::after{
+      content:""; position:absolute; right:-40px; top:-40px;
+      width:200px; height:200px; border-radius:50%;
+      background:rgba(251,191,36,.15);
+    }
+    .hero .tag{
+      display:inline-flex; align-items:center; gap:6px;
+      background:rgba(255,255,255,.14); padding:5px 11px; border-radius:999px;
+      font-size:12px; font-weight:600; letter-spacing:.3px;
+    }
+    .hero h2{font-size:30px; margin:14px 0 8px; font-weight:800; line-height:1.15}
+    .hero p{margin:0; opacity:.92; font-size:16px; max-width:580px}
+
+    /* Sections */
+    section{
+      background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+      padding:28px 30px; margin-bottom:24px; box-shadow:var(--shadow);
+      scroll-margin-top:80px;
+    }
+    section h2{
+      font-size:22px; margin:0 0 4px; font-weight:700;
+      display:flex; align-items:center; gap:10px;
+    }
+    section h2 .badge{
+      font-size:11px; padding:3px 8px; border-radius:6px;
+      background:var(--soft); color:var(--muted); font-weight:600;
+      letter-spacing:.4px; text-transform:uppercase;
+    }
+    section .lead{color:var(--muted); margin:0 0 20px; font-size:14.5px}
+    section h3{font-size:16px; margin:22px 0 10px; font-weight:700}
+
+    /* Steps */
+    ol.steps{counter-reset:step; list-style:none; padding:0; margin:0}
+    ol.steps li{
+      counter-increment:step; position:relative;
+      padding:14px 16px 14px 50px; margin-bottom:8px;
+      background:var(--soft); border-radius:10px;
+      font-size:14.5px;
+    }
+    ol.steps li::before{
+      content:counter(step); position:absolute; left:14px; top:14px;
+      width:26px; height:26px; border-radius:50%;
+      background:var(--azul); color:#fff;
+      font-weight:700; font-size:13px;
+      display:flex; align-items:center; justify-content:center;
+    }
+    ol.steps li b{color:var(--azul-esc)}
+
+    /* Bullets */
+    ul.feats{list-style:none; padding:0; margin:0}
+    ul.feats li{
+      position:relative; padding:8px 0 8px 26px; font-size:14.5px;
+      border-bottom:1px solid var(--border);
+    }
+    ul.feats li:last-child{border-bottom:0}
+    ul.feats li::before{
+      content:"✓"; position:absolute; left:0; top:8px;
+      color:var(--ok); font-weight:700;
+    }
+
+    /* Callouts */
+    .tip, .warn{
+      border-radius:10px; padding:14px 16px; margin:14px 0;
+      font-size:14px; display:flex; gap:12px; align-items:flex-start;
+    }
+    .tip{background:#EEF4FF; border-left:4px solid var(--azul-claro); color:#1E3A8A}
+    .warn{background:#FFF7E6; border-left:4px solid var(--warn); color:#92400E}
+    .tip b, .warn b{display:block; margin-bottom:2px}
+
+    /* Role cards */
+    .roles{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; margin-top:8px}
+    .role{
+      border:1px solid var(--border); border-radius:12px; padding:18px;
+      background:#fff; transition:transform .15s, box-shadow .15s;
+    }
+    .role:hover{transform:translateY(-2px); box-shadow:var(--shadow)}
+    .role .icon{
+      width:42px; height:42px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+      background:var(--soft); font-size:20px; margin-bottom:10px;
+    }
+    .role h4{margin:0 0 4px; font-size:15px}
+    .role p{margin:0; color:var(--muted); font-size:13px}
+    .role.op .icon{background:#E8F0FF; color:var(--azul)}
+    .role.cx .icon{background:#FEF3C7; color:#92400E}
+    .role.rc .icon{background:#FEE2E2; color:var(--vermelho)}
+    .role.ad .icon{background:#DCFCE7; color:#166534}
+
+    /* Flow diagram */
+    .flow{
+      background:var(--soft); border-radius:12px; padding:20px;
+      display:grid; grid-template-columns:repeat(3,1fr); gap:14px;
+      margin:14px 0;
+    }
+    .flow .step{
+      background:#fff; border-radius:10px; padding:14px;
+      text-align:center; border:1px solid var(--border);
+    }
+    .flow .step .n{
+      width:28px; height:28px; border-radius:50%; background:var(--azul); color:#fff;
+      display:inline-flex; align-items:center; justify-content:center;
+      font-weight:700; font-size:13px; margin-bottom:8px;
+    }
+    .flow .step b{display:block; font-size:13px; margin-bottom:2px}
+    .flow .step span{font-size:12px; color:var(--muted)}
+
+    /* Tables */
+    table{width:100%; border-collapse:collapse; font-size:14px; margin:8px 0}
+    th, td{padding:10px 12px; text-align:left; border-bottom:1px solid var(--border)}
+    th{background:var(--soft); font-weight:600; font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px}
+
+    .footer{
+      text-align:center; color:var(--muted); font-size:13px;
+      padding:30px 20px; border-top:1px solid var(--border); margin-top:40px;
+    }
+    .footer .heart{color:var(--vermelho)}
+
+    @media (max-width: 880px){
+      .layout{grid-template-columns:1fr}
+      aside{
+        position:fixed; top:64px; left:0; right:0; bottom:0; height:auto;
+        z-index:30; transform:translateX(-100%); transition:transform .2s;
+        width:280px; border-right:1px solid var(--border);
+      }
+      aside.open{transform:translateX(0)}
+      .topbar .menu-btn{display:block}
+      main{padding:20px}
+      .hero{padding:24px}
+      .hero h2{font-size:24px}
+      section{padding:22px 20px}
+      .flow{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <img src="../assets/logo.png" alt="GEH" onerror="this.style.display='none'">
+  <div>
+    <h1>Guia de uso — App GEH</h1>
+    <small>Como usar cada parte do sistema</small>
+  </div>
+  <button class="menu-btn" onclick="document.querySelector('aside').classList.toggle('open')">☰</button>
+</header>
+
+<div class="layout">
+
+  <aside>
+    <h3>Início</h3>
+    <a href="#visao-geral"><span class="ico">🗺️</span> Visão geral</a>
+    <a href="#fluxo"><span class="ico">🎪</span> Fluxo do evento</a>
+
+    <h3>Operador</h3>
+    <a href="#op-home"><span class="ico">📱</span> Tela inicial</a>
+    <a href="#op-vender"><span class="ico">🛒</span> Vender</a>
+    <a href="#op-consultar"><span class="ico">🔎</span> Consultar saldo</a>
+
+    <h3>Caixa</h3>
+    <a href="#cx-home"><span class="ico">💰</span> Recarga + extrato</a>
+
+    <h3>Recepção</h3>
+    <a href="#rc-conferencia"><span class="ico">🎟️</span> Conferência</a>
+    <a href="#rc-porta"><span class="ico">🚪</span> Venda na porta</a>
+
+    <h3>Diretoria (Admin)</h3>
+    <a href="#ad-login"><span class="ico">🔐</span> Login</a>
+    <a href="#ad-dashboard"><span class="ico">📊</span> Dashboard</a>
+    <a href="#ad-eventos"><span class="ico">📅</span> Eventos</a>
+    <a href="#ad-comparativo"><span class="ico">📈</span> Comparativo</a>
+    <a href="#ad-historico"><span class="ico">🔍</span> Histórico</a>
+    <a href="#ad-produtos"><span class="ico">📦</span> Produtos</a>
+    <a href="#ad-clientes"><span class="ico">👥</span> Clientes</a>
+    <a href="#ad-recepcao"><span class="ico">🚪</span> Recepção (painel)</a>
+    <a href="#ad-estoque"><span class="ico">📥</span> Estoque</a>
+    <a href="#ad-despesas"><span class="ico">💸</span> Despesas</a>
+    <a href="#ad-ajuste"><span class="ico">✏️</span> Ajuste de saldo</a>
+    <a href="#ad-relatorio"><span class="ico">📈</span> Relatório</a>
+    <a href="#ad-fechamento"><span class="ico">📄</span> Fechamento</a>
+    <a href="#ad-usuarios"><span class="ico">👤</span> Usuários</a>
+
+    <h3>Extras</h3>
+    <a href="#pwa"><span class="ico">📲</span> Instalar no celular</a>
+    <a href="#atalhos"><span class="ico">⌨️</span> Atalhos</a>
+    <a href="impressao.html" target="_blank"><span class="ico">🖨️</span> Guia de bolso (imprimir)</a>
+  </aside>
+
+  <main>
+
+    <div class="hero">
+      <span class="tag">📘 Manual do usuário</span>
+      <h2>Como usar o App GEH</h2>
+      <p>Um passo a passo de cada tela do sistema, organizado por perfil. Use o menu lateral para pular direto para o que você precisa.</p>
+    </div>
+
+    <!-- VISÃO GERAL -->
+    <section id="visao-geral">
+      <h2>🗺️ Visão geral</h2>
+      <p class="lead">O App GEH tem <b>quatro perfis</b>. Na página inicial, cada pessoa escolhe o seu — e cai num app feito para o contexto de uso.</p>
+
+      <div class="roles">
+        <div class="role op">
+          <div class="icon">📱</div>
+          <h4>Operador de venda</h4>
+          <p>Celular no balcão. Sem login. Escaneia QR e registra venda.</p>
+        </div>
+        <div class="role cx">
+          <div class="icon">💰</div>
+          <h4>Caixa</h4>
+          <p>Celular ou tablet. Sem login. Recarga e consulta de saldo.</p>
+        </div>
+        <div class="role rc">
+          <div class="icon">🚪</div>
+          <h4>Recepção</h4>
+          <p>Celular na porta. Sem login. Check-in + venda de convite.</p>
+        </div>
+        <div class="role ad">
+          <div class="icon">🖥️</div>
+          <h4>Diretoria</h4>
+          <p>Desktop. Com login. Cadastros, financeiro e relatórios.</p>
+        </div>
+      </div>
+
+      <div class="tip">
+        <span>💡</span>
+        <div><b>Dica</b>Quem está no balcão não precisa de senha — o controle é físico (só quem tem o aparelho na mão consegue abrir a tela). Login só na área da diretoria.</div>
+      </div>
+    </section>
+
+    <!-- FLUXO -->
+    <section id="fluxo">
+      <h2>🎪 Fluxo de um evento</h2>
+      <p class="lead">Da preparação até o fechamento — quem faz o quê, na ordem.</p>
+
+      <h3>Antes do evento (Diretoria, no PC)</h3>
+      <div class="flow">
+        <div class="step"><div class="n">1</div><b>Criar evento</b><span>Em "Eventos" → ativar</span></div>
+        <div class="step"><div class="n">2</div><b>Cadastrar produtos</b><span>Individual ou em lote (CSV)</span></div>
+        <div class="step"><div class="n">3</div><b>Cadastrar clientes</b><span>IDs dos QR codes</span></div>
+      </div>
+
+      <h3>Durante o evento</h3>
+      <div class="flow">
+        <div class="step"><div class="n">4</div><b>Recepção</b><span>Check-in dos antecipados + venda na porta</span></div>
+        <div class="step"><div class="n">5</div><b>Caixa</b><span>Carrega saldo no QR do cliente</span></div>
+        <div class="step"><div class="n">6</div><b>Operador</b><span>Vende escaneando o QR</span></div>
+      </div>
+
+      <h3>Depois do evento</h3>
+      <div class="flow">
+        <div class="step"><div class="n">7</div><b>Lançar despesas</b><span>Insumos e gastos do evento</span></div>
+        <div class="step"><div class="n">8</div><b>Encerrar evento</b><span>Em "Eventos"</span></div>
+        <div class="step"><div class="n">9</div><b>Relatório</b><span>Conferir + exportar CSV/PDF</span></div>
+      </div>
+    </section>
+
+    <!-- OPERADOR -->
+    <section id="op-home">
+      <h2>📱 Operador — Tela inicial <span class="badge">sem login</span></h2>
+      <p class="lead">Mostra o evento ativo e dá acesso às duas ações principais.</p>
+      <ul class="feats">
+        <li>Cabeçalho com nome do <b>evento ativo</b> em tempo real</li>
+        <li>Botão grande <b>Vender</b> (fluxo principal)</li>
+        <li>Botão <b>Consultar saldo</b></li>
+      </ul>
+      <div class="warn">
+        <span>⚠️</span>
+        <div><b>Sem evento ativo?</b>O operador não consegue vender. A diretoria precisa ativar um evento em <code>admin/eventos</code> primeiro.</div>
+      </div>
+    </section>
+
+    <section id="op-vender">
+      <h2>🛒 Operador — Vender</h2>
+      <p class="lead">Fluxo estilo delivery: escaneia, monta carrinho, finaliza.</p>
+      <ol class="steps">
+        <li>Toque em <b>Vender</b> na home — abre o scanner.</li>
+        <li>Aponte a câmera para o <b>QR code do cliente</b> (ou digite o ID manual).</li>
+        <li>O carrinho abre mostrando todos os produtos com <b>botões + e −</b> em cada card.</li>
+        <li>Vá adicionando — a barra POS no rodapé mostra <b>quantidade e total</b> em tempo real.</li>
+        <li>Toque em <b>Finalizar</b> — o sistema desconta do saldo do cliente e baixa o estoque.</li>
+        <li>Aparece um <b>toast de confirmação</b> com vibração háptica.</li>
+      </ol>
+      <ul class="feats">
+        <li>Badge vermelho de <b>promoção</b> com preço riscado</li>
+        <li>Aviso ⚠️ quando o estoque está baixo</li>
+        <li>Botão <b>desabilita</b> se acabar o estoque</li>
+        <li>Bloqueia a venda se o saldo do cliente for insuficiente</li>
+      </ul>
+      <div class="tip"><span>💡</span><div><b>Dica de barulho</b>O toast vibra o celular pra você ter certeza que deu certo, mesmo sem ouvir nada.</div></div>
+    </section>
+
+    <section id="op-consultar">
+      <h2>🔎 Operador — Consultar saldo</h2>
+      <p class="lead">Quando o cliente só quer saber quanto tem — sem vender nada.</p>
+      <ol class="steps">
+        <li>Toque em <b>Consultar saldo</b>.</li>
+        <li>Escaneie o QR.</li>
+        <li>A tela mostra o <b>saldo atual</b> e as últimas movimentações.</li>
+      </ol>
+    </section>
+
+    <!-- CAIXA -->
+    <section id="cx-home">
+      <h2>💰 Caixa — Recarga + extrato <span class="badge">sem login</span></h2>
+      <p class="lead">Versão dedicada para o caixa, separada do fluxo de venda. Ideal para a fila de recarga.</p>
+      <ol class="steps">
+        <li>Abra <code>caixa/</code> no celular.</li>
+        <li>Toque em <b>Carregar saldo</b> e escaneie o QR.</li>
+        <li>Na mesma tela aparece o <b>extrato resumido</b>: últimas recargas + últimas vendas.</li>
+        <li>Digite valor e forma de pagamento, confirme.</li>
+      </ol>
+      <h3>Transferência de saldo entre clientes</h3>
+      <ol class="steps">
+        <li>Escaneie o QR do cliente <b>de origem</b>.</li>
+        <li>Escolha a opção <b>Transferir saldo</b>.</li>
+        <li>Escaneie o QR do cliente <b>de destino</b>.</li>
+        <li>Digite o <b>valor</b> e confirme. O saldo sai de um e entra no outro na hora.</li>
+      </ol>
+
+      <h3>Formas de pagamento disponíveis</h3>
+      <ul class="feats">
+        <li><b>Dinheiro</b> — pagamento em espécie</li>
+        <li><b>Pix</b> — transferência via Pix</li>
+        <li><b>Cartão</b> — débito ou crédito</li>
+        <li><b>Troquinho</b> — saldo deixado como troco pelo cliente (não entra como receita)</li>
+        <li><b>Correção</b> — ajuste interno feito pelo caixa para corrigir lançamento errado</li>
+      </ul>
+      <div class="tip"><span>💡</span><div><b>Por que separado do operador?</b>O caixa fica num lugar fixo (mesa de entrada), o operador anda pelos balcões. Telas separadas evitam confusão e permitem fluxos diferentes.</div></div>
+    </section>
+
+    <!-- RECEPÇÃO -->
+    <section id="rc-conferencia">
+      <h2>🎟️ Recepção — Conferência de antecipados <span class="badge">sem login</span></h2>
+      <p class="lead">Para quem comprou convite antes do evento.</p>
+      <ol class="steps">
+        <li>Abra <code>recepcao/</code> e toque em <b>Conferência</b>.</li>
+        <li><b>Procure pelo nome</b> ou escaneie o convite, se houver QR.</li>
+        <li>Toque em <b>Marcar check-in</b>.</li>
+        <li>O nome fica verde na lista — e aparece em tempo real no painel da diretoria.</li>
+      </ol>
+      <div class="warn"><span>⚠️</span><div><b>Pré-requisito</b>A lista precisa ter sido importada antes pela diretoria em <i>Convites antecipados</i>.</div></div>
+    </section>
+
+    <section id="rc-porta">
+      <h2>🚪 Recepção — Venda de convite na porta</h2>
+      <p class="lead">Para quem chega no dia sem convite comprado.</p>
+      <ol class="steps">
+        <li>Toque em <b>Venda na porta</b>.</li>
+        <li>Informe o <b>valor</b>, a <b>forma de pagamento</b> e (opcional) uma observação.</li>
+        <li>Confirme — a venda entra ao vivo no painel da diretoria e no comparativo do evento.</li>
+      </ol>
+    </section>
+
+    <!-- ADMIN -->
+    <section id="ad-login">
+      <h2>🔐 Diretoria — Login <span class="badge">com login</span></h2>
+      <ol class="steps">
+        <li>Abra <code>admin/login.html</code> no PC.</li>
+        <li>Entre com <b>Google</b> (recomendado) ou email/senha.</li>
+        <li>O acesso só libera se o seu perfil estiver com <b>papel "admin" e ativo</b> em <i>Usuários</i>.</li>
+      </ol>
+      <div class="warn"><span>⚠️</span><div><b>Primeira vez?</b>Peça pra outra pessoa da diretoria já cadastrada te ativar em <i>Usuários</i>. Se for a primeira pessoa do sistema, ative direto pelo console do Firebase.</div></div>
+    </section>
+
+    <section id="ad-dashboard">
+      <h2>📊 Diretoria — Dashboard</h2>
+      <p class="lead">A primeira tela depois do login. Visão em <b>tempo real</b> do evento ativo.</p>
+      <h3>KPIs de vendas</h3>
+      <ul class="feats">
+        <li><b>Total vendido</b> no evento, com ticket médio, hora de pico e vendas na última hora</li>
+        <li><b>Nº de vendas</b> realizadas</li>
+        <li><b>Saldo em circulação</b> (recargas − vendas)</li>
+        <li><b>Clientes ativos</b> e quantos estão sem saldo</li>
+      </ul>
+      <h3>KPIs de recarga</h3>
+      <ul class="feats">
+        <li><b>Total recarregado</b> no evento</li>
+        <li><b>Nº de recargas</b> realizadas</li>
+        <li><b>Ticket médio de recarga</b></li>
+      </ul>
+      <h3>KPIs de presença (convites antecipados)</h3>
+      <ul class="feats">
+        <li><b>Presentes</b> — quantos antecipados já fizeram check-in</li>
+        <li><b>Total de convites</b> importados</li>
+        <li><b>Pendentes</b> — ainda não chegaram</li>
+      </ul>
+      <h3>KPIs de estoque</h3>
+      <ul class="feats">
+        <li><b>Itens vendidos</b> no total</li>
+        <li><b>Produtos sem estoque</b></li>
+        <li><b>Valor em estoque</b> restante</li>
+      </ul>
+      <h3>Gráficos e tabelas</h3>
+      <ul class="feats">
+        <li><b>Receita por hora</b> — ritmo de vendas ao longo do evento</li>
+        <li><b>Top produtos</b> — os mais vendidos em gráfico</li>
+        <li><b>Ranking de vendedores</b> — pódio com os operadores que mais venderam</li>
+        <li><b>Situação do estoque</b> — tabela com estoque atual, unidades vendidas e status de cada produto</li>
+        <li><b>Alerta de estoque</b> — aparece automaticamente quando algum produto está baixo ou zerado</li>
+      </ul>
+      <p style="margin-top:14px; color:var(--muted); font-size:13.5px">Os blocos de recarga e presença ficam ocultos quando não há evento ativo.</p>
+    </section>
+
+    <section id="ad-eventos">
+      <h2>📅 Diretoria — Eventos</h2>
+      <ol class="steps">
+        <li>Toque em <b>Novo evento</b>, dê nome e data.</li>
+        <li>Para começar, toque em <b>Ativar</b> — fica como <i>evento ativo</i> e habilita os operadores.</li>
+        <li>Quando acabar, toque em <b>Encerrar</b>.</li>
+      </ol>
+      <div class="tip"><span>💡</span><div><b>Só um por vez</b>Só pode existir um evento ativo. Ativar outro encerra o anterior automaticamente.</div></div>
+
+      <h3>Categorias de ingresso</h3>
+      <p class="lead">Com o evento ativo, você pode cadastrar tipos de convite — cada um com preço antecipado, preço na porta e estoque disponível na porta.</p>
+      <ul class="feats">
+        <li>Exemplos: Adulto, Idoso, Criança</li>
+        <li>Cada categoria tem <b>preço antecipado</b>, <b>preço na porta</b> e <b>estoque na porta</b></li>
+        <li>As categorias aparecem na tela de venda na porta da recepção</li>
+      </ul>
+
+      <h3>Preparar para novo evento</h3>
+      <p class="lead">Limpa os dados operacionais sem apagar o histórico de vendas — ideal pra reutilizar os mesmos clientes e QR codes.</p>
+      <ul class="feats">
+        <li>Zera o saldo de todos os clientes</li>
+        <li>Apaga todos os produtos</li>
+        <li>Limpa convites antecipados e vendas na porta</li>
+        <li><b>O histórico de vendas e movimentações fica preservado</b></li>
+      </ul>
+      <div class="warn"><span>⚠️</span><div><b>Ação irreversível.</b>Confirme antes de usar — não tem como desfazer os zeros.</div></div>
+
+      <h3>Excluir todos os clientes</h3>
+      <p class="lead">Remove permanentemente todos os cadastros de clientes do sistema.</p>
+      <div class="warn"><span>⚠️</span><div><b>Ação irreversível.</b>Use só quando quiser começar do zero com uma nova base de QR codes.</div></div>
+
+      <h3>Outras ações no histórico</h3>
+      <ul class="feats">
+        <li><b>Editar nome</b> de qualquer evento (inclusive o ativo)</li>
+        <li><b>Reativar</b> um evento encerrado (encerra o ativo atual, se houver)</li>
+        <li><b>Excluir</b> evento sem vendas (eventos com vendas ficam preservados como histórico)</li>
+      </ul>
+    </section>
+
+    <section id="ad-comparativo">
+      <h2>📈 Diretoria — Comparativo</h2>
+      <p class="lead">Confronta dois ou mais eventos lado a lado: vendas com saldo, vendas na porta, despesas. Ótimo pra ver evolução ano a ano.</p>
+    </section>
+
+    <section id="ad-historico">
+      <h2>🔍 Diretoria — Histórico</h2>
+      <p class="lead">Buscar tudo que um cliente fez.</p>
+      <ol class="steps">
+        <li>Use a busca para encontrar o cliente (por ID).</li>
+        <li>A tela mostra todas as <b>recargas</b> e <b>vendas</b> com data e itens.</li>
+      </ol>
+    </section>
+
+    <section id="ad-produtos">
+      <h2>📦 Diretoria — Produtos</h2>
+      <ul class="feats">
+        <li><b>Cadastrar produto</b>: nome, preço, estoque, categoria</li>
+        <li><b>Promoção</b>: ativa o preço promocional (vira badge na tela do operador)</li>
+        <li><b>Cadastro em lote</b>: cole um CSV com vários produtos de uma vez</li>
+        <li>Badges automáticos de <b>estoque baixo</b> e <b>sem estoque</b></li>
+      </ul>
+    </section>
+
+    <section id="ad-clientes">
+      <h2>👥 Diretoria — Clientes</h2>
+      <ol class="steps">
+        <li>Para um cliente novo, escaneie/digite o <b>ID do QR</b> e cadastre.</li>
+        <li>Para vários, use <b>Importar em lote</b> (cole a lista de IDs).</li>
+        <li>Use a busca para encontrar e excluir, se precisar.</li>
+      </ol>
+      <div class="tip"><span>💡</span><div><b>Antes do evento</b>Cadastre todos os QR codes que vai usar — assim o operador não precisa parar a fila pra cadastrar ninguém.</div></div>
+    </section>
+
+    <section id="ad-recepcao">
+      <h2>🚪 Diretoria — Painel da recepção</h2>
+      <p class="lead">Acompanhamento ao vivo do que acontece na porta.</p>
+      <ul class="feats">
+        <li><b>Quantos antecipados</b> já chegaram</li>
+        <li><b>Vendas na porta</b> em tempo real</li>
+        <li>Edição rápida de <b>preço/estoque</b> dos convites de porta</li>
+      </ul>
+      <p>Telas relacionadas: <b>Convites antecipados</b> (importar lista, marcar pagamento manual) e <b>Histórico de recepção</b> (consulta + export CSV).</p>
+    </section>
+
+    <section id="ad-estoque">
+      <h2>📥 Diretoria — Estoque (entradas / compras)</h2>
+      <p class="lead">Toda vez que o grupo compra mercadoria pra revender.</p>
+      <ol class="steps">
+        <li>Escolha o <b>produto</b>.</li>
+        <li>Informe <b>quantidade</b>, <b>custo total</b> e <b>fornecedor</b>.</li>
+        <li>Confirme — o estoque do produto sobe automaticamente.</li>
+      </ol>
+    </section>
+
+    <section id="ad-despesas">
+      <h2>💸 Diretoria — Despesas</h2>
+      <ul class="feats">
+        <li>Lance gastos do evento com <b>categoria</b> e <b>valor</b></li>
+        <li>Use <b>Insumos</b> como catálogo de despesas recorrentes</li>
+        <li>Permite <b>importação em lote</b></li>
+      </ul>
+    </section>
+
+    <section id="ad-ajuste">
+      <h2>✏️ Diretoria — Ajuste de saldo</h2>
+      <p class="lead">Para corrigir saldo de cliente quando algo deu errado (ex.: recarga registrada errada).</p>
+      <ol class="steps">
+        <li>Busque o cliente.</li>
+        <li>Informe o <b>novo saldo</b> e o <b>motivo</b>.</li>
+        <li>Confirme. Fica registrado em <b>histórico auditável</b> (quem ajustou, quando, antes/depois).</li>
+      </ol>
+      <div class="warn"><span>⚠️</span><div><b>Use com critério</b>Toda alteração fica gravada — é a forma de manter rastreabilidade.</div></div>
+    </section>
+
+    <section id="ad-relatorio">
+      <h2>📈 Diretoria — Relatório</h2>
+      <p class="lead">A tela mais completa: tudo do evento em números.</p>
+      <ul class="feats">
+        <li>Filtre por <b>evento</b></li>
+        <li>Veja <b>receita</b>, <b>custo</b>, <b>lucro bruto</b> e <b>saldo em circulação</b></li>
+        <li><b>Ranking</b> dos produtos mais vendidos</li>
+        <li><b>Recargas por forma de pagamento</b> (dinheiro, Pix, cartão)</li>
+        <li>Botão <b>Exportar CSV</b> e <b>Imprimir / PDF</b> com logo do GEH</li>
+      </ul>
+    </section>
+
+    <section id="ad-fechamento">
+      <h2>📄 Diretoria — Fechamento</h2>
+      <p class="lead">Consolidação financeira final do evento: vendas + porta + despesas + ajustes, num único resumo pronto pra ata.</p>
+      <ul class="feats">
+        <li><b>Receita total</b> — vendas com saldo + vendas na porta</li>
+        <li><b>Despesas</b> lançadas no evento</li>
+        <li><b>Lucro bruto</b> (receita − despesas)</li>
+        <li><b>Ticket médio</b> por cliente</li>
+        <li><b>Clientes únicos</b> que compraram no evento</li>
+        <li><b>Transferências</b> entre clientes registradas no evento</li>
+        <li>Saldo em circulação, ajustes de saldo e recargas por forma de pagamento</li>
+        <li>Espaço para <b>assinaturas</b> na versão impressa</li>
+      </ul>
+    </section>
+
+    <section id="ad-usuarios">
+      <h2>👤 Diretoria — Usuários</h2>
+      <ol class="steps">
+        <li>Liste quem tem acesso ao admin.</li>
+        <li>Defina o <b>papel</b> (admin) e marque/desmarque <b>ativo</b>.</li>
+        <li>Desativar é a forma mais segura de tirar acesso de alguém — sem precisar excluir o registro.</li>
+      </ol>
+      <h3>Formas de cadastrar novos usuários</h3>
+      <ul class="feats">
+        <li><b>Cadastro individual</b> — nome, e-mail e senha provisória; a pessoa troca depois pelo "Esqueci minha senha"</li>
+        <li><b>Importação em lote</b> — suba um arquivo xlsx ou csv com vários usuários de uma vez; tem preview e barra de progresso</li>
+        <li><b>Convite Google</b> — adicione o e-mail na whitelist em <i>Pendentes</i>; na primeira vez que a pessoa entrar com Google, o perfil é provisionado automaticamente</li>
+      </ul>
+      <div class="tip"><span>💡</span><div><b>Convite Google é o mais fácil</b>A pessoa não precisa memorizar senha — entra com a conta Google que já usa.</div></div>
+    </section>
+
+    <!-- EXTRAS -->
+    <section id="pwa">
+      <h2>📲 Instalar no celular (PWA)</h2>
+      <h3>Android (Chrome)</h3>
+      <ol class="steps">
+        <li>Abra o site no Chrome.</li>
+        <li>Toque no <b>banner "Instalar app"</b> que aparece — ou no menu ⋮ → <b>Adicionar à tela inicial</b>.</li>
+      </ol>
+      <h3>iOS (Safari)</h3>
+      <ol class="steps">
+        <li>Abra o site no Safari.</li>
+        <li>Toque no <b>botão Compartilhar</b> e escolha <b>Adicionar à Tela de Início</b>.</li>
+      </ol>
+      <div class="tip"><span>💡</span><div><b>Funciona offline</b>Depois de instalado, abre rápido mesmo sem sinal. Os dados em tempo real (vendas, saldo) chegam quando a internet volta.</div></div>
+    </section>
+
+    <section id="atalhos">
+      <h2>⌨️ Atalhos de teclado (admin)</h2>
+      <table>
+        <thead><tr><th>Tecla</th><th>O que faz</th></tr></thead>
+        <tbody>
+          <tr><td><code>/</code></td><td>Foca a busca da tela</td></tr>
+          <tr><td><code>g</code> + <code>d</code></td><td>Vai para o Dashboard</td></tr>
+          <tr><td><code>g</code> + <code>h</code></td><td>Vai para o Histórico</td></tr>
+          <tr><td><code>?</code></td><td>Lista todos os atalhos</td></tr>
+        </tbody>
+      </table>
+      <p style="margin-top:14px; color:var(--muted); font-size:13.5px">Em qualquer tabela do admin: clique nos cabeçalhos pra <b>ordenar</b>, use a busca pra <b>filtrar</b>, ou clique em <b>Exportar CSV</b>.</p>
+    </section>
+
+    <div class="footer">
+      Feito com <span class="heart">💙</span> pro <b>Grupo Escoteiro Hokkaido</b> · <i>Sempre Alerta</i>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  // Sidebar: marca link ativo conforme rola
+  const links = document.querySelectorAll('aside a');
+  const sections = [...document.querySelectorAll('section[id]')];
+  const setActive = () => {
+    const y = window.scrollY + 120;
+    let cur = sections[0];
+    for (const s of sections) if (s.offsetTop <= y) cur = s;
+    links.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + cur.id));
+  };
+  window.addEventListener('scroll', setActive, { passive: true });
+  setActive();
+
+  // Fecha menu mobile ao clicar
+  links.forEach(l => l.addEventListener('click', () => {
+    if (window.innerWidth <= 880) document.querySelector('aside').classList.remove('open');
+  }));
+</script>
+
+</body>
+</html>

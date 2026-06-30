@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auditoria — Admin GEH</title>
+  <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="manifest" href="../manifest.json">
+  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+  <style>
+    .aud-filtros {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0.75rem;
+    }
+    .aud-acoes {
+      display: flex; flex-wrap: wrap;
+      gap: 0.75rem; align-items: center;
+      justify-content: space-between;
+      margin-top: 0.75rem;
+    }
+    .aud-toggle {
+      display: inline-flex; align-items: center;
+      gap: 0.5rem; cursor: pointer;
+      font-size: 0.9rem;
+    }
+    .aud-live-dot {
+      width: 0.6rem; height: 0.6rem;
+      border-radius: 50%;
+      background: var(--cinza);
+      flex-shrink: 0;
+    }
+    .aud-toggle.ativo .aud-live-dot {
+      background: var(--verde);
+      animation: aud-pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes aud-pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: 0.4; transform: scale(1.4); }
+    }
+
+    .aud-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.5rem;
+      margin: 1rem 0;
+    }
+    .aud-stat {
+      background: var(--branco);
+      border: 1px solid var(--cinza-claro);
+      border-radius: 10px;
+      padding: 0.75rem;
+    }
+    .aud-stat-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--cinza);
+      font-weight: 700;
+    }
+    .aud-stat-valor {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--cinza-escuro);
+      margin-top: 0.2rem;
+    }
+    .aud-stat.verde    .aud-stat-valor { color: var(--verde); }
+    .aud-stat.vermelho .aud-stat-valor { color: var(--vermelho); }
+    .aud-stat.azul     .aud-stat-valor { color: var(--azul); }
+
+    .aud-resumo {
+      font-size: 0.85rem;
+      color: var(--cinza);
+      margin-bottom: 0.5rem;
+    }
+
+    .aud-feed { display: flex; flex-direction: column; gap: 0.4rem; }
+    .aud-item {
+      background: var(--branco);
+      border: 1px solid var(--cinza-claro);
+      border-radius: 10px;
+      padding: 0.6rem 0.75rem;
+      cursor: pointer;
+      transition: background 0.12s ease, transform 0.08s ease;
+    }
+    .aud-item:hover  { background: var(--cinza-fundo); }
+    .aud-item:active { transform: scale(0.99); }
+    .aud-item-row1 {
+      display: flex; align-items: center;
+      gap: 0.5rem; flex-wrap: wrap;
+    }
+    .aud-quando {
+      font-size: 0.78rem;
+      color: var(--cinza);
+      font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
+    }
+    .aud-badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      color: white;
+    }
+    .aud-valor {
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      margin-left: auto;
+    }
+    .aud-item-row2 {
+      font-size: 0.82rem;
+      color: var(--cinza-escuro);
+      margin-top: 0.25rem;
+    }
+    .aud-item-row2 strong { color: var(--cinza-escuro); }
+    .aud-item-row3 {
+      font-size: 0.78rem;
+      color: var(--cinza);
+      margin-top: 0.15rem;
+    }
+
+    .aud-vazio {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: var(--cinza);
+    }
+
+    .btn-ver-mais-aud {
+      width: auto;
+      display: block;
+      margin: 1rem auto 0;
+      font-size: 0.88rem;
+    }
+
+    /* Modal de detalhes */
+    .aud-modal {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.55);
+      display: flex; align-items: center; justify-content: center;
+      padding: 1rem; z-index: 1000;
+      animation: aud-modal-fade 0.18s ease-out;
+    }
+    .aud-modal.hidden { display: none; }
+    @keyframes aud-modal-fade { from { opacity: 0 } to { opacity: 1 } }
+    .aud-modal-card {
+      background: var(--branco);
+      border-radius: 14px;
+      padding: 1.25rem;
+      width: 100%; max-width: 500px;
+      max-height: 85vh; overflow-y: auto;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+    }
+    .aud-modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 0.5rem; margin-bottom: 0.75rem;
+    }
+    .aud-modal-header h3 {
+      margin: 0; color: var(--azul);
+      font-size: 1.1rem;
+      display: inline-flex; align-items: center; gap: 0.4rem;
+    }
+    .aud-modal-fechar {
+      background: var(--cinza-fundo);
+      border: none;
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .aud-modal-corpo dl {
+      display: grid;
+      grid-template-columns: max-content 1fr;
+      gap: 0.4rem 1rem;
+      margin: 0;
+    }
+    .aud-modal-corpo dt {
+      font-size: 0.78rem;
+      color: var(--cinza);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      font-weight: 700;
+    }
+    .aud-modal-corpo dd {
+      margin: 0;
+      font-size: 0.9rem;
+      color: var(--cinza-escuro);
+      word-break: break-word;
+    }
+    .aud-modal-corpo h4 {
+      color: var(--azul);
+      margin: 1rem 0 0.4rem;
+      font-size: 0.9rem;
+    }
+    .aud-modal-itens {
+      background: var(--cinza-fundo);
+      border-radius: 8px;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.85rem;
+    }
+    .aud-modal-itens .item {
+      display: flex; justify-content: space-between;
+      padding: 0.2rem 0;
+    }
+    .aud-modal-itens .item + .item { border-top: 1px dashed var(--cinza-claro); }
+  </style>
+</head>
+<body>
+  <main class="admin">
+    <h2 style="color:var(--azul);margin-bottom:1rem;display:inline-flex;align-items:center;gap:0.5rem;">
+      <span data-icon="shield" data-size="24"></span> Auditoria
+    </h2>
+
+    <div class="card">
+      <div class="aud-filtros">
+        <div class="form-group" style="margin-bottom:0;">
+          <label for="sel-evento">Evento</label>
+          <select id="sel-evento"><option value="">Carregando…</option></select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label for="sel-tipo">Tipo</label>
+          <select id="sel-tipo">
+            <option value="">Todos</option>
+            <option value="venda">Vendas</option>
+            <option value="recarga">Recargas</option>
+            <option value="transfer">Transferências</option>
+            <option value="ajuste">Ajustes manuais</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label for="sel-usuario">Usuário</label>
+          <select id="sel-usuario"><option value="">Todos</option></select>
+        </div>
+      </div>
+
+      <div class="aud-acoes">
+        <label class="aud-toggle" id="lbl-live">
+          <span class="aud-live-dot"></span>
+          <input type="checkbox" id="chk-live"> Atualizar ao vivo
+        </label>
+        <button id="btn-csv" class="btn btn-secondary" style="width:auto;" disabled>
+          <span data-icon="download" data-size="16"></span> Exportar CSV
+        </button>
+      </div>
+    </div>
+
+    <div class="aud-stats" id="aud-stats"></div>
+    <div class="aud-resumo" id="aud-resumo">Selecione um evento.</div>
+    <div id="aud-feed" class="aud-feed"></div>
+  </main>
+
+  <div id="aud-modal" class="aud-modal hidden" role="dialog" aria-modal="true">
+    <div class="aud-modal-card">
+      <div class="aud-modal-header">
+        <h3 id="aud-modal-titulo">Detalhes</h3>
+        <button id="aud-modal-fechar" type="button" class="aud-modal-fechar" aria-label="Fechar">
+          <span data-icon="x" data-size="18"></span>
+        </button>
+      </div>
+      <div id="aud-modal-corpo" class="aud-modal-corpo"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { montarNav } from "./_nav.js";
+    import {
+      db, collection, doc, getDoc, getDocs, query, where, orderBy,
+      onSnapshot
+    } from "../js/firebase-config.js";
+    import { icon, renderIcons } from "../js/icons.js";
+    import { fmtBRL } from "../js/helpers.js";
+
+    montarNav('auditoria.html');
+    renderIcons();
+
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+
+
+    const LOTE_FEED = 50;
+    const LS_LIVE_KEY = 'auditoria-live';
+
+    // Cache normalizado por colecao — quando um listener atualiza, substitui
+    // o array da sua colecao e re-renderiza tudo junto.
+    const dados = {
+      vendas: [],
+      movimentacoes_saldo: [],
+      transferencias_saldo: [],
+      ajustes_saldo: [],
+    };
+    let unsubs = [];
+    let mostrarN = LOTE_FEED;
+    let eventoAtual = null;
+    let live = localStorage.getItem(LS_LIVE_KEY) === '1';
+    // Versão do filtro — listeners obsoletos checam contra isso e se descartam.
+    let versionFiltro = 0;
+
+    // ---- normalizadores ----
+    function nVenda(id, v) {
+      const itens = (v.itens || []).map(i => `${i.qtd}× ${i.nome}`).join(', ');
+      return {
+        id, coll: 'vendas',
+        tipo: 'venda', badge: 'venda', cor: 'var(--vermelho)',
+        quando: v.criadoEm?.toDate?.() || new Date(0),
+        valor: Number(v.total || 0),
+        sinal: '-',
+        usuarioId: v.operadorId || null,
+        usuarioNome: v.operadorNome || v.operadorEmail || '—',
+        usuarioPapel: 'operador',
+        cliente: v.clienteNome ? `${v.clienteId} (${v.clienteNome})` : (v.clienteId || '—'),
+        detalhe: itens || '—',
+        raw: v,
+      };
+    }
+    function nRecarga(id, m) {
+      return {
+        id, coll: 'movimentacoes_saldo',
+        tipo: 'recarga', badge: 'recarga', cor: 'var(--verde)',
+        quando: m.criadoEm?.toDate?.() || new Date(0),
+        valor: Number(m.valor || 0),
+        sinal: '+',
+        usuarioId: m.caixaId || null,
+        usuarioNome: m.caixaNome || m.caixaEmail || '—',
+        usuarioPapel: 'caixa',
+        cliente: m.clienteId || '—',
+        detalhe: `via ${m.forma || '—'}`,
+        raw: m,
+      };
+    }
+    function nTransfer(id, t) {
+      const orig = t.origemNome ? `${t.origemId} (${t.origemNome})` : t.origemId;
+      const dest = t.destinoNome ? `${t.destinoId} (${t.destinoNome})` : t.destinoId;
+      return {
+        id, coll: 'transferencias_saldo',
+        tipo: 'transfer', badge: 'transfer', cor: 'var(--azul)',
+        quando: t.criadoEm?.toDate?.() || new Date(0),
+        valor: Number(t.valor || 0),
+        sinal: '↔',
+        usuarioId: t.usuarioId || null,
+        usuarioNome: t.usuarioNome || t.usuarioEmail || '—',
+        usuarioPapel: t.usuarioPapel || '—',
+        cliente: `${orig} → ${dest}`,
+        detalhe: t.motivo || '',
+        raw: t,
+      };
+    }
+    function nAjuste(id, a) {
+      const positivo = Number(a.valor || 0) >= 0;
+      return {
+        id, coll: 'ajustes_saldo',
+        tipo: 'ajuste', badge: positivo ? 'ajuste +' : 'ajuste −', cor: '#B45309',
+        quando: a.criadoEm?.toDate?.() || new Date(0),
+        valor: Math.abs(Number(a.valor || 0)),
+        sinal: positivo ? '+' : '-',
+        usuarioId: a.adminId || null,
+        usuarioNome: a.adminNome || a.adminEmail || '—',
+        usuarioPapel: 'admin',
+        cliente: a.clienteNome ? `${a.clienteId} (${a.clienteNome})` : (a.clienteId || '—'),
+        detalhe: a.motivo || '—',
+        raw: a,
+      };
+    }
+
+    // ---- carregar eventos ----
+    async function carregarEventos() {
+      const ativoSnap = await getDoc(doc(db, 'config', 'eventoAtivo'));
+      const ativoId = ativoSnap.exists() ? ativoSnap.data().id : null;
+
+      const snap = await getDocs(collection(db, 'eventos'));
+      const eventos = [];
+      snap.forEach(d => eventos.push({ id: d.id, ...d.data() }));
+      // Ordena por data desc se houver, senao por nome
+      eventos.sort((a, b) => {
+        const da = a.data?.toDate?.()?.getTime?.() ?? 0;
+        const db_ = b.data?.toDate?.()?.getTime?.() ?? 0;
+        if (da !== db_) return db_ - da;
+        return (a.nome || '').localeCompare(b.nome || '');
+      });
+
+      const sel = $('sel-evento');
+      sel.innerHTML = '';
+      if (eventos.length === 0) {
+        sel.innerHTML = '<option value="">Nenhum evento cadastrado</option>';
+        $('aud-resumo').textContent = 'Cadastre um evento em Eventos antes.';
+        return;
+      }
+      eventos.forEach(e => {
+        const opt = document.createElement('option');
+        opt.value = e.id;
+        const marca = e.id === ativoId ? ' • ATIVO' : '';
+        opt.textContent = (e.nome || e.id) + marca;
+        sel.appendChild(opt);
+      });
+      // Default: evento ativo, ou primeiro da lista
+      sel.value = ativoId && eventos.some(e => e.id === ativoId) ? ativoId : eventos[0].id;
+      // Live default ON se evento selecionado e o ativo
+      if (sel.value === ativoId) live = localStorage.getItem(LS_LIVE_KEY) !== '0';
+      $('chk-live').checked = live;
+      atualizarToggleLive();
+      sel.onchange = aplicarFiltro;
+    }
+
+    function atualizarToggleLive() {
+      $('lbl-live').classList.toggle('ativo', live);
+    }
+
+    // ---- aplicar filtro: cancela listeners antigos, cria novos ----
+    function aplicarFiltro() {
+      // Cancela tudo
+      unsubs.forEach(u => { try { u(); } catch (_) {} });
+      unsubs = [];
+      Object.keys(dados).forEach(k => dados[k] = []);
+      mostrarN = LOTE_FEED;
+      eventoAtual = $('sel-evento').value;
+      versionFiltro++;
+      if (!eventoAtual) {
+        $('aud-resumo').textContent = 'Selecione um evento.';
+        $('aud-feed').innerHTML = '';
+        $('aud-stats').innerHTML = '';
+        $('btn-csv').disabled = true;
+        return;
+      }
+      $('aud-resumo').textContent = live ? 'Carregando ao vivo…' : 'Carregando…';
+      $('btn-csv').disabled = true;
+      $('aud-feed').innerHTML = Array.from({ length: 5 }).map(() =>
+        `<div class="skel-hist-item"><div class="row"><span class="skel skel-pill"></span><span class="skel skel-text" style="width:28%"></span><span class="skel skel-num grow" style="margin-left:auto;width:80px"></span></div><span class="skel skel-text" style="width:70%"></span></div>`
+      ).join('');
+
+      const cols = Object.keys(dados);
+      cols.forEach(coll => abrirColecao(coll));
+    }
+
+    function abrirColecao(coll) {
+      // Tenta where + orderBy. Se faltar indice, Firestore loga link no console.
+      const q = query(
+        collection(db, coll),
+        where('eventoId', '==', eventoAtual),
+        orderBy('criadoEm', 'desc')
+      );
+      // Captura a versão atual do filtro — se o filtro mudar antes do snapshot
+      // chegar, o handler se descarta em vez de pintar dados obsoletos.
+      const minhaVersao = versionFiltro;
+      const handler = (snap) => {
+        if (minhaVersao !== versionFiltro) return;
+        dados[coll] = snap.docs.map(d => normalizar(coll, d.id, d.data()));
+        renderTudo();
+      };
+      const onErr = (err) => {
+        if (minhaVersao !== versionFiltro) return;
+        console.error(`[auditoria] erro lendo ${coll}:`, err);
+        // Texto puro no aud-resumo passa despercebido em tela cheia —
+        // injeta um alert-danger visível pra admin não perder o erro.
+        $('aud-resumo').innerHTML = `<div class="alert alert-danger" style="margin:0;">Erro lendo ${coll}: ${err.message}</div>`;
+      };
+      if (live) {
+        unsubs.push(onSnapshot(q, handler, onErr));
+      } else {
+        getDocs(q).then(handler).catch(onErr);
+      }
+    }
+
+    function normalizar(coll, id, data) {
+      switch (coll) {
+        case 'vendas':                return nVenda(id, data);
+        case 'movimentacoes_saldo':   return nRecarga(id, data);
+        case 'transferencias_saldo':  return nTransfer(id, data);
+        case 'ajustes_saldo':         return nAjuste(id, data);
+      }
+    }
+
+    // ---- juntar + filtrar (client) ----
+    function montarLista() {
+      const tipo = $('sel-tipo').value;
+      const usuario = $('sel-usuario').value;
+      let lista = [].concat(...Object.values(dados));
+      if (tipo)    lista = lista.filter(x => x.tipo === tipo);
+      if (usuario) lista = lista.filter(x => x.usuarioNome === usuario);
+      lista.sort((a, b) => b.quando - a.quando);
+      return lista;
+    }
+
+    // ---- render ----
+    function renderTudo() {
+      const lista = montarLista();
+      renderStats(lista);
+      renderUsuariosSelect();
+      renderFeed(lista);
+      $('btn-csv').disabled = lista.length === 0;
+    }
+
+    function renderStats(lista) {
+      const totalAcoes = lista.length;
+      const vendido    = lista.filter(x => x.tipo === 'venda').reduce((s, x) => s + x.valor, 0);
+      const recarregado = lista.filter(x => x.tipo === 'recarga').reduce((s, x) => s + x.valor, 0);
+      const transferido = lista.filter(x => x.tipo === 'transfer').reduce((s, x) => s + x.valor, 0);
+      const nAjustes    = lista.filter(x => x.tipo === 'ajuste').length;
+      $('aud-stats').innerHTML = `
+        <div class="aud-stat">
+          <div class="aud-stat-label">Ações</div>
+          <div class="aud-stat-valor">${totalAcoes}</div>
+        </div>
+        <div class="aud-stat vermelho">
+          <div class="aud-stat-label">Vendido</div>
+          <div class="aud-stat-valor">${fmtBRL(vendido)}</div>
+        </div>
+        <div class="aud-stat verde">
+          <div class="aud-stat-label">Recarregado</div>
+          <div class="aud-stat-valor">${fmtBRL(recarregado)}</div>
+        </div>
+        <div class="aud-stat azul">
+          <div class="aud-stat-label">Transferido</div>
+          <div class="aud-stat-valor">${fmtBRL(transferido)}</div>
+        </div>
+        <div class="aud-stat">
+          <div class="aud-stat-label">Ajustes</div>
+          <div class="aud-stat-valor">${nAjustes}</div>
+        </div>
+      `;
+    }
+
+    function renderUsuariosSelect() {
+      const sel = $('sel-usuario');
+      const valorAtual = sel.value;
+      const todos = [].concat(...Object.values(dados));
+      const nomes = [...new Set(todos.map(x => x.usuarioNome).filter(n => n && n !== '—'))].sort();
+      sel.innerHTML = '<option value="">Todos</option>' +
+        nomes.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+      // Preserva selecao se ainda existir
+      if (nomes.includes(valorAtual)) sel.value = valorAtual;
+    }
+
+    function renderFeed(lista) {
+      const feed = $('aud-feed');
+      if (lista.length === 0) {
+        feed.innerHTML = `<div class="aud-vazio">${icon('inbox', { size: 32 })}<p>Nenhuma ação encontrada com esses filtros.</p></div>`;
+        $('aud-resumo').textContent = '';
+        return;
+      }
+      const exibir = lista.slice(0, mostrarN);
+      const total = lista.length;
+      $('aud-resumo').textContent =
+        `${total} ${total === 1 ? 'ação' : 'ações'} no evento` +
+        (total > mostrarN ? ` · mostrando ${exibir.length}` : '');
+
+      feed.innerHTML = exibir.map((x, i) => {
+        const dt = x.quando.toLocaleString('pt-BR');
+        const corValor = x.tipo === 'venda' ? 'var(--vermelho)'
+                       : x.tipo === 'recarga' ? 'var(--verde)'
+                       : x.tipo === 'transfer' ? 'var(--azul)'
+                       : (x.sinal === '+' ? 'var(--verde)' : 'var(--vermelho)');
+        const detalhe = x.detalhe ? `<div class="aud-item-row3">${esc(x.detalhe)}</div>` : '';
+        return `
+          <div class="aud-item" data-i="${i}">
+            <div class="aud-item-row1">
+              <span class="aud-quando">${esc(dt)}</span>
+              <span class="aud-badge" style="background:${x.cor};">${esc(x.badge)}</span>
+              <span class="aud-valor" style="color:${corValor};">${x.sinal} ${fmtBRL(x.valor)}</span>
+            </div>
+            <div class="aud-item-row2">
+              <strong>${esc(x.cliente)}</strong>
+              · por ${esc(x.usuarioNome)} <span style="color:var(--cinza);">(${esc(x.usuarioPapel)})</span>
+            </div>
+            ${detalhe}
+          </div>
+        `;
+      }).join('') +
+      (total > mostrarN
+        ? `<button type="button" id="btn-ver-mais-aud" class="btn btn-secondary btn-ver-mais-aud">
+             Mostrar mais ${Math.min(LOTE_FEED, total - mostrarN)} (${total - mostrarN} restantes)
+           </button>`
+        : '');
+
+      // Click pra detalhes
+      feed.querySelectorAll('.aud-item').forEach(el => {
+        el.onclick = () => abrirDetalhe(exibir[Number(el.dataset.i)]);
+      });
+      $('btn-ver-mais-aud')?.addEventListener('click', () => {
+        mostrarN += LOTE_FEED;
+        renderFeed(montarLista());
+      });
+    }
+
+    // ---- modal de detalhes ----
+    function abrirDetalhe(x) {
+      $('aud-modal-titulo').innerHTML = `${icon('shield', { size: 18 })} ${esc(x.badge.toUpperCase())} · ${fmtBRL(x.valor)}`;
+      const dt = x.quando.toLocaleString('pt-BR');
+      const r = x.raw || {};
+
+      let extra = '';
+      if (x.tipo === 'venda') {
+        const itens = (r.itens || []).map(i => `
+          <div class="item">
+            <span>${esc(i.qtd)}× ${esc(i.nome)}</span>
+            <span>${fmtBRL(i.subtotal ?? (i.qtd * i.preco))}</span>
+          </div>
+        `).join('');
+        extra = `<h4>Itens</h4><div class="aud-modal-itens">${itens || '<em class="text-muted">Sem itens.</em>'}</div>`;
+      } else if (x.tipo === 'recarga') {
+        extra = `<h4>Forma de pagamento</h4><div>${esc(r.forma || '—')}</div>`;
+      } else if (x.tipo === 'transfer') {
+        extra = `
+          <h4>Saldos</h4>
+          <dl>
+            <dt>Origem antes</dt><dd>${fmtBRL(r.origemSaldoAntes)}</dd>
+            <dt>Origem depois</dt><dd>${fmtBRL(r.origemSaldoDepois)}</dd>
+            <dt>Destino antes</dt><dd>${fmtBRL(r.destinoSaldoAntes)}</dd>
+            <dt>Destino depois</dt><dd>${fmtBRL(r.destinoSaldoDepois)}</dd>
+          </dl>
+        `;
+      } else if (x.tipo === 'ajuste') {
+        extra = `
+          <h4>Saldos</h4>
+          <dl>
+            <dt>Antes</dt><dd>${fmtBRL(r.saldoAntes)}</dd>
+            <dt>Depois</dt><dd>${fmtBRL(r.saldoDepois)}</dd>
+          </dl>
+        `;
+      }
+
+      $('aud-modal-corpo').innerHTML = `
+        <dl>
+          <dt>Quando</dt><dd>${esc(dt)}</dd>
+          <dt>Cliente</dt><dd>${esc(x.cliente)}</dd>
+          <dt>Usuário</dt><dd>${esc(x.usuarioNome)} (${esc(x.usuarioPapel)})</dd>
+          ${r.usuarioEmail || r.caixaEmail || r.adminEmail || r.operadorEmail
+            ? `<dt>Email</dt><dd>${esc(r.usuarioEmail || r.caixaEmail || r.adminEmail || r.operadorEmail)}</dd>`
+            : ''}
+          ${x.detalhe ? `<dt>Detalhe</dt><dd>${esc(x.detalhe)}</dd>` : ''}
+          ${r.motivo ? `<dt>Motivo</dt><dd>${esc(r.motivo)}</dd>` : ''}
+          <dt>Coleção</dt><dd><code>${esc(x.coll)}</code></dd>
+          <dt>Doc ID</dt><dd><code style="font-size:0.78rem;">${esc(x.id)}</code></dd>
+        </dl>
+        ${extra}
+      `;
+      renderIcons($('aud-modal-titulo'));
+      $('aud-modal').classList.remove('hidden');
+    }
+    function fecharModal() { $('aud-modal').classList.add('hidden'); }
+    $('aud-modal-fechar').onclick = fecharModal;
+    $('aud-modal').onclick = (e) => { if (e.target === $('aud-modal')) fecharModal(); };
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !$('aud-modal').classList.contains('hidden')) fecharModal();
+    });
+
+    // ---- exportar CSV ----
+    function gerarCSV(lista) {
+      const cab = ['quando', 'tipo', 'valor', 'sinal', 'usuario', 'papel', 'cliente', 'detalhe', 'doc_id', 'colecao'];
+      const escCsv = (v) => {
+        const s = String(v ?? '');
+        return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const linhas = lista.map(x => [
+        x.quando.toISOString(),
+        x.tipo,
+        x.valor.toFixed(2).replace('.', ','),
+        x.sinal,
+        x.usuarioNome,
+        x.usuarioPapel,
+        x.cliente,
+        x.detalhe,
+        x.id,
+        x.coll,
+      ].map(escCsv).join(';'));
+      // BOM pra Excel reconhecer UTF-8
+      return '﻿' + cab.join(';') + '\n' + linhas.join('\n');
+    }
+
+    $('btn-csv').onclick = () => {
+      const lista = montarLista();
+      if (lista.length === 0) return;
+      const csv = gerarCSV(lista);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const sel = $('sel-evento');
+      const evNome = sel.options[sel.selectedIndex]?.text?.replace(/\s*•\s*ATIVO/, '') || 'evento';
+      const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+      a.href = url;
+      a.download = `auditoria-${evNome.replace(/[^\w-]+/g, '_')}-${stamp}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    };
+
+    // ---- bind filtros ----
+    $('sel-tipo').onchange = () => { mostrarN = LOTE_FEED; renderTudo(); };
+    $('sel-usuario').onchange = () => { mostrarN = LOTE_FEED; renderTudo(); };
+    $('chk-live').onchange = (e) => {
+      live = e.target.checked;
+      localStorage.setItem(LS_LIVE_KEY, live ? '1' : '0');
+      atualizarToggleLive();
+      aplicarFiltro();
+    };
+
+    // ---- bootstrap ----
+    (async () => {
+      await carregarEventos();
+      aplicarFiltro();
+    })();
+  </script>
+</body>
+</html>

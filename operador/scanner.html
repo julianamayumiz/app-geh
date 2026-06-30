@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="../css/style.css">
   <link rel="manifest" href="../manifest.json">
   <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="../js/vendor/html5-qrcode.min.js"></script>
 </head>
 <body>
   <header class="header">
@@ -21,11 +21,20 @@
   <main>
     <div class="card">
       <p class="text-center text-muted mb-2">Aponte a câmera para o QR code do cliente</p>
-      <div id="scanner-container">
+      <div id="dica-scan" class="alert alert-info mb-2">
+        <strong>💡 Dica:</strong> Para QR codes pequenos, aproxime a câmera e centralize o código na área marcada
+      </div>
+      <div id="scanner-container" style="position: relative;">
         <div id="reader" style="width: 100%;"></div>
+        <div id="scan-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; display: flex; align-items: center; justify-content: center;">
+          <div style="border: 3px solid rgba(30, 58, 138, 0.6); border-radius: 12px; width: 60%; height: 60%; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.3);"></div>
+        </div>
       </div>
 
       <div id="alerta" class="alert alert-info mt-2 hidden"></div>
+      <div id="status-scan" class="text-center text-muted mt-2" style="font-size: 0.9rem;">
+        <span id="status-texto">Inicializando câmera...</span>
+      </div>
 
       <div class="mt-2">
         <button id="btn-manual" class="btn btn-secondary">
@@ -36,7 +45,7 @@
 
       <div id="manual-form" class="hidden mt-2">
         <div class="form-group">
-          <label>ID do cliente</label>
+          <label for="id-manual">ID do cliente</label>
           <input type="text" id="id-manual" placeholder="Ex: GEH001" autocomplete="off">
         </div>
         <button class="btn btn-primary" onclick="usarIdManual()">Continuar</button>
@@ -46,19 +55,31 @@
   <script type="module" src="../js/icons.js"></script>
 
   <script type="module">
+<<<<<<< HEAD
     const { requireAuth } = await import('../js/auth-guard.js');
     await requireAuth({ papel: 'operador' });
+=======
+    // Carrega todos os modulos em paralelo. Antes era uma cadeia
+    // sequencial de await import() que serializava 3 round-trips.
+    const [
+      { requireAuth },
+      { icon },
+      { iniciarScanner }
+    ] = await Promise.all([
+      import('../js/auth-guard.js'),
+      import('../js/icons.js'),
+      import('../js/scanner.js'),
+    ]);
+>>>>>>> 9bf69ef8c85ddfdc4a7d07f92bae193ae334a660
 
     const params = new URLSearchParams(window.location.search);
     const acao = params.get('acao') || 'consultar';
 
-    const { icon } = await import('../js/icons.js');
     const titulos = {
       vender:    { ic: 'shopping-cart', txt: 'Vender para cliente' },
-      carregar:  { ic: 'wallet', txt: 'Carregar saldo' },
       consultar: { ic: 'eye', txt: 'Consultar saldo' }
     };
-    const t = titulos[acao];
+    const t = titulos[acao] || titulos.consultar;
     const h1 = document.getElementById('titulo-acao');
     h1.innerHTML = `${icon(t.ic, { size: 20 })} ${t.txt}`;
     h1.style.display = 'inline-flex';
@@ -66,45 +87,70 @@
     h1.style.gap = '0.5rem';
 
     const alerta = document.getElementById('alerta');
+    const statusTexto = document.getElementById('status-texto');
+    const dicaScan = document.getElementById('dica-scan');
 
     function irPara(clienteId) {
       if (acao === 'vender') {
         window.location.href = `vender.html?cliente=${encodeURIComponent(clienteId)}`;
-      } else if (acao === 'carregar') {
-        window.location.href = `carregar.html?cliente=${encodeURIComponent(clienteId)}`;
       } else {
-        window.location.href = `carregar.html?cliente=${encodeURIComponent(clienteId)}&somente=1`;
+        window.location.href = `consultar.html?cliente=${encodeURIComponent(clienteId)}`;
       }
     }
 
-    // Scanner
-    const scanner = new Html5Qrcode("reader");
-    scanner.start(
-      { facingMode: "environment" },
-      {
-        fps: 30,
-        qrbox: (w, h) => ({ width: Math.min(w, h) * 0.8, height: Math.min(w, h) * 0.8 }),
-        aspectRatio: 1.0,
-        experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+    // Inicia a camera EM PARALELO com a checagem de auth. A negociacao
+    // WebRTC e o prompt de permissao demoram 0.5-2s; rodando junto com a
+    // leitura do perfil no Firestore, o tempo total e o maior dos dois,
+    // nao a soma. Se o usuario ler o QR antes do auth confirmar, o ID
+    // fica pendente e e processado quando o auth liberar.
+    let authConfirmado = false;
+    let qrPendente = null;
+
+    const scannerPromise = iniciarScanner({
+      elementId: 'reader',
+      onDetected: (texto) => {
+        if (!authConfirmado) { qrPendente = texto; return; }
+        statusTexto.textContent = '✓ QR code detectado!';
+        statusTexto.style.color = 'var(--verde)';
+        dicaScan.style.display = 'none';
+        irPara(texto);
       },
-      (decoded) => {
-        scanner.stop();
-        irPara(decoded.trim());
-      },
-      () => { /* ignorar erros de frame */ }
-    ).catch(err => {
+      onReady: () => {
+        statusTexto.textContent = 'Câmera pronta - Aproxime o QR code';
+        statusTexto.style.color = 'var(--azul)';
+      }
+    }).catch(err => {
+      console.error('Erro ao iniciar scanner:', err);
       alerta.textContent = "Não consegui acessar a câmera. Use o botão abaixo para digitar o ID.";
       alerta.className = "alert alert-warning mt-2";
+      dicaScan.style.display = 'none';
+      statusTexto.textContent = 'Câmera indisponível';
+      statusTexto.style.color = 'var(--vermelho)';
+      return null;
     });
 
-    // Entrada manual
+    await requireAuth({ papel: 'operador' });
+    authConfirmado = true;
+
+    const scannerHandle = await scannerPromise;
+
+    if (qrPendente) {
+      statusTexto.textContent = '✓ QR code detectado!';
+      statusTexto.style.color = 'var(--verde)';
+      dicaScan.style.display = 'none';
+      irPara(qrPendente);
+    }
+
     document.getElementById('btn-manual').onclick = () => {
       document.getElementById('manual-form').classList.toggle('hidden');
+      if (!document.getElementById('manual-form').classList.contains('hidden')) {
+        document.getElementById('id-manual').focus();
+      }
     };
     window.usarIdManual = () => {
       const id = document.getElementById('id-manual').value.trim();
       if (!id) return alert('Digite um ID');
-      scanner.stop().catch(()=>{});
+      scannerHandle?.stop();
       irPara(id);
     };
   </script>

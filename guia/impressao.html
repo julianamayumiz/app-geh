@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guia de bolso — App GEH</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+  <link rel="icon" href="../assets/logo.png">
+  <style>
+    :root{
+      --azul:#1E3A8A; --azul-esc:#0F1D4D; --azul-claro:#3B5BC9;
+      --vermelho:#DC2626; --amarelo:#FBBF24;
+      --ok:#16A34A; --warn:#D97706;
+      --text:#0F172A; --muted:#64748B; --border:#CBD5E1; --soft:#F1F5F9;
+    }
+
+    *{box-sizing:border-box; margin:0; padding:0}
+    html,body{font-family:'Inter',system-ui,sans-serif; background:#E5E7EB; color:var(--text); font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased}
+
+    /* ── tela ── */
+    .btn-print{
+      display:flex; align-items:center; gap:8px;
+      position:fixed; top:20px; right:20px; z-index:99;
+      background:var(--azul); color:#fff; border:0; padding:10px 20px;
+      border-radius:10px; font-size:14px; font-weight:700; cursor:pointer;
+      box-shadow:0 4px 12px rgba(30,58,138,.35);
+    }
+    .btn-print:hover{background:var(--azul-claro)}
+    .btn-print svg{width:16px;height:16px;fill:currentColor;flex-shrink:0}
+
+    .page{
+      width:210mm; margin:20px auto; background:#fff;
+      border-radius:12px; overflow:hidden;
+      box-shadow:0 2px 8px rgba(0,0,0,.10), 0 12px 32px rgba(0,0,0,.08);
+      page-break-after:always;
+    }
+    .page:last-child{page-break-after:auto}
+
+    /* ── cabeçalho da folha ── */
+    .page-header{
+      padding:22px 28px 18px;
+      display:flex; align-items:center; gap:16px;
+      border-bottom:2px solid currentColor;
+    }
+    .page-header .badge{
+      min-width:52px; height:52px; border-radius:12px;
+      display:flex; align-items:center; justify-content:center;
+      font-size:26px; flex-shrink:0;
+    }
+    .page-header .info h2{font-size:22px; font-weight:800; line-height:1.1}
+    .page-header .info p{font-size:13px; margin-top:2px; opacity:.75}
+    .page-header .tag{
+      margin-left:auto; padding:4px 12px; border-radius:999px;
+      font-size:11px; font-weight:700; letter-spacing:.5px; text-transform:uppercase;
+      white-space:nowrap;
+    }
+
+    /* ── cores por perfil ── */
+    .operador .page-header{color:#1E3A8A; border-color:#1E3A8A}
+    .operador .page-header .badge{background:#EFF6FF; color:#1E3A8A}
+    .operador .page-header .tag{background:#DBEAFE; color:#1E3A8A}
+    .operador .step-num{background:#1E3A8A}
+    .operador .section-title{color:#1E3A8A; border-color:#BFDBFE}
+
+    .caixa .page-header{color:#92400E; border-color:#D97706}
+    .caixa .page-header .badge{background:#FEF3C7; color:#92400E}
+    .caixa .page-header .tag{background:#FEF3C7; color:#92400E}
+    .caixa .step-num{background:#D97706}
+    .caixa .section-title{color:#92400E; border-color:#FDE68A}
+
+    .recepcao .page-header{color:#991B1B; border-color:#DC2626}
+    .recepcao .page-header .badge{background:#FEE2E2; color:#991B1B}
+    .recepcao .page-header .tag{background:#FEE2E2; color:#991B1B}
+    .recepcao .step-num{background:#DC2626}
+    .recepcao .section-title{color:#991B1B; border-color:#FECACA}
+
+    .admin .page-header{color:#14532D; border-color:#16A34A}
+    .admin .page-header .badge{background:#DCFCE7; color:#14532D}
+    .admin .page-header .tag{background:#DCFCE7; color:#14532D}
+    .admin .step-num{background:#16A34A}
+    .admin .section-title{color:#14532D; border-color:#BBF7D0}
+
+    /* ── corpo da folha ── */
+    .page-body{padding:22px 28px 24px; display:grid; grid-template-columns:1fr 1fr; gap:0 28px}
+    .col-full{grid-column:1/-1}
+
+    .section-title{
+      font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px;
+      padding-bottom:6px; border-bottom:2px solid;
+      margin-bottom:12px; margin-top:18px;
+    }
+    .section-title:first-of-type{margin-top:0}
+
+    ol.steps{list-style:none; counter-reset:s}
+    ol.steps li{
+      counter-increment:s;
+      display:flex; gap:10px; align-items:flex-start;
+      padding:8px 10px; border-radius:8px; margin-bottom:6px;
+      background:var(--soft); font-size:13px;
+    }
+    ol.steps li:last-child{margin-bottom:0}
+    .step-num{
+      counter-increment:none;
+      min-width:22px; height:22px; border-radius:50%;
+      color:#fff; font-size:12px; font-weight:700;
+      display:inline-flex; align-items:center; justify-content:center;
+      flex-shrink:0; margin-top:1px;
+    }
+    ol.steps li .step-num::before{content:counter(s)}
+
+    ul.feats{list-style:none}
+    ul.feats li{
+      padding:6px 10px 6px 28px; position:relative;
+      font-size:13px; border-bottom:1px solid var(--border);
+    }
+    ul.feats li:last-child{border-bottom:0}
+    ul.feats li::before{content:"✓"; position:absolute; left:8px; color:var(--ok); font-weight:700}
+
+    .callout{
+      border-radius:8px; padding:10px 12px; margin-top:14px;
+      font-size:12.5px; display:flex; gap:10px; align-items:flex-start;
+      grid-column:1/-1;
+    }
+    .callout.tip{background:#EEF4FF; border-left:3px solid var(--azul-claro); color:#1e3a8a}
+    .callout.warn{background:#FFF7E6; border-left:3px solid var(--warn); color:#92400E}
+    .callout b{display:block; margin-bottom:1px; font-size:12px}
+
+    /* rodapé da folha */
+    .page-footer{
+      border-top:1px solid var(--border); padding:10px 28px;
+      display:flex; justify-content:space-between; align-items:center;
+      font-size:11px; color:var(--muted);
+    }
+    .page-footer strong{font-weight:700}
+
+    /* ── índice (tela apenas) ── */
+    .index-bar{
+      width:210mm; margin:0 auto 0px; padding:16px 24px;
+      display:flex; gap:10px; flex-wrap:wrap;
+    }
+    .index-bar a{
+      padding:8px 16px; border-radius:999px; font-size:13px; font-weight:600;
+      text-decoration:none; color:#fff;
+    }
+    .index-bar a.op{background:#1E3A8A}
+    .index-bar a.cx{background:#D97706}
+    .index-bar a.rc{background:#DC2626}
+    .index-bar a.ad{background:#16A34A}
+
+    /* ── impressão ── */
+    @media print{
+      html,body{background:#fff}
+      .btn-print, .index-bar{display:none}
+      .page{
+        width:100%; max-width:none; margin:0; border-radius:0;
+        box-shadow:none; border:0;
+        page-break-after:always;
+        break-after:page;
+      }
+      .page:last-child{page-break-after:auto; break-after:auto}
+      .page-body{gap:0 24px}
+    }
+    @page{size:A4; margin:12mm 14mm}
+  </style>
+</head>
+<body>
+
+<button class="btn-print" onclick="window.print()">
+  <svg viewBox="0 0 20 20"><path d="M5 4v3H4a2 2 0 00-2 2v5a2 2 0 002 2h1v2a1 1 0 001 1h8a1 1 0 001-1v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a1 1 0 00-1-1H6a1 1 0 00-1 1zm2 0h6v3H7V4zm-1 9h8v4H6v-4zm8-5a1 1 0 110 2 1 1 0 010-2z"/></svg>
+  Imprimir as 4 folhas
+</button>
+
+<nav class="index-bar">
+  <a class="op" href="#operador">📱 Operador</a>
+  <a class="cx" href="#caixa">💰 Caixa</a>
+  <a class="rc" href="#recepcao">🚪 Recepção</a>
+  <a class="ad" href="#admin">🖥️ Diretoria</a>
+</nav>
+
+<!-- ══════════════════════════════════════
+     FOLHA 1 — OPERADOR
+═══════════════════════════════════════ -->
+<div class="page operador" id="operador">
+  <div class="page-header">
+    <div class="badge">📱</div>
+    <div class="info">
+      <h2>Operador de venda</h2>
+      <p>Celular no balcão · Acesso: <strong>operador/</strong></p>
+    </div>
+    <span class="tag">Sem login</span>
+  </div>
+
+  <div class="page-body">
+
+    <div class="col-full">
+      <div class="section-title">Vender (fluxo principal)</div>
+      <ol class="steps">
+        <li><div class="step-num operador"></div><span>Toque em <strong>Vender</strong> na tela inicial — abre o scanner.</span></li>
+        <li><div class="step-num operador"></div><span>Aponte a câmera pro <strong>QR code do cliente</strong> (ou digite o ID na mão).</span></li>
+        <li><div class="step-num operador"></div><span>O carrinho abre com todos os produtos — use os botões <strong>+</strong> e <strong>−</strong> em cada card.</span></li>
+        <li><div class="step-num operador"></div><span>A barra no rodapé mostra <strong>quantidade e total</strong> ao vivo.</span></li>
+        <li><div class="step-num operador"></div><span>Toque em <strong>Finalizar</strong> — desconta do saldo e baixa o estoque.</span></li>
+        <li><div class="step-num operador"></div><span>Um aviso verde e uma vibração confirmam que deu certo.</span></li>
+      </ol>
+    </div>
+
+    <div>
+      <div class="section-title">Consultar saldo</div>
+      <ol class="steps">
+        <li><div class="step-num operador"></div><span>Toque em <strong>Consultar saldo</strong>.</span></li>
+        <li><div class="step-num operador"></div><span>Escaneie o QR.</span></li>
+        <li><div class="step-num operador"></div><span>Vê o saldo atual e as últimas movimentações.</span></li>
+      </ol>
+
+      <div class="section-title" style="margin-top:16px">O que observar</div>
+      <ul class="feats">
+        <li>Badge vermelho = produto em <strong>promoção</strong></li>
+        <li>⚠️ = estoque baixo; botão cinza = sem estoque</li>
+        <li>Bloqueio automático se <strong>saldo insuficiente</strong></li>
+      </ul>
+    </div>
+
+    <div class="callout warn">
+      <span>⚠️</span>
+      <div><b>Sem evento ativo?</b>Não é possível vender. A diretoria precisa ativar o evento em <em>admin/eventos</em>.</div>
+    </div>
+
+  </div>
+
+  <div class="page-footer">
+    <span>App GEH · Grupo Escoteiro Hokkaido</span>
+    <strong>Folha 1 de 4 — Operador</strong>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     FOLHA 2 — CAIXA
+═══════════════════════════════════════ -->
+<div class="page caixa" id="caixa">
+  <div class="page-header">
+    <div class="badge">💰</div>
+    <div class="info">
+      <h2>Caixa</h2>
+      <p>Celular ou tablet fixo · Acesso: <strong>caixa/</strong></p>
+    </div>
+    <span class="tag">Sem login</span>
+  </div>
+
+  <div class="page-body">
+
+    <div class="col-full">
+      <div class="section-title">Recarregar saldo de um cliente</div>
+      <ol class="steps">
+        <li><div class="step-num caixa"></div><span>Abra <strong>caixa/</strong> no celular.</span></li>
+        <li><div class="step-num caixa"></div><span>Toque em <strong>Carregar saldo</strong>.</span></li>
+        <li><div class="step-num caixa"></div><span>Aponte a câmera pro <strong>QR code do cliente</strong>.</span></li>
+        <li><div class="step-num caixa"></div><span>Digite o <strong>valor</strong> e escolha a forma de pagamento: <strong>dinheiro, Pix ou cartão</strong>.</span></li>
+        <li><div class="step-num caixa"></div><span>Confirme — o saldo é creditado na hora.</span></li>
+        <li><div class="step-num caixa"></div><span>A tela mostra automaticamente o <strong>extrato</strong> do cliente (últimas recargas + compras).</span></li>
+      </ol>
+    </div>
+
+    <div>
+      <div class="section-title">O que você vê no extrato</div>
+      <ul class="feats">
+        <li>Saldo atual do cliente</li>
+        <li>Últimas recargas (data, valor, forma de pagamento)</li>
+        <li>Últimas compras realizadas nos balcões</li>
+      </ul>
+    </div>
+
+    <div>
+      <div class="section-title">Transferência de saldo entre clientes</div>
+      <ol class="steps">
+        <li><div class="step-num caixa"></div><span>Escaneie o QR do cliente de <strong>origem</strong>.</span></li>
+        <li><div class="step-num caixa"></div><span>Escolha <strong>Transferir saldo</strong>.</span></li>
+        <li><div class="step-num caixa"></div><span>Escaneie o QR do cliente de <strong>destino</strong>.</span></li>
+        <li><div class="step-num caixa"></div><span>Digite o <strong>valor</strong> e confirme.</span></li>
+      </ol>
+    </div>
+
+    <div>
+      <div class="section-title">Formas de pagamento</div>
+      <ul class="feats">
+        <li><strong>Dinheiro</strong> — pagamento em espécie</li>
+        <li><strong>Pix</strong> — transferência via Pix</li>
+        <li><strong>Cartão</strong> — débito ou crédito</li>
+        <li><strong>Troquinho</strong> — troco que o cliente deixa como saldo</li>
+        <li><strong>Correção</strong> — ajuste interno para corrigir lançamento errado</li>
+      </ul>
+    </div>
+
+    <div>
+      <div class="section-title">Dicas rápidas</div>
+      <ul class="feats">
+        <li>O caixa fica num <strong>ponto fixo</strong> (mesa de entrada)</li>
+        <li>O operador anda pelos balcões — são fluxos separados</li>
+        <li>Se o cliente quiser só conferir o saldo, mostre o extrato</li>
+        <li>Qualquer recarga errada → peça à diretoria para ajustar</li>
+      </ul>
+    </div>
+
+    <div class="callout tip">
+      <span>💡</span>
+      <div><b>Fila grande?</b>Um segundo celular também pode abrir <em>caixa/</em> — todos os aparelhos enxergam o mesmo banco de dados em tempo real.</div>
+    </div>
+
+  </div>
+
+  <div class="page-footer">
+    <span>App GEH · Grupo Escoteiro Hokkaido</span>
+    <strong>Folha 2 de 4 — Caixa</strong>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     FOLHA 3 — RECEPÇÃO
+═══════════════════════════════════════ -->
+<div class="page recepcao" id="recepcao">
+  <div class="page-header">
+    <div class="badge">🚪</div>
+    <div class="info">
+      <h2>Recepção</h2>
+      <p>Celular na porta · Acesso: <strong>recepcao/</strong></p>
+    </div>
+    <span class="tag">Sem login</span>
+  </div>
+
+  <div class="page-body">
+
+    <div>
+      <div class="section-title">Check-in — convite antecipado</div>
+      <ol class="steps">
+        <li><div class="step-num recepcao"></div><span>Abra <strong>recepcao/</strong> e toque em <strong>Conferência</strong>.</span></li>
+        <li><div class="step-num recepcao"></div><span>Busque o nome do participante na lista.</span></li>
+        <li><div class="step-num recepcao"></div><span>Toque em <strong>Marcar check-in</strong>.</span></li>
+        <li><div class="step-num recepcao"></div><span>O nome fica verde e aparece ao vivo no painel da diretoria.</span></li>
+      </ol>
+
+      <div class="callout warn" style="margin-top:12px; grid-column:auto">
+        <span>⚠️</span>
+        <div><b>Pré-requisito</b>A lista de antecipados precisa ter sido importada pela diretoria antes do evento em <em>Convites antecipados</em>.</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title">Venda na porta — sem convite</div>
+      <ol class="steps">
+        <li><div class="step-num recepcao"></div><span>Toque em <strong>Venda na porta</strong>.</span></li>
+        <li><div class="step-num recepcao"></div><span>Informe o <strong>valor do convite</strong> e a <strong>forma de pagamento</strong>.</span></li>
+        <li><div class="step-num recepcao"></div><span>(Opcional) Adicione uma observação — ex.: nome do participante.</span></li>
+        <li><div class="step-num recepcao"></div><span>Confirme — a venda entra ao vivo no comparativo do evento.</span></li>
+      </ol>
+
+      <div class="callout tip" style="margin-top:12px; grid-column:auto">
+        <span>💡</span>
+        <div><b>Sem internet momentaneamente?</b>O app foi instalado como PWA — ele continua aberto. Quando a conexão voltar, as vendas são sincronizadas.</div>
+      </div>
+    </div>
+
+    <div class="col-full">
+      <div class="section-title">Resumo do que a recepção faz</div>
+      <ul class="feats">
+        <li>Marca check-in de quem comprou convite antecipado</li>
+        <li>Registra venda de convite pra quem chegou sem comprar antes</li>
+        <li><strong>Não</strong> carrega saldo de cartão escoteiro — isso é função do caixa</li>
+        <li><strong>Não</strong> precisa de senha ou login</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <div class="page-footer">
+    <span>App GEH · Grupo Escoteiro Hokkaido</span>
+    <strong>Folha 3 de 4 — Recepção</strong>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     FOLHA 4 — DIRETORIA (ADMIN)
+═══════════════════════════════════════ -->
+<div class="page admin" id="admin">
+  <div class="page-header">
+    <div class="badge">🖥️</div>
+    <div class="info">
+      <h2>Diretoria (admin)</h2>
+      <p>PC ou notebook · Acesso: <strong>admin/login.html</strong></p>
+    </div>
+    <span class="tag">Com login</span>
+  </div>
+
+  <div class="page-body">
+
+    <div>
+      <div class="section-title">Antes do evento</div>
+      <ol class="steps">
+        <li><div class="step-num admin"></div><span>Login com Google em <strong>admin/login.html</strong> (papel "admin" e ativo em Usuários).</span></li>
+        <li><div class="step-num admin"></div><span><strong>Eventos</strong> → Novo evento → dar nome → <strong>Ativar</strong>. Ou use <strong>Preparar para novo evento</strong> para zerar saldos/produtos/convites mantendo o histórico.</span></li>
+        <li><div class="step-num admin"></div><span><strong>Eventos</strong> → <strong>Categorias de ingresso</strong> → cadastrar tipos de convite (preço antecipado, porta e estoque).</span></li>
+        <li><div class="step-num admin"></div><span><strong>Produtos</strong> → cadastrar individual ou em lote (CSV). Marcar promoção se tiver.</span></li>
+        <li><div class="step-num admin"></div><span><strong>Estoque</strong> → registrar compras de mercadoria (sobe estoque automaticamente).</span></li>
+        <li><div class="step-num admin"></div><span><strong>Clientes</strong> → importar em lote os IDs dos QR codes.</span></li>
+        <li><div class="step-num admin"></div><span><strong>Convites antecipados</strong> → importar lista de quem já pagou.</span></li>
+      </ol>
+    </div>
+
+    <div>
+      <div class="section-title">Durante o evento (acompanhamento)</div>
+      <ul class="feats">
+        <li><strong>Dashboard</strong> — KPIs de vendas, recargas, presença e estoque; gráficos; ranking de vendedores</li>
+        <li><strong>Painel da recepção</strong> — antecipados que chegaram + vendas na porta</li>
+        <li><strong>Histórico</strong> — tudo que um cliente específico fez</li>
+        <li><strong>Ajuste de saldo</strong> — corrige erro de recarga (auditado)</li>
+      </ul>
+
+      <div class="section-title" style="margin-top:16px">Após o evento</div>
+      <ol class="steps">
+        <li><div class="step-num admin"></div><span><strong>Despesas</strong> → lançar todos os gastos do evento.</span></li>
+        <li><div class="step-num admin"></div><span><strong>Eventos</strong> → <strong>Encerrar</strong> o evento ativo.</span></li>
+        <li><div class="step-num admin"></div><span><strong>Relatório</strong> → conferir números → Exportar CSV ou PDF.</span></li>
+        <li><div class="step-num admin"></div><span><strong>Fechamento</strong> → resumo consolidado (ticket médio, clientes únicos, transferências) pra ata.</span></li>
+      </ol>
+    </div>
+
+    <div class="col-full">
+      <div class="callout tip">
+        <span>💡</span>
+        <div><b>Atalhos no admin</b>&nbsp; <code>/</code> foca a busca · <code>g d</code> → Dashboard · <code>g h</code> → Histórico · <code>?</code> lista todos os atalhos.</div>
+      </div>
+      <div class="callout warn" style="margin-top:8px">
+        <span>⚠️</span>
+        <div><b>Primeira vez no sistema?</b>Peça pra outra pessoa da diretoria já cadastrada te adicionar em <em>Usuários</em> — por cadastro manual, importação em lote (xlsx/csv) ou convite Google (whitelist em Pendentes).</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="page-footer">
+    <span>App GEH · Grupo Escoteiro Hokkaido</span>
+    <strong>Folha 4 de 4 — Diretoria</strong>
+  </div>
+</div>
+
+</body>
+</html>

@@ -8,156 +8,9 @@
   <title>Vender — App GEH</title>
   <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/vender.css">
   <link rel="manifest" href="../manifest.json">
   <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
-  <style>
-    .prod-card {
-      background: var(--branco);
-      border-radius: var(--radius-sm);
-      padding: 0.875rem;
-      box-shadow: var(--sombra);
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-      border: 2px solid transparent;
-      transition: border-color 0.15s;
-    }
-    .prod-card.no-carrinho { border-color: var(--azul); }
-    .prod-card.sem-estoque { opacity: 0.45; pointer-events: none; }
-
-    .prod-nome { font-weight: 600; font-size: 0.95rem; }
-    .prod-preco { font-weight: 700; font-size: 1.05rem; color: var(--verde); }
-    .prod-preco.promo { color: var(--vermelho); }
-    .prod-preco-old { font-size: 0.78rem; color: var(--cinza); text-decoration: line-through; }
-    .prod-estoque { font-size: 0.75rem; color: var(--cinza); }
-
-    .prod-controle {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      margin-top: 0.5rem;
-    }
-    .btn-qtd {
-      width: 44px; height: 44px;
-      border-radius: 50%;
-      border: none;
-      font-size: 1.25rem;
-      font-weight: 700;
-      cursor: pointer;
-      display: inline-flex; align-items: center; justify-content: center;
-      transition: transform 0.1s;
-      padding: 0;
-    }
-    .btn-qtd .icon { display: block; }
-    .btn-qtd:active { transform: scale(0.9); }
-    .btn-menos { background: var(--cinza-claro); color: var(--cinza-escuro); }
-    .btn-mais  { background: var(--azul); color: white; }
-    .qtd-display {
-      font-weight: 700;
-      font-size: 1.1rem;
-      min-width: 28px;
-      text-align: center;
-      color: var(--azul);
-    }
-    .btn-adicionar {
-      width: 100%;
-      margin-top: 0.5rem;
-      padding: 0.5rem;
-      background: var(--azul);
-      color: white;
-      border: none;
-      border-radius: var(--radius-sm);
-      font-weight: 600;
-      cursor: pointer;
-      font-size: 0.9rem;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.3rem;
-    }
-
-    /* Carrinho flutuante */
-    .carrinho-fab {
-      position: fixed;
-      bottom: 1.5rem;
-      left: 50%;
-      transform: translateX(-50%);
-      background: var(--azul);
-      color: white;
-      border: none;
-      border-radius: 999px;
-      padding: 0.875rem 2rem;
-      font-size: 1rem;
-      font-weight: 700;
-      cursor: pointer;
-      box-shadow: var(--sombra-forte);
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      z-index: 100;
-      transition: transform 0.2s, opacity 0.2s;
-      white-space: nowrap;
-    }
-    .carrinho-fab.hidden { opacity: 0; pointer-events: none; transform: translateX(-50%) translateY(20px); }
-    .carrinho-fab .badge {
-      background: var(--amarelo);
-      color: var(--cinza-escuro);
-      border-radius: 50%;
-      width: 24px; height: 24px;
-      font-size: 0.85rem;
-      display: flex; align-items: center; justify-content: center;
-    }
-
-    /* Modal do carrinho */
-    .modal-overlay {
-      display: none;
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.5);
-      z-index: 200;
-      align-items: flex-end;
-    }
-    .modal-overlay.aberto { display: flex; }
-    .modal-box {
-      background: var(--branco);
-      border-radius: var(--radius) var(--radius) 0 0;
-      width: 100%;
-      max-height: 80vh;
-      overflow-y: auto;
-      padding: 1.25rem 1rem;
-    }
-    .modal-titulo {
-      font-size: 1.1rem;
-      font-weight: 700;
-      color: var(--azul);
-      margin-bottom: 1rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .modal-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.6rem 0;
-      border-bottom: 1px solid var(--cinza-claro);
-      gap: 0.5rem;
-    }
-    .modal-item-nome { flex: 1; font-size: 0.95rem; }
-    .modal-item-ctrl {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
-    .modal-total {
-      display: flex;
-      justify-content: space-between;
-      font-weight: 700;
-      font-size: 1.2rem;
-      padding: 0.875rem 0;
-      color: var(--azul);
-    }
-  </style>
 </head>
 <body>
   <header class="header">
@@ -167,25 +20,45 @@
 
   <main style="padding-bottom: 6rem;">
     <div class="cliente-info">
-      <div class="nome" id="cliente-nome">Carregando...</div>
+      <div class="nome" id="cliente-nome"><span class="skel skel-on-dark skel-title" style="width:60%"></span></div>
       <div class="saldo-label">Saldo disponível</div>
-      <div class="saldo" id="cliente-saldo">R$ 0,00</div>
+      <div class="saldo" id="cliente-saldo"><span class="skel skel-on-dark skel-num" style="width:140px;height:1.8rem"></span></div>
     </div>
 
     <div id="alerta" class="alert hidden"></div>
 
     <h3 class="card-title" style="padding-left:0.25rem;margin-bottom:0.5rem;">Produtos</h3>
-    <div id="produtos-grid" class="produtos-grid">
-      <p class="text-muted text-center">Carregando produtos...</p>
+    <div class="busca-wrapper">
+      <span class="busca-icon" data-icon="search" data-size="18"></span>
+      <input type="search" id="busca-prod" placeholder="Buscar produto..." autocomplete="off">
+      <button type="button" class="busca-clear" id="busca-clear" aria-label="Limpar busca"><span data-icon="x" data-size="16"></span></button>
+    </div>
+    <div id="cat-bar" class="cat-bar" role="tablist" aria-label="Filtro de categorias"></div>
+    <div id="produtos-container">
+      <div class="produtos-grid" id="produtos-loading" role="status" aria-busy="true" aria-label="Carregando produtos">
+        <div class="skel-prod-card"><span class="skel skel-text" style="width:80%"></span><span class="skel skel-text" style="width:50%"></span><span class="skel skel-text" style="width:35%"></span></div>
+        <div class="skel-prod-card"><span class="skel skel-text" style="width:70%"></span><span class="skel skel-text" style="width:55%"></span><span class="skel skel-text" style="width:40%"></span></div>
+        <div class="skel-prod-card"><span class="skel skel-text" style="width:85%"></span><span class="skel skel-text" style="width:45%"></span><span class="skel skel-text" style="width:30%"></span></div>
+        <div class="skel-prod-card"><span class="skel skel-text" style="width:75%"></span><span class="skel skel-text" style="width:60%"></span><span class="skel skel-text" style="width:38%"></span></div>
+        <div class="skel-prod-card"><span class="skel skel-text" style="width:65%"></span><span class="skel skel-text" style="width:50%"></span><span class="skel skel-text" style="width:42%"></span></div>
+        <div class="skel-prod-card"><span class="skel skel-text" style="width:78%"></span><span class="skel skel-text" style="width:55%"></span><span class="skel skel-text" style="width:36%"></span></div>
+      </div>
     </div>
   </main>
 
-  <!-- Botão flutuante do carrinho -->
-  <button class="carrinho-fab hidden" id="fab-carrinho">
-    <span style="display:inline-flex;align-items:center;gap:0.4rem;"><span data-icon="shopping-cart" data-size="18"></span> Ver carrinho</span>
-    <span class="badge" id="fab-qtd">0</span>
-    <span id="fab-total">R$ 0,00</span>
-  </button>
+  <!-- Barra POS do carrinho (fixa no rodapé) -->
+  <div class="cart-bar" id="cart-bar" role="region" aria-label="Resumo do carrinho">
+    <div class="resumo">
+      <span class="resumo-label">Total do carrinho</span>
+      <span class="resumo-total" id="fab-total">R$ 0,00</span>
+      <span class="resumo-qtd" id="fab-qtd-label">0 itens</span>
+    </div>
+    <button class="btn-ver" id="fab-carrinho">
+      <span data-icon="shopping-cart" data-size="18"></span>
+      Ver carrinho
+      <span class="badge" id="fab-qtd">0</span>
+    </button>
+  </div>
 
   <!-- Modal do carrinho -->
   <div class="modal-overlay" id="modal-overlay">
@@ -211,12 +84,21 @@
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
     import { requireAuth } from "../js/auth-guard.js";
+<<<<<<< HEAD
 
     await requireAuth({ papel: 'operador' });
+=======
+>>>>>>> 9bf69ef8c85ddfdc4a7d07f92bae193ae334a660
 
-    // Evento ativo
-    let eventoAtivo = null;
-    getDoc(doc(db, 'config', 'eventoAtivo')).then(s => { if (s.exists()) eventoAtivo = s.data(); });
+    const { perfil } = await requireAuth({ papel: 'operador' });
+    import { toast } from "../js/ui.js";
+    import { fmtBRL } from "../js/helpers.js";
+
+    // Evento ativo — await garante que o valor esta pronto antes do primeiro clique
+    const eventoAtivoPromise = getDoc(doc(db, 'config', 'eventoAtivo'))
+      .then(s => s.exists() ? s.data() : null)
+      .catch(e => { console.warn('[vender] falha ao ler eventoAtivo:', e); return null; });
+    let eventoAtivo = await eventoAtivoPromise;
 
     const params = new URLSearchParams(window.location.search);
     const clienteId = params.get('cliente');
@@ -255,20 +137,136 @@
     }
 
     // ── Produtos ─────────────────────────────────────
+    let produtosCache = [];
+
     async function carregarProdutos() {
-      const grid = $('produtos-grid');
-      grid.innerHTML = '';
+      const cont = $('produtos-container');
       const snap = await getDocs(collection(db, 'produtos'));
       if (snap.empty) {
-        grid.innerHTML = `<div class="empty-state">${icon('package', { size: 32 })}<p>Nenhum produto cadastrado.</p></div>`;
+        cont.innerHTML = `<div class="empty-state">${icon('package', { size: 32 })}<p>Nenhum produto cadastrado.</p></div>`;
         return;
       }
+      produtosCache = [];
       snap.forEach(d => {
         const p = { id: d.id, ...d.data() };
         p.precoFinal = p.promocao && p.precoPromo ? p.precoPromo : p.preco;
-        grid.appendChild(criarCardProduto(p));
+        produtosCache.push(p);
+      });
+      // Ordem alfabética dentro de cada grupo
+      produtosCache.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+      renderizarCategorias();
+      renderizarProdutos();
+    }
+
+    let categoriaAtiva = 'Todos';
+
+    function renderizarCategorias() {
+      const bar = $('cat-bar');
+      const cats = Array.from(new Set(
+        produtosCache.map(p => (p.categoria || 'Geral').trim() || 'Geral')
+      )).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+      // Se só houver uma categoria (ou nenhuma), não mostra a barra
+      if (cats.length <= 1) {
+        bar.style.display = 'none';
+        categoriaAtiva = 'Todos';
+        return;
+      }
+      bar.style.display = '';
+
+      const opcoes = ['Todos', ...cats];
+      bar.innerHTML = '';
+      opcoes.forEach(cat => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'cat-chip' + (cat === categoriaAtiva ? ' ativo' : '');
+        chip.textContent = cat;
+        chip.setAttribute('role', 'tab');
+        chip.setAttribute('aria-selected', cat === categoriaAtiva ? 'true' : 'false');
+        chip.onclick = () => {
+          categoriaAtiva = cat;
+          bar.querySelectorAll('.cat-chip').forEach(c => {
+            const ativo = c.textContent === cat;
+            c.classList.toggle('ativo', ativo);
+            c.setAttribute('aria-selected', ativo ? 'true' : 'false');
+          });
+          renderizarProdutos();
+        };
+        bar.appendChild(chip);
       });
     }
+
+    // Normaliza pra busca (case + acento insensitive)
+    const norm = (s) => (s || '').toString().toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+    function renderizarProdutos() {
+      const cont = $('produtos-container');
+      const termo = norm($('busca-prod').value.trim());
+      const porCategoria = categoriaAtiva && categoriaAtiva !== 'Todos'
+        ? produtosCache.filter(p => ((p.categoria || 'Geral').trim() || 'Geral') === categoriaAtiva)
+        : produtosCache;
+      const filtrados = termo
+        ? porCategoria.filter(p => norm(p.nome).includes(termo) || norm(p.categoria).includes(termo))
+        : porCategoria;
+
+      if (filtrados.length === 0) {
+        const msg = termo
+          ? `Nenhum produto encontrado para "${$('busca-prod').value}".`
+          : `Nenhum produto na categoria "${categoriaAtiva}".`;
+        cont.innerHTML = `<div class="empty-state">${icon('search', { size: 32 })}<p>${msg}</p></div>`;
+        return;
+      }
+
+      const favoritos = filtrados.filter(p => p.favorito);
+      const demais    = filtrados.filter(p => !p.favorito);
+
+      cont.innerHTML = '';
+
+      // Quando há busca ativa, não separa em seções — só lista o resultado
+      if (termo) {
+        const grid = document.createElement('div');
+        grid.className = 'produtos-grid';
+        filtrados.forEach(p => grid.appendChild(criarCardProduto(p)));
+        cont.appendChild(grid);
+        return;
+      }
+
+      if (favoritos.length > 0) {
+        const titFav = document.createElement('div');
+        titFav.className = 'secao-titulo';
+        titFav.innerHTML = `${icon('star', { size: 14 })} Favoritos`;
+        cont.appendChild(titFav);
+        const gridFav = document.createElement('div');
+        gridFav.className = 'produtos-grid';
+        favoritos.forEach(p => gridFav.appendChild(criarCardProduto(p)));
+        cont.appendChild(gridFav);
+      }
+
+      if (demais.length > 0) {
+        if (favoritos.length > 0) {
+          const titAll = document.createElement('div');
+          titAll.className = 'secao-titulo';
+          titAll.style.color = 'var(--cinza)';
+          titAll.innerHTML = 'Demais produtos';
+          cont.appendChild(titAll);
+        }
+        const gridAll = document.createElement('div');
+        gridAll.className = 'produtos-grid';
+        demais.forEach(p => gridAll.appendChild(criarCardProduto(p)));
+        cont.appendChild(gridAll);
+      }
+
+      // Re-aplica estado do carrinho aos cards recém-renderizados
+      carrinho.forEach(({ qtd }, id) => atualizarCardProduto(id, qtd));
+    }
+
+    $('busca-prod').addEventListener('input', renderizarProdutos);
+    $('busca-clear').addEventListener('click', () => {
+      $('busca-prod').value = '';
+      renderizarProdutos();
+      $('busca-prod').focus();
+    });
 
     function criarCardProduto(p) {
       const ESTOQUE_BAIXO = 10;
@@ -291,7 +289,12 @@
         : estoqueBaixo
           ? `${icon('alert-triangle', { size: 12 })} Restam ${p.estoque}`
           : `Est: ${p.estoque}`;
+      const starHtml = p.favorito
+        ? `<span class="fav-star" aria-label="Favorito">${icon('star', { size: 14 })}</span>`
+        : '';
       card.innerHTML = `
+        <span class="qtd-badge" id="badge-${p.id}" aria-hidden="true">0</span>
+        ${starHtml}
         ${badgePromo}
         <div class="prod-nome">${p.nome}</div>
         ${precoHtml}
@@ -317,8 +320,7 @@
     function adicionar(p) {
       const atual = carrinho.get(p.id) || { produto: p, qtd: 0 };
       if (atual.qtd + 1 > p.estoque) {
-        vibrar([60, 40, 60]); // erro = 2 pulsos
-        mostrarAlerta(`Estoque máximo de ${p.nome} atingido`, 'warning');
+        toast(`Estoque máximo de ${p.nome} atingido`, { tipo: 'erro' });
         return;
       }
       atual.qtd += 1;
@@ -351,12 +353,14 @@
       const ctrl = $(`ctrl-${id}`);
       const addBtn = $(`add-${id}`);
       const qtdEl = $(`qtd-${id}`);
+      const badge = $(`badge-${id}`);
       const card = $(`card-${id}`);
       if (!ctrl) return;
       if (qtd > 0) {
         ctrl.classList.remove('hidden');
         addBtn.classList.add('hidden');
         qtdEl.textContent = qtd;
+        if (badge) badge.textContent = qtd;
         card.classList.add('no-carrinho');
       } else {
         ctrl.classList.add('hidden');
@@ -374,19 +378,16 @@
       return Array.from(carrinho.values()).reduce((s, { qtd }) => s + qtd, 0);
     }
 
-    function fmtBRL(v) {
-      return `R$ ${Number(v).toFixed(2).replace('.', ',')}`;
-    }
-
     function atualizarFab() {
-      const fab = $('fab-carrinho');
+      const bar = $('cart-bar');
       const total = totalCarrinho();
       const qtd = qtdTotalCarrinho();
       if (qtd === 0) {
-        fab.classList.add('hidden');
+        bar.classList.remove('aberta');
       } else {
-        fab.classList.remove('hidden');
+        bar.classList.add('aberta');
         $('fab-qtd').textContent = qtd;
+        $('fab-qtd-label').textContent = qtd === 1 ? '1 item' : `${qtd} itens`;
         $('fab-total').textContent = fmtBRL(total);
       }
     }
@@ -434,11 +435,21 @@
 
     // ── Finalizar ─────────────────────────────────────
     $('btn-finalizar').onclick = async () => {
-      if (!cliente) return;
-      if (carrinho.size === 0) return;
+      const alertaModal = $('alerta-modal');
+      if (!cliente) {
+        // Sem feedback aqui o operador clica e nada acontece — comum
+        // se a carga inicial do cliente falhou por rede ruim.
+        alertaModal.textContent = 'Dados do cliente não carregados. Recarregue a página (cliente=' + clienteId + ').';
+        alertaModal.className = 'alert alert-danger';
+        return;
+      }
+      if (carrinho.size === 0) {
+        alertaModal.textContent = 'Carrinho vazio.';
+        alertaModal.className = 'alert alert-warning';
+        return;
+      }
 
       const total = totalCarrinho();
-      const alertaModal = $('alerta-modal');
 
       if ((cliente.saldo || 0) < total) {
         alertaModal.textContent = `Saldo insuficiente. Falta ${fmtBRL(total - cliente.saldo)}`;
@@ -448,6 +459,15 @@
 
       $('btn-finalizar').disabled = true;
       $('btn-finalizar').innerHTML = '<div class="loader"></div> Processando...';
+
+      // Se o servidor demorar pra confirmar (wifi/3G ruim), avisa o operador
+      // que ainda está aguardando — não trava nem cancela a transação.
+      const timerLento = setTimeout(() => {
+        $('btn-finalizar').innerHTML = '<div class="loader"></div> Conexão lenta — aguardando servidor…';
+      }, 5000);
+
+      let vendaIdGerado = null;
+      let saldoFinal = null;
 
       try {
         await runTransaction(db, async (tx) => {
@@ -468,9 +488,13 @@
             tx.update(prodRefs[i], { estoque: estAtual - qtd });
           });
 
-          tx.update(clienteRef, { saldo: saldoAtual - total });
+          // Captura o saldo final DA TX — o `cliente.saldo` em memória pode
+          // estar stale se alguma recarga aconteceu em paralelo.
+          saldoFinal = saldoAtual - total;
+          tx.update(clienteRef, { saldo: saldoFinal });
 
           const vendaRef = doc(collection(db, 'vendas'));
+          vendaIdGerado = vendaRef.id;
           tx.set(vendaRef, {
             clienteId: cliente.id,
             clienteNome: cliente.id,   // mesmo valor por ora; campo já existe pra quando tiver nome
@@ -485,23 +509,45 @@
               subtotal: (produto.precoFinal ?? produto.preco) * qtd
             })),
             total,
+            operadorId: perfil?.uid || null,
+            operadorNome: perfil?.nome || perfil?.email || 'Operador',
             criadoEm: serverTimestamp()
           });
         });
 
-        vibrar([40, 60, 40, 60, 80]); // padrão de sucesso
+        clearTimeout(timerLento);
         fecharModal();
-        const saldoFinal = (cliente.saldo || 0) - total;
         cliente.saldo = saldoFinal;
         atualizarSaldoExibido();
-        const alertaEl = $('alerta');
-        alertaEl.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 18 })} Venda concluída! Total: ${fmtBRL(total)} · Saldo final: <strong>${fmtBRL(saldoFinal)}</strong></span>`;
-        alertaEl.className = 'alert alert-success';
-        alertaEl.classList.remove('hidden');
-        setTimeout(() => window.location.href = 'index.html', 2500);
+        const idCurto = (vendaIdGerado || '').slice(-6).toUpperCase();
+        toast(`Venda #${idCurto} — ${fmtBRL(total)} · saldo final ${fmtBRL(saldoFinal)}`, {
+          tipo: 'sucesso',
+          duracao: 4000,
+        });
+        // 4s pra dar tempo do operador ler o saldo final em evento barulhento
+        setTimeout(() => window.location.href = 'index.html', 4000);
       } catch (err) {
+        clearTimeout(timerLento);
         vibrar([100, 50, 100]); // padrão de erro
-        $('alerta-modal').textContent = `Erro: ${err.message}`;
+
+        // Diferencia os tipos de erro pra dar mensagem útil pro operador.
+        // Contenção de transação (raro, mas possível com vários operadores
+        // vendendo o mesmo produto ao mesmo tempo) gera FAILED_PRECONDITION
+        // ou ABORTED — nesse caso a venda NÃO foi cobrada, só clicar de novo.
+        let mensagem;
+        const eContencao = err.code === 'failed-precondition'
+                        || err.code === 'aborted'
+                        || /stored version/i.test(err.message || '');
+        if (err.message === 'Saldo insuficiente') {
+          mensagem = 'Saldo insuficiente pra essa venda.';
+        } else if ((err.message || '').startsWith('Estoque insuficiente')) {
+          mensagem = err.message + '. Atualize a tela e tente de novo.';
+        } else if (eContencao) {
+          mensagem = 'Conflito com outra venda simultânea. A venda NÃO foi cobrada — clique Finalizar de novo.';
+        } else {
+          mensagem = `Erro: ${err.message}. Tente de novo.`;
+        }
+        $('alerta-modal').textContent = mensagem;
         $('alerta-modal').className = 'alert alert-danger';
         $('btn-finalizar').disabled = false;
         $('btn-finalizar').innerHTML = `${icon('check', { size: 20 })} Finalizar Venda`;

@@ -3,10 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#1E3A8A">
-  <meta name="theme-color" content="#0F172A" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#0F1D4D">
+  <meta name="theme-color" content="#0A1436" media="(prefers-color-scheme: dark)">
   <title>App GEH — Grupo Escoteiro Hokkaido</title>
   <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="css/style.css">
   <link rel="icon" href="assets/logo.png">
   <link rel="manifest" href="manifest.json">
@@ -14,21 +16,44 @@
 </head>
 <body>
   <div class="landing">
-    <img src="assets/logo.png" alt="Grupo Escoteiro Hokkaido" onerror="this.style.display='none'">
+    <span class="tag"><span class="dot"></span> Sistema de vendas em eventos</span>
+
+    <div class="logo-wrap">
+      <img src="assets/logo.png" alt="Grupo Escoteiro Hokkaido" onerror="this.style.display='none'">
+    </div>
+
     <h1>Grupo Escoteiro Hokkaido</h1>
-    <p>Sistema de vendas em eventos</p>
+    <p>Cadastre clientes, carregue saldo e registre vendas direto do seu celular.</p>
 
     <div class="acoes">
-      <a href="operador/index.html" class="btn btn-accent btn-lg">
-        <span data-icon="smartphone" data-size="32"></span>
-        Sou Operador de Venda
+      <a href="operador/index.html" class="btn btn-primary-land">
+        <span data-icon="smartphone" data-size="22"></span>
+        <span>Sou Operador de Venda</span>
+        <span class="seta" data-icon="arrow-right" data-size="18"></span>
       </a>
-      <a href="admin/login.html" class="btn btn-secondary btn-lg" style="background: rgba(255,255,255,0.1); color: white; border-color: white;">
-        <span data-icon="monitor" data-size="32"></span>
-        Sou da Diretoria
+      <a href="caixa/index.html" class="btn btn-ghost-land">
+        <span data-icon="wallet" data-size="22"></span>
+        <span>Sou Caixa</span>
+        <span class="seta" data-icon="arrow-right" data-size="18"></span>
+      </a>
+      <a href="recepcao/index.html" class="btn btn-ghost-land">
+        <span data-icon="door-open" data-size="22"></span>
+        <span>Sou da Recepção</span>
+        <span class="seta" data-icon="arrow-right" data-size="18"></span>
+      </a>
+      <a href="admin/login.html" class="btn btn-ghost-land">
+        <span data-icon="monitor" data-size="22"></span>
+        <span>Sou da Diretoria</span>
+        <span class="seta" data-icon="arrow-right" data-size="18"></span>
       </a>
     </div>
+
+    <div class="rodape">GEH · Sempre Alerta</div>
   </div>
   <script type="module" src="js/icons.js"></script>
+  <script type="module">
+    import { instalarBannerPWA } from './js/install-banner.js';
+    instalarBannerPWA();
+  </script>
 </body>
 </html>

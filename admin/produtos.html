@@ -17,30 +17,34 @@
       <h3 class="card-title" id="form-titulo">Adicionar produto</h3>
       <input type="hidden" id="prod-id">
       <div class="form-group">
-        <label>Nome</label>
+        <label for="prod-nome">Nome</label>
         <input type="text" id="prod-nome" placeholder="Ex: Brigadeiro">
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;">
         <div class="form-group">
-          <label>Preço (R$)</label>
+          <label for="prod-preco">Preço (R$)</label>
           <input type="number" id="prod-preco" step="0.50" min="0">
         </div>
         <div class="form-group">
-          <label>Preço promo (R$)</label>
+          <label for="prod-preco-promo">Preço promo (R$)</label>
           <input type="number" id="prod-preco-promo" step="0.50" min="0" placeholder="Opcional">
         </div>
         <div class="form-group">
-          <label>Estoque inicial</label>
+          <label for="prod-estoque">Estoque inicial</label>
           <input type="number" id="prod-estoque" min="0" step="1">
         </div>
         <div class="form-group">
-          <label>Categoria</label>
+          <label for="prod-categoria">Categoria</label>
           <input type="text" id="prod-categoria" placeholder="Ex: Doces">
         </div>
       </div>
       <div class="form-group" style="display:flex;align-items:center;gap:0.5rem;">
         <input type="checkbox" id="prod-promocao" style="width:20px;height:20px;cursor:pointer;">
         <label for="prod-promocao" style="cursor:pointer;margin-bottom:0;display:inline-flex;align-items:center;gap:0.35rem;"><span data-icon="tag" data-size="16"></span> Marcar como promoção agora</label>
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:0.5rem;">
+        <input type="checkbox" id="prod-favorito" style="width:20px;height:20px;cursor:pointer;">
+        <label for="prod-favorito" style="cursor:pointer;margin-bottom:0;display:inline-flex;align-items:center;gap:0.35rem;"><span data-icon="star" data-size="16"></span> Fixar no topo da tela de venda (favorito)</label>
       </div>
       <div id="alerta" class="alert hidden"></div>
       <div style="display:flex;gap:0.5rem;">
@@ -59,7 +63,7 @@
 Suco de Laranja, 5.00, 50, Bebidas
 "Bolo de Cenoura, fatia", 4.00, 30</pre>
       <div class="form-group">
-        <label>Lista de produtos</label>
+        <label for="lote-produtos">Lista de produtos</label>
         <textarea id="lote-produtos" rows="8" style="font-family:monospace;font-size:0.875rem;" placeholder="Nome, Preço, Estoque, Categoria"></textarea>
       </div>
       <div id="alerta-lote" class="alert hidden"></div>
@@ -77,7 +81,8 @@ Suco de Laranja, 5.00, 50, Bebidas
   </main>
 
   <script type="module">
-    import { montarNav, fmtBRL } from "./_nav.js";
+    import { montarNav } from "./_nav.js";
+    import { fmtBRL } from "../js/helpers.js";
     import { db, collection, doc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, writeBatch } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
     import { confirmarAsync } from "../js/ui.js";
@@ -96,6 +101,7 @@ Suco de Laranja, 5.00, 50, Bebidas
       $('prod-estoque').value = '';
       $('prod-categoria').value = '';
       $('prod-promocao').checked = false;
+      $('prod-favorito').checked = false;
       $('form-titulo').textContent = 'Adicionar produto';
       $('btn-cancelar').classList.add('hidden');
       alerta.classList.add('hidden');
@@ -111,10 +117,12 @@ Suco de Laranja, 5.00, 50, Bebidas
         preco: parseFloat($('prod-preco').value) || 0,
         precoPromo: precoPromo > 0 ? precoPromo : null,
         promocao: promocao,
+        favorito: $('prod-favorito').checked,
         estoque: parseInt($('prod-estoque').value) || 0,
         categoria: $('prod-categoria').value.trim() || 'Geral'
       };
-      if (!dados.nome || dados.preco <= 0) {
+      // preco 0 e permitido: itens servidos a vontade, registrados so pra contar quantidade
+      if (!dados.nome || dados.preco < 0) {
         alerta.textContent = 'Preencha nome e preço válido.';
         alerta.className = 'alert alert-warning';
         return;
@@ -162,7 +170,7 @@ Suco de Laranja, 5.00, 50, Bebidas
         const preco = parseFloat((partes[1] || '').replace(',', '.'));
         const estoque = parseInt(partes[2]) || 0;
         const categoria = partes[3] || 'Geral';
-        if (!nome || isNaN(preco) || preco <= 0) {
+        if (!nome || isNaN(preco) || preco < 0) {
           erros.push(`Linha ${i + 1}: "${linha}" — nome ou preço inválido`);
         } else {
           produtos.push({ nome, preco, estoque, categoria });
@@ -192,7 +200,7 @@ Suco de Laranja, 5.00, 50, Bebidas
       setTimeout(() => alertaLote.classList.add('hidden'), 3000);
     };
 
-    onSnapshot(collection(db, 'produtos'), (snap) => {
+    const unsub = onSnapshot(collection(db, 'produtos'), (snap) => {
       const tbody = $('tbl');
       tbody.innerHTML = '';
       if (snap.empty) {
@@ -206,6 +214,9 @@ Suco de Laranja, 5.00, 50, Bebidas
         const badgePromo = p.promocao
           ? `<span style="background:var(--vermelho);color:white;font-size:0.7rem;padding:2px 6px;border-radius:999px;margin-left:4px;display:inline-flex;align-items:center;gap:3px;">${icon('tag', { size: 11 })} PROMO</span>`
           : '';
+        const badgeFav = p.favorito
+          ? `<span style="background:var(--amarelo);color:#1F2937;font-size:0.7rem;padding:2px 6px;border-radius:999px;margin-left:4px;display:inline-flex;align-items:center;gap:3px;">${icon('star', { size: 11 })} FAV</span>`
+          : '';
         const badgeEstoque = p.estoque <= 0
           ? `<span style="background:var(--cinza);color:white;font-size:0.7rem;padding:2px 6px;border-radius:999px;margin-left:4px;">SEM ESTOQUE</span>`
           : p.estoque <= ESTOQUE_BAIXO
@@ -215,7 +226,7 @@ Suco de Laranja, 5.00, 50, Bebidas
           ? `<span style="text-decoration:line-through;color:var(--cinza);font-size:0.85rem;">${fmtBRL(p.preco)}</span> <strong style="color:var(--vermelho);">${fmtBRL(p.precoPromo)}</strong>`
           : fmtBRL(p.preco);
         tr.innerHTML = `
-          <td>${p.nome}${badgePromo}${badgeEstoque}</td>
+          <td>${p.nome}${badgeFav}${badgePromo}${badgeEstoque}</td>
           <td>${p.categoria || '—'}</td>
           <td>${precoHtml}</td>
           <td>${p.estoque}</td>
@@ -230,6 +241,7 @@ Suco de Laranja, 5.00, 50, Bebidas
           $('prod-preco').value = p.preco;
           $('prod-preco-promo').value = p.precoPromo || '';
           $('prod-promocao').checked = p.promocao || false;
+          $('prod-favorito').checked = p.favorito || false;
           $('prod-estoque').value = p.estoque;
           $('prod-categoria').value = p.categoria || '';
           $('form-titulo').textContent = `Editando "${p.nome}"`;
@@ -243,6 +255,7 @@ Suco de Laranja, 5.00, 50, Bebidas
         tbody.appendChild(tr);
       });
     });
+    window.addEventListener('pagehide', () => unsub());
   </script>
 </body>
 </html>
