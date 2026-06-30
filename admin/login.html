@@ -109,14 +109,8 @@
 
   <script type="module">
     import {
-<<<<<<< HEAD
       auth, signInWithEmailAndPassword, onAuthStateChanged,
       GoogleAuthProvider, signInWithPopup, signOut, sendPasswordResetEmail
-=======
-      auth, db, signInWithEmailAndPassword, onAuthStateChanged,
-      GoogleAuthProvider, signInWithPopup, signOut, sendPasswordResetEmail,
-      doc, getDoc, setDoc, deleteDoc
->>>>>>> 9bf69ef8c85ddfdc4a7d07f92bae193ae334a660
     } from "../js/firebase-config.js";
     import { carregarPerfil } from "../js/auth-guard.js";
     import { icon } from "../js/icons.js";
@@ -124,18 +118,6 @@
     const alerta = document.getElementById('alerta');
     const alertaOk = document.getElementById('alerta-ok');
 
-<<<<<<< HEAD
-=======
-    // Permite digitar so o usuario (ex: "operador07") no lugar do e-mail
-    // completo: sem "@", apenda o dominio de teste. E-mail real (ja com
-    // "@") e login Google passam intactos.
-    function normalizarEmail(valor) {
-      const v = (valor || '').trim();
-      if (!v) return '';
-      return v.includes('@') ? v : v + '@teste.com';
-    }
-
->>>>>>> 9bf69ef8c85ddfdc4a7d07f92bae193ae334a660
     const params = new URLSearchParams(location.search);
     if (params.get('erro') === 'sem-acesso') {
       alerta.textContent = 'Sua conta não tem acesso. Fale com a diretoria para ser cadastrada.';
@@ -144,44 +126,11 @@
 
     function destinoPor(perfil) {
       if (perfil?.papel === 'operador') return '../operador/index.html';
-<<<<<<< HEAD
-=======
-      if (perfil?.papel === 'caixa')    return '../caixa/index.html';
-      if (perfil?.papel === 'recepcao') return '../recepcao/index.html';
->>>>>>> 9bf69ef8c85ddfdc4a7d07f92bae193ae334a660
       return 'dashboard.html';
     }
 
     async function dispatch(user) {
-<<<<<<< HEAD
       const perfil = await carregarPerfil(user);
-=======
-      let perfil = await carregarPerfil(user);
-
-      // Auto-provisionamento: usuario sem perfil que tem convite em /pendentes
-      // (tipico do primeiro login com Google apos admin ter adicionado o e-mail)
-      if (!perfil && user.email) {
-        try {
-          const emailKey = user.email.toLowerCase();
-          const conviteSnap = await getDoc(doc(db, 'pendentes', emailKey));
-          if (conviteSnap.exists()) {
-            const c = conviteSnap.data();
-            await setDoc(doc(db, 'usuarios', user.uid), {
-              nome: c.nome,
-              email: emailKey,
-              papel: c.papel,
-              ativo: true,
-              criadoEm: new Date(),
-            });
-            await deleteDoc(doc(db, 'pendentes', emailKey));
-            perfil = await carregarPerfil(user);
-          }
-        } catch (e) {
-          console.warn('[login] erro no auto-provisionamento:', e);
-        }
-      }
-
->>>>>>> 9bf69ef8c85ddfdc4a7d07f92bae193ae334a660
       if (!perfil || perfil.ativo === false) {
         await signOut(auth);
         alerta.textContent = perfil?.ativo === false

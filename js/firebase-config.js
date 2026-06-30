@@ -69,13 +69,6 @@ const auth = getAuth(app);
 // trocaria a sessão.
 function criarAppSecundario() {
   const secundario = initializeApp(firebaseConfig, 'cadastro-' + Date.now());
-<<<<<<< HEAD
-=======
-  initializeAppCheck(secundario, {
-    provider: new ReCaptchaV3Provider(RECAPTCHA_SITE_KEY),
-    isTokenAutoRefreshEnabled: true,
-  });
->>>>>>> 9bf69ef8c85ddfdc4a7d07f92bae193ae334a660
   return { app: secundario, auth: getAuth(secundario) };
 }
 

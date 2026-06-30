@@ -58,15 +58,8 @@
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
     import { requireAuth } from "../js/auth-guard.js";
-<<<<<<< HEAD:operador/carregar.html
 
     await requireAuth({ papel: 'operador' });
-=======
-    import { fmtBRL } from "../js/helpers.js";
-
-    // Aceita admin também (homeFor não redireciona, e admin pode atender o caixa).
-    const { perfil } = await requireAuth({ papel: 'caixa' });
->>>>>>> 9bf69ef8c85ddfdc4a7d07f92bae193ae334a660:caixa/carregar.html
 
     const params = new URLSearchParams(window.location.search);
     const clienteId = params.get('cliente');

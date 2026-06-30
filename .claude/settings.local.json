@@ -44,7 +44,10 @@
       "Bash(git show *)",
       "Bash(python3 -c ' *)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\julia\\\\Desktop\\\\App GEH\\\\admin\" -File)",
-      "Bash(Select-Object Name)"
+      "Bash(Select-Object Name)",
+      "PowerShell(git -C \"C:\\\\Users\\\\julia\\\\Desktop\\\\App GEH\" status --porcelain)",
+      "PowerShell(git -C \"C:\\\\Users\\\\julia\\\\Desktop\\\\App GEH\" log --oneline -3)",
+      "PowerShell(\"----\")"
     ]
   }
 }
