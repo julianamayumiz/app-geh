@@ -55,8 +55,17 @@
   <script type="module" src="../js/icons.js"></script>
 
   <script type="module">
-    const { requireAuth } = await import('../js/auth-guard.js');
-    await requireAuth({ papel: 'operador' });
+    // Carrega todos os modulos em paralelo. Antes era uma cadeia
+    // sequencial de await import() que serializava 3 round-trips.
+    const [
+      { requireAuth },
+      { icon },
+      { iniciarScanner }
+    ] = await Promise.all([
+      import('../js/auth-guard.js'),
+      import('../js/icons.js'),
+      import('../js/scanner.js'),
+    ]);
 
     const params = new URLSearchParams(window.location.search);
     const acao = params.get('acao') || 'consultar';

@@ -152,8 +152,12 @@
   <script type="module" src="../js/icons.js"></script>
   <script type="module">
     import { db, doc, getDoc, auth, signOut } from "../js/firebase-config.js";
+    import { renderIcons } from "../js/icons.js";
     import { requireAuth } from "../js/auth-guard.js";
 
+    // Dispara em paralelo com requireAuth — ambas ficam na fila do App Check
+    // e viajam juntas assim que o token reCAPTCHA chegar
+    const snapPromise = getDoc(doc(db, 'config', 'eventoAtivo'));
     await requireAuth({ papel: 'operador' });
 
     document.getElementById('btn-logout').onclick = async () => {
@@ -161,9 +165,12 @@
       window.location.href = '../admin/login.html';
     };
 
-    const snap = await getDoc(doc(db, 'config', 'eventoAtivo'));
-    const label = document.getElementById('evento-label');
-    const box = document.getElementById('evento-box');
+    const snap = await snapPromise;
+    const box  = document.getElementById('evento-box');
+    const tag  = document.getElementById('evento-tag');
+    const nome = document.getElementById('evento-nome');
+    const sub  = document.getElementById('evento-sub');
+
     if (snap.exists() && snap.data().id) {
       tag.innerHTML = '<span class="dot"></span> Evento ativo';
       nome.textContent = snap.data().nome;

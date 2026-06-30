@@ -85,8 +85,6 @@
     import { icon, renderIcons } from "../js/icons.js";
     import { requireAuth } from "../js/auth-guard.js";
 
-    await requireAuth({ papel: 'operador' });
-
     const { perfil } = await requireAuth({ papel: 'operador' });
     import { toast } from "../js/ui.js";
     import { fmtBRL } from "../js/helpers.js";

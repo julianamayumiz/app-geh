@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="../css/style.css">
   <link rel="manifest" href="../manifest.json">
   <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     .user-row .badge {
       display: inline-block;
@@ -20,16 +21,16 @@
     }
     .badge-admin    { background: rgba(30,58,138,0.12); color: var(--azul); }
     .badge-operador { background: rgba(22,163,74,0.12); color: var(--verde); }
-    .badge-inativo  { background: rgba(220,38,38,0.12); color: #B91C1C; }
+    .badge-caixa    { background: rgba(217,119,6,0.14);  color: #B45309; }
+    .badge-recepcao { background: rgba(124,58,237,0.14); color: #6D28D9; }
+    .badge-inativo  { background: rgba(220,38,38,0.12); color: var(--vermelho-texto); }
     :root[data-theme="dark"] .badge-admin    { background: rgba(59,130,246,0.18); color: #93C5FD; }
     :root[data-theme="dark"] .badge-operador { background: rgba(34,197,94,0.18); color: #86EFAC; }
+    :root[data-theme="dark"] .badge-caixa    { background: rgba(245,158,11,0.20); color: #FCD34D; }
+    :root[data-theme="dark"] .badge-recepcao { background: rgba(167,139,250,0.20); color: #C4B5FD; }
     :root[data-theme="dark"] .badge-inativo  { background: rgba(239,68,68,0.18); color: #FCA5A5; }
 
-    .acoes-linha {
-      display: inline-flex;
-      gap: 0.35rem;
-      flex-wrap: wrap;
-    }
+    .acoes-linha { display: inline-flex; gap: 0.35rem; flex-wrap: wrap; }
     .acoes-linha button {
       padding: 0.35rem 0.7rem;
       font-size: 0.78rem;
@@ -39,14 +40,12 @@
       color: var(--cinza-escuro);
       cursor: pointer;
     }
-    .acoes-linha button:hover { background: var(--cinza-fundo); }
-    .acoes-linha .danger { color: #B91C1C; }
+    .acoes-linha button:hover:not(:disabled) { background: var(--cinza-fundo); }
+    .acoes-linha button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .acoes-linha .danger { color: var(--vermelho-texto); }
 
-    .form-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.75rem;
-    }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .form-grid > .form-group { min-width: 0; }
     @media (max-width: 700px) { .form-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -62,26 +61,28 @@
         <span data-icon="user-plus" data-size="18"></span> Cadastrar novo usuário
       </h3>
       <p style="font-size:0.85rem;color:var(--cinza);margin-bottom:0.75rem;">
-        A pessoa entra com este e-mail e a senha provisória que você definir aqui.
+        A pessoa entra com este e-mail e a senha provisória que você definir.
         Ela pode trocar depois pelo "Esqueci minha senha" no login.
       </p>
       <div class="form-grid">
         <div class="form-group">
-          <label>Nome</label>
+          <label for="novo-nome">Nome</label>
           <input type="text" id="novo-nome" placeholder="Maria da Silva">
         </div>
         <div class="form-group">
-          <label>E-mail</label>
+          <label for="novo-email">E-mail</label>
           <input type="email" id="novo-email" placeholder="maria@grupohokkaido.org">
         </div>
         <div class="form-group">
-          <label>Senha provisória (mín. 6 caracteres)</label>
+          <label for="novo-senha">Senha provisória (mín. 6 caracteres)</label>
           <input type="text" id="novo-senha" placeholder="ex: geh2026">
         </div>
         <div class="form-group">
-          <label>Papel</label>
+          <label for="novo-papel">Papel</label>
           <select id="novo-papel">
             <option value="operador">Operador (vende em eventos)</option>
+            <option value="caixa">Caixa (recarrega saldo dos clientes)</option>
+            <option value="recepcao">Recepção (confere convites e venda na porta)</option>
             <option value="admin">Admin (acesso total)</option>
           </select>
         </div>
@@ -93,17 +94,123 @@
       </button>
     </div>
 
+    <div class="card" style="margin-top:1rem;">
+      <h3 class="card-title" style="display:inline-flex;align-items:center;gap:0.5rem;">
+        <span data-icon="upload" data-size="18"></span> Importar usuários em lote
+      </h3>
+      <p style="font-size:0.85rem;color:var(--cinza);margin-bottom:0.5rem;">
+        Sobe um arquivo <code style="background:var(--cinza-claro);padding:2px 6px;border-radius:4px;">.xlsx</code> ou
+        <code style="background:var(--cinza-claro);padding:2px 6px;border-radius:4px;">.csv</code> com colunas
+        <code style="background:var(--cinza-claro);padding:2px 6px;border-radius:4px;">nome | email | senha | papel</code>.
+        Papel aceita: <code>admin</code>, <code>caixa</code>, <code>operador</code>, <code>recepcao</code>.
+      </p>
+      <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:0.75rem;">
+        <label for="arquivo-lote" style="font-weight:500;font-size:0.88rem;">Arquivo:</label>
+        <input type="file" id="arquivo-lote" accept=".xlsx,.xls,.csv">
+        <button id="btn-modelo-usuarios" class="btn btn-secondary" style="width:auto;padding:0.4rem 0.85rem;font-size:0.85rem;margin-left:auto;">Baixar modelo</button>
+      </div>
+      <div id="alerta-lote" class="alert hidden"></div>
+      <div id="preview-lote" class="hidden">
+        <div class="table-wrapper" style="margin-bottom:0.75rem;max-height:320px;overflow-y:auto;">
+          <table id="tbl-preview">
+            <thead><tr><th>Nome</th><th>E-mail</th><th>Senha</th><th>Papel</th><th>Status</th></tr></thead>
+            <tbody id="tbl-preview-body"></tbody>
+          </table>
+        </div>
+        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+          <button id="btn-importar" class="btn btn-primary" style="width:auto;padding:0.6rem 1.25rem;">Importar</button>
+          <span id="label-erros" style="font-size:0.85rem;color:var(--vermelho-texto);"></span>
+        </div>
+      </div>
+      <div id="progresso-lote" class="hidden" style="margin-top:0.5rem;">
+        <p id="txt-progresso" style="font-size:0.88rem;color:var(--cinza-escuro);margin-bottom:0.35rem;">Preparando...</p>
+        <progress id="barra-progresso" style="width:100%;height:8px;" max="1" value="0"></progress>
+      </div>
+      <div id="resultado-lote" class="hidden" style="margin-top:0.5rem;"></div>
+    </div>
+
+    <div class="card" style="margin-top:1rem;">
+      <h3 class="card-title" style="display:inline-flex;align-items:center;gap:0.5rem;">
+        <span data-icon="mail-plus" data-size="18"></span> Convidar usuário via Google
+      </h3>
+      <p style="font-size:0.85rem;color:var(--cinza);margin-bottom:0.75rem;">
+        Adicione o e-mail da conta Google da pessoa. Na primeira vez que ela clicar em
+        "Entrar com Google", o acesso é liberado automaticamente com o papel definido aqui.
+        Sem senha provisória.
+      </p>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="google-nome">Nome</label>
+          <input type="text" id="google-nome" placeholder="Maria da Silva">
+        </div>
+        <div class="form-group">
+          <label for="google-email">E-mail Google</label>
+          <input type="email" id="google-email" placeholder="maria@gmail.com">
+        </div>
+        <div class="form-group">
+          <label for="google-papel">Papel</label>
+          <select id="google-papel">
+            <option value="operador">Operador (vende em eventos)</option>
+            <option value="caixa">Caixa (recarrega saldo dos clientes)</option>
+            <option value="recepcao">Recepção (confere convites e venda na porta)</option>
+            <option value="admin">Admin (acesso total)</option>
+          </select>
+        </div>
+      </div>
+      <div id="alerta-google" class="alert alert-danger hidden"></div>
+      <div id="alerta-google-ok" class="alert alert-success hidden"></div>
+      <button id="btn-convidar-google" class="btn btn-primary" style="width:auto;padding:0.6rem 1.25rem;">
+        <span data-icon="mail-plus" data-size="16"></span> Adicionar convite
+      </button>
+
+      <div style="border-top:1px solid var(--cinza-claro);padding-top:0.75rem;margin-top:1rem;">
+        <p style="font-size:0.85rem;color:var(--cinza);margin-bottom:0.5rem;">
+          Ou importe vários de uma vez — arquivo
+          <code style="background:var(--cinza-claro);padding:2px 6px;border-radius:4px;">.xlsx</code> ou
+          <code style="background:var(--cinza-claro);padding:2px 6px;border-radius:4px;">.csv</code>
+          com colunas <code style="background:var(--cinza-claro);padding:2px 6px;border-radius:4px;">nome | email | papel</code>
+          (sem coluna de senha):
+        </p>
+        <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:0.5rem;">
+          <label for="arquivo-google" style="font-weight:500;font-size:0.88rem;">Arquivo:</label>
+          <input type="file" id="arquivo-google" accept=".xlsx,.xls,.csv">
+          <button id="btn-modelo-google" class="btn btn-secondary" style="width:auto;padding:0.4rem 0.85rem;font-size:0.85rem;margin-left:auto;">Baixar modelo</button>
+        </div>
+        <div id="alerta-google-lote" class="alert hidden"></div>
+        <div id="preview-google-lote" class="hidden">
+          <div class="table-wrapper" style="margin-bottom:0.5rem;max-height:240px;overflow-y:auto;">
+            <table>
+              <thead><tr><th>Nome</th><th>E-mail</th><th>Papel</th><th>Status</th></tr></thead>
+              <tbody id="tbl-google-preview"></tbody>
+            </table>
+          </div>
+          <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+            <button id="btn-google-importar" class="btn btn-primary" style="width:auto;padding:0.6rem 1.25rem;">Importar</button>
+            <span id="label-erros-google" style="font-size:0.85rem;color:var(--vermelho-texto);"></span>
+          </div>
+        </div>
+        <div id="resultado-google-lote" class="hidden" style="margin-top:0.5rem;"></div>
+      </div>
+
+      <div style="border-top:1px solid var(--cinza-claro);padding-top:0.75rem;margin-top:0.75rem;">
+        <h4 style="font-size:0.92rem;font-weight:600;color:var(--azul);margin-bottom:0.5rem;">Aguardando primeiro login</h4>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Nome</th><th>E-mail</th><th>Papel</th><th>Ação</th></tr></thead>
+            <tbody id="tbl-pendentes">
+              <tr><td colspan="4" class="text-center text-muted">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <h3 style="color:var(--azul);margin:1.5rem 0 0.75rem;">Usuários cadastrados</h3>
     <div class="table-wrapper">
       <table>
         <thead>
-          <tr>
-            <th>Nome</th>
-            <th>E-mail</th>
-            <th>Papel</th>
-            <th>Status</th>
-            <th>Ações</th>
-          </tr>
+          <tr><th>Nome</th><th>E-mail</th><th>Papel</th><th>Status</th><th>Ações</th></tr>
         </thead>
         <tbody id="tbl-usuarios">
           <tr><td colspan="5" class="text-center text-muted">Carregando...</td></tr>
@@ -113,8 +220,7 @@
 
     <div class="alert alert-info" style="margin-top:1.5rem;font-size:0.85rem;">
       <strong>Dica:</strong> "Desativar" tira o acesso na hora — a pessoa não consegue mais entrar mesmo com a senha.
-      Pra excluir definitivamente da lista de logins do Firebase Auth (caso a pessoa queira que o e-mail dela seja apagado),
-      use o console do Firebase em <em>Authentication → Users</em>.
+      Pra excluir o login do Firebase Auth de vez, use o console do Firebase em <em>Authentication → Users</em>.
     </div>
   </main>
 
@@ -123,16 +229,62 @@
     import { montarNav } from "./_nav.js";
     import { icon, renderIcons } from "../js/icons.js";
     import {
-      db, auth, firebaseConfig, criarAppSecundario,
-      collection, doc, getDoc, setDoc, updateDoc, deleteDoc,
+      db, auth, criarAppSecundario,
+      collection, doc, setDoc, updateDoc, deleteDoc,
       onSnapshot, query, orderBy,
       createUserWithEmailAndPassword, signOut, sendPasswordResetEmail
     } from "../js/firebase-config.js";
-    import { SUPER_ADMIN_EMAIL } from "../js/auth-guard.js";
+    import { SUPER_ADMIN_EMAIL, requireAuth } from "../js/auth-guard.js";
+    import { confirmarAsync } from "../js/ui.js";
+    import { esc } from "../js/helpers.js";
 
-    const navPromise = montarNav('usuarios.html');
+    montarNav('usuarios.html');
+    let perfilAtual = null;
+    requireAuth({ papel: 'admin' }).then(({ perfil }) => { perfilAtual = perfil; });
 
-    const $  = id => document.getElementById(id);
+    const $ = id => document.getElementById(id);
+
+    function pedirPapelAsync(papelAtual) {
+      return new Promise(resolve => {
+        const backdrop = document.createElement('div');
+        backdrop.className = 'confirm-backdrop';
+        backdrop.innerHTML = `
+          <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="pedirpapel-msg">
+            <p id="pedirpapel-msg" class="confirm-msg">Escolha o novo papel:</p>
+            <div class="form-group" style="margin-bottom:0.75rem;">
+              <select id="pedirpapel-select" style="width:100%;padding:0.6rem;border:1px solid var(--cinza-claro);border-radius:8px;font-size:0.95rem;">
+                <option value="operador">Operador (vende em eventos)</option>
+                <option value="caixa">Caixa (recarrega saldo dos clientes)</option>
+                <option value="recepcao">Recepção (confere convites e venda na porta)</option>
+                <option value="admin">Admin (acesso total)</option>
+              </select>
+            </div>
+            <div class="confirm-acoes">
+              <button type="button" class="btn btn-secondary" data-acao="cancelar">Cancelar</button>
+              <button type="button" class="btn btn-primary" data-acao="ok">Salvar</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(backdrop);
+        const sel = backdrop.querySelector('#pedirpapel-select');
+        sel.value = papelAtual;
+        sel.focus();
+        const fechar = (valor) => {
+          document.removeEventListener('keydown', onKey);
+          backdrop.remove();
+          resolve(valor);
+        };
+        const onKey = (e) => { if (e.key === 'Escape') fechar(null); };
+        document.addEventListener('keydown', onKey);
+        backdrop.addEventListener('click', (e) => {
+          if (e.target === backdrop) fechar(null);
+          const acao = e.target.closest('[data-acao]')?.dataset.acao;
+          if (acao === 'ok') fechar(sel.value);
+          if (acao === 'cancelar') fechar(null);
+        });
+      });
+    }
+
     const tbl = $('tbl-usuarios');
     const alertaNovo = $('alerta-novo');
     const alertaOk = $('alerta-ok');
@@ -148,11 +300,7 @@
       alertaOk.classList.remove('hidden');
     }
 
-    // ── Lista usuários em tempo real ──────────────────────────────
-    let perfilAtual = null;
-    navPromise.then(({ perfil }) => { perfilAtual = perfil; });
-
-    onSnapshot(
+    const unsub1 = onSnapshot(
       query(collection(db, 'usuarios'), orderBy('nome')),
       (snap) => {
         if (snap.empty) {
@@ -173,6 +321,10 @@
           const isSuper = u.email === SUPER_ADMIN_EMAIL;
           const badgePapel = u.papel === 'admin'
             ? '<span class="badge badge-admin">Admin</span>'
+            : u.papel === 'caixa'
+            ? '<span class="badge badge-caixa">Caixa</span>'
+            : u.papel === 'recepcao'
+            ? '<span class="badge badge-recepcao">Recepção</span>'
             : '<span class="badge badge-operador">Operador</span>';
           const badgeStatus = u.ativo === false
             ? '<span class="badge badge-inativo">Desativado</span>'
@@ -200,11 +352,10 @@
         renderIcons(tbl);
       },
       (err) => {
-        tbl.innerHTML = `<tr><td colspan="5" class="text-center" style="color:#B91C1C;">Erro ao carregar: ${err.message}</td></tr>`;
+        tbl.innerHTML = `<tr><td colspan="5" class="text-center" style="color:var(--vermelho-texto);">Erro: ${err.message}</td></tr>`;
       }
     );
 
-    // ── Ações da tabela (delegação) ────────────────────────────────
     tbl.addEventListener('click', async (e) => {
       const btn = e.target.closest('button[data-acao]');
       if (!btn || btn.disabled) return;
@@ -214,16 +365,22 @@
       try {
         if (acao === 'papel') {
           const atual = btn.dataset.papel;
-          const novo = atual === 'admin' ? 'operador' : 'admin';
-          if (!confirm(`Mudar papel de "${atual}" para "${novo}"?`)) return;
+          const novo = await pedirPapelAsync(atual);
+          if (!novo || novo === atual) return;
           await updateDoc(doc(db, 'usuarios', id), { papel: novo });
         } else if (acao === 'desativar') {
-          if (!confirm('Desativar este usuário? Ele perde acesso imediatamente.')) return;
+          if (!(await confirmarAsync(
+            'Desativar este usuário? Ele perde acesso imediatamente.',
+            { destrutivo: true, textoOk: 'Desativar' }
+          ))) return;
           await updateDoc(doc(db, 'usuarios', id), { ativo: false });
         } else if (acao === 'ativar') {
           await updateDoc(doc(db, 'usuarios', id), { ativo: true });
         } else if (acao === 'excluir') {
-          if (!confirm('Excluir este registro? A pessoa perde acesso, mas o login dela continua existindo no Firebase Auth (apague lá no console se quiser remover de vez).')) return;
+          if (!(await confirmarAsync(
+            'Excluir este registro? A pessoa perde acesso, mas o login dela continua existindo no Firebase Auth (apague lá no console se quiser remover de vez).',
+            { destrutivo: true, textoOk: 'Excluir' }
+          ))) return;
           await deleteDoc(doc(db, 'usuarios', id));
         } else if (acao === 'reset') {
           const email = btn.dataset.email;
@@ -235,7 +392,6 @@
       }
     });
 
-    // ── Cadastrar novo usuário ────────────────────────────────────
     $('btn-cadastrar').onclick = async () => {
       alertaNovo.classList.add('hidden');
       alertaOk.classList.add('hidden');
@@ -254,18 +410,14 @@
 
       let secundario = null;
       try {
-        // Cria o auth do novo usuário num app secundário, pra
-        // não trocar a sessão do admin atual.
         secundario = criarAppSecundario();
         const cred = await createUserWithEmailAndPassword(secundario.auth, email, senha);
 
-        // Cria perfil no Firestore (continua usando a sessão do admin)
         await setDoc(doc(db, 'usuarios', cred.user.uid), {
           nome, email, papel, ativo: true,
           criadoEm: new Date(),
         });
 
-        // Desloga o app secundário e o joga fora
         await signOut(secundario.auth);
 
         showOk(`Usuário ${nome} cadastrado! Avise a senha provisória.`);
@@ -274,7 +426,7 @@
         $('novo-senha').value = '';
       } catch (err) {
         const msg = err.code === 'auth/email-already-in-use'
-          ? 'Este e-mail já tem login. Se a pessoa não estiver na lista, peça pra ela usar "Esqueci minha senha" no login — ou apague o login antigo no console do Firebase.'
+          ? 'Este e-mail já tem login. Se a pessoa não está na lista, peça pra ela usar "Esqueci minha senha" no login — ou apague o login antigo no console do Firebase.'
           : err.code === 'auth/weak-password'
           ? 'Senha muito fraca (mínimo 6 caracteres).'
           : err.code === 'auth/invalid-email'
@@ -287,6 +439,439 @@
         btn.innerHTML = `${icon('user-plus', { size: 16 })} Cadastrar`;
       }
     };
+
+    // === importacao em lote ===
+    const PAPEIS_VALIDOS = ['admin', 'caixa', 'operador', 'recepcao'];
+    let linhasParaImportar = [];
+
+    function normHeader(h) {
+      return (h || '').toString().trim().toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '');
+    }
+
+    function detectarColIdx(headers, candidatos) {
+      return headers.findIndex(h => candidatos.includes(normHeader(h)));
+    }
+
+    function validarLinha(l) {
+      const erros = [];
+      if (!l.nome) erros.push('nome vazio');
+      if (!l.email || !/.+@.+\..+/.test(l.email)) erros.push('e-mail invalido');
+      if (!l.senha || l.senha.length < 6) erros.push('senha < 6 chars');
+      if (!PAPEIS_VALIDOS.includes(l.papel)) erros.push('papel invalido');
+      return erros;
+    }
+
+    $('arquivo-lote').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      const alertaL = $('alerta-lote');
+      const previewL = $('preview-lote');
+
+      alertaL.classList.add('hidden');
+      previewL.classList.add('hidden');
+      $('resultado-lote').classList.add('hidden');
+      linhasParaImportar = [];
+
+      if (!file) return;
+
+      if (typeof XLSX === 'undefined') {
+        alertaL.textContent = 'Biblioteca de leitura nao carregou. Verifique sua conexao e recarregue a pagina.';
+        alertaL.className = 'alert alert-danger';
+        alertaL.classList.remove('hidden');
+        return;
+      }
+
+      try {
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+        if (rows.length < 2) throw new Error('Arquivo sem dados alem do cabecalho.');
+
+        const headers = rows[0].map(h => (h || '').toString());
+        const iNome  = detectarColIdx(headers, ['nome', 'name']);
+        const iEmail = detectarColIdx(headers, ['email', 'e-mail']);
+        const iSenha = detectarColIdx(headers, ['senha', 'password', 'pass']);
+        const iPapel = detectarColIdx(headers, ['papel', 'role', 'perfil', 'funcao', 'funcao']);
+
+        if ([iNome, iEmail, iSenha, iPapel].includes(-1)) {
+          throw new Error('Colunas nao encontradas. O arquivo precisa ter: nome, email, senha e papel (em qualquer ordem).');
+        }
+
+        const dados = rows.slice(1).filter(r => r.some(c => c !== ''));
+        if (!dados.length) throw new Error('Nenhuma linha de dados no arquivo.');
+
+        linhasParaImportar = [];
+        const tbody = $('tbl-preview-body');
+        tbody.innerHTML = '';
+
+        dados.forEach(row => {
+          const l = {
+            nome:  (row[iNome]  || '').toString().trim(),
+            email: (row[iEmail] || '').toString().trim().toLowerCase(),
+            senha: (row[iSenha] || '').toString().trim(),
+            papel: (row[iPapel] || '').toString().trim().toLowerCase(),
+          };
+          const erros = validarLinha(l);
+          const ok = erros.length === 0;
+          if (ok) linhasParaImportar.push(l);
+
+          const tr = document.createElement('tr');
+          tr.style.background = ok ? '' : 'rgba(220,38,38,0.06)';
+          tr.innerHTML = `
+            <td>${esc(l.nome) || '—'}</td>
+            <td>${esc(l.email) || '—'}</td>
+            <td>${l.senha ? '••••••' : '—'}</td>
+            <td>${esc(l.papel) || '—'}</td>
+            <td style="font-size:0.8rem;">${ok
+              ? '<span style="color:var(--verde);">✓ OK</span>'
+              : `<span style="color:var(--vermelho-texto);" title="${esc(erros.join(', '))}">✗ ${esc(erros.join(', '))}</span>`
+            }</td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        const nErros = dados.length - linhasParaImportar.length;
+        $('btn-importar').textContent = `Importar ${linhasParaImportar.length} usuário${linhasParaImportar.length !== 1 ? 's' : ''}`;
+        $('btn-importar').disabled = linhasParaImportar.length === 0;
+        $('label-erros').textContent = nErros > 0
+          ? `${nErros} linha${nErros !== 1 ? 's' : ''} com erro ser${nErros !== 1 ? 'ao' : 'a'} ignorada${nErros !== 1 ? 's' : ''}`
+          : '';
+
+        previewL.classList.remove('hidden');
+      } catch (err) {
+        alertaL.textContent = err.message;
+        alertaL.className = 'alert alert-danger';
+        alertaL.classList.remove('hidden');
+      }
+    });
+
+    $('btn-importar').onclick = async () => {
+      if (!linhasParaImportar.length) return;
+      const n = linhasParaImportar.length;
+      if (!(await confirmarAsync(
+        `Criar ${n} usuário${n !== 1 ? 's' : ''}? As senhas provisorias estao na planilha — guarde-as antes de continuar.`,
+        { textoOk: 'Importar' }
+      ))) return;
+
+      $('preview-lote').classList.add('hidden');
+      const progL  = $('progresso-lote');
+      const txtProg = $('txt-progresso');
+      const barra  = $('barra-progresso');
+      progL.classList.remove('hidden');
+      barra.max   = n;
+      barra.value = 0;
+
+      const criados = [];
+      const falhas  = [];
+
+      for (let i = 0; i < linhasParaImportar.length; i++) {
+        const u = linhasParaImportar[i];
+        txtProg.textContent = `Criando ${i + 1} de ${n}: ${u.email}…`;
+        barra.value = i;
+
+        let sec = null;
+        try {
+          sec = criarAppSecundario();
+          const cred = await createUserWithEmailAndPassword(sec.auth, u.email, u.senha);
+          await setDoc(doc(db, 'usuarios', cred.user.uid), {
+            nome: u.nome, email: u.email, papel: u.papel,
+            ativo: true, criadoEm: new Date(),
+          });
+          await signOut(sec.auth);
+          criados.push(u.email);
+        } catch (err) {
+          if (sec) { try { await signOut(sec.auth); } catch (_) {} }
+          const motivo = err.code === 'auth/email-already-in-use' ? 'e-mail ja existe'
+            : err.code === 'auth/invalid-email' ? 'e-mail invalido'
+            : err.message;
+          falhas.push({ email: u.email, motivo });
+        }
+        barra.value = i + 1;
+      }
+
+      progL.classList.add('hidden');
+      $('arquivo-lote').value = '';
+      linhasParaImportar = [];
+
+      const res = $('resultado-lote');
+      res.innerHTML = `
+        <div class="alert ${falhas.length === 0 ? 'alert-success' : 'alert-info'}">
+          <strong>${criados.length} usuário${criados.length !== 1 ? 's' : ''} criado${criados.length !== 1 ? 's' : ''}!</strong>
+          ${falhas.length > 0 ? ` ${falhas.length} falha${falhas.length !== 1 ? 's' : ''}.` : ' Tudo certo.'}
+        </div>
+        ${falhas.length > 0 ? `
+          <div style="font-size:0.85rem;margin-top:0.35rem;">
+            <strong>Falhas:</strong>
+            <ul style="margin:0.25rem 0 0 1rem;padding:0;">
+              ${falhas.map(f => `<li>${esc(f.email)} — ${esc(f.motivo)}</li>`).join('')}
+            </ul>
+          </div>
+        ` : ''}
+      `;
+      res.classList.remove('hidden');
+    };
+
+    // === convites Google ===
+    let googleLinhasParaImportar = [];
+
+    $('btn-convidar-google').onclick = async () => {
+      const alertaG   = $('alerta-google');
+      const alertaGOk = $('alerta-google-ok');
+      alertaG.classList.add('hidden');
+      alertaGOk.classList.add('hidden');
+
+      const nome  = $('google-nome').value.trim();
+      const email = $('google-email').value.trim().toLowerCase();
+      const papel = $('google-papel').value;
+
+      if (!nome || !email) {
+        alertaG.textContent = 'Preencha nome e e-mail.';
+        alertaG.classList.remove('hidden');
+        return;
+      }
+
+      const btn = $('btn-convidar-google');
+      btn.disabled = true;
+      try {
+        await setDoc(doc(db, 'pendentes', email), { nome, email, papel, criadoEm: new Date() });
+        alertaGOk.textContent = `Convite salvo para ${nome}. Na primeira vez que ela logar com Google, o acesso sera liberado automaticamente.`;
+        alertaGOk.classList.remove('hidden');
+        $('google-nome').value = '';
+        $('google-email').value = '';
+      } catch (err) {
+        alertaG.textContent = `Erro: ${err.message}`;
+        alertaG.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+      }
+    };
+
+    const unsub2 = onSnapshot(
+      query(collection(db, 'pendentes'), orderBy('criadoEm', 'desc')),
+      (snap) => {
+        const tbl = $('tbl-pendentes');
+        if (snap.empty) {
+          tbl.innerHTML = `<tr><td colspan="4" class="text-center text-muted">Nenhum convite aguardando.</td></tr>`;
+          return;
+        }
+        tbl.innerHTML = '';
+        snap.docs.forEach(d => {
+          const p = d.data();
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${esc(p.nome || '—')}</td>
+            <td>${esc(d.id)}</td>
+            <td>${esc(p.papel || '—')}</td>
+            <td>
+              <div class="acoes-linha">
+                <button data-acao-pendente="papel" data-email="${esc(d.id)}" data-papel="${esc(p.papel || 'operador')}"
+                  style="padding:0.3rem 0.65rem;font-size:0.78rem;border:1px solid var(--cinza-claro);
+                         background:var(--branco);color:var(--cinza-escuro);border-radius:8px;cursor:pointer;">
+                  Mudar papel
+                </button>
+                <button data-revogar="${esc(d.id)}"
+                  style="padding:0.3rem 0.65rem;font-size:0.78rem;border:1px solid var(--cinza-claro);
+                         background:var(--branco);color:var(--vermelho-texto);border-radius:8px;cursor:pointer;">
+                  Revogar
+                </button>
+              </div>
+            </td>
+          `;
+          tbl.appendChild(tr);
+        });
+      }
+    );
+
+    $('tbl-pendentes').addEventListener('click', async (e) => {
+      const btnPapel = e.target.closest('[data-acao-pendente="papel"]');
+      if (btnPapel) {
+        const email = btnPapel.dataset.email;
+        const atual = btnPapel.dataset.papel;
+        const novo = await pedirPapelAsync(atual);
+        if (!novo || novo === atual) return;
+        try {
+          await updateDoc(doc(db, 'pendentes', email), { papel: novo });
+        } catch (err) {
+          showErr(`Erro: ${err.message}`);
+        }
+        return;
+      }
+      const btn = e.target.closest('[data-revogar]');
+      if (!btn) return;
+      const email = btn.dataset.revogar;
+      if (!(await confirmarAsync(`Revogar convite de ${email}?`, { destrutivo: true, textoOk: 'Revogar' }))) return;
+      try {
+        await deleteDoc(doc(db, 'pendentes', email));
+      } catch (err) {
+        showErr(`Erro: ${err.message}`);
+      }
+    });
+
+    function validarLinhaGoogle(l) {
+      const erros = [];
+      if (!l.nome) erros.push('nome vazio');
+      if (!l.email || !/.+@.+\..+/.test(l.email)) erros.push('e-mail invalido');
+      if (!PAPEIS_VALIDOS.includes(l.papel)) erros.push('papel invalido');
+      return erros;
+    }
+
+    $('arquivo-google').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      const alertaGL  = $('alerta-google-lote');
+      const previewGL = $('preview-google-lote');
+
+      alertaGL.classList.add('hidden');
+      previewGL.classList.add('hidden');
+      $('resultado-google-lote').classList.add('hidden');
+      googleLinhasParaImportar = [];
+      if (!file) return;
+
+      if (typeof XLSX === 'undefined') {
+        alertaGL.textContent = 'Biblioteca nao carregou. Recarregue a pagina.';
+        alertaGL.className = 'alert alert-danger';
+        alertaGL.classList.remove('hidden');
+        return;
+      }
+
+      try {
+        const buf = await file.arrayBuffer();
+        const wb  = XLSX.read(buf, { type: 'array' });
+        const ws  = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+        if (rows.length < 2) throw new Error('Arquivo sem dados alem do cabecalho.');
+
+        const headers = rows[0].map(h => (h || '').toString());
+        const iNome  = detectarColIdx(headers, ['nome', 'name']);
+        const iEmail = detectarColIdx(headers, ['email', 'e-mail']);
+        const iPapel = detectarColIdx(headers, ['papel', 'role', 'perfil', 'funcao']);
+
+        if ([iNome, iEmail, iPapel].includes(-1)) {
+          throw new Error('Colunas nao encontradas. O arquivo precisa ter: nome, email e papel.');
+        }
+
+        const dados = rows.slice(1).filter(r => r.some(c => c !== ''));
+        if (!dados.length) throw new Error('Nenhuma linha de dados no arquivo.');
+
+        googleLinhasParaImportar = [];
+        const tbody = $('tbl-google-preview');
+        tbody.innerHTML = '';
+
+        dados.forEach(row => {
+          const l = {
+            nome:  (row[iNome]  || '').toString().trim(),
+            email: (row[iEmail] || '').toString().trim().toLowerCase(),
+            papel: (row[iPapel] || '').toString().trim().toLowerCase(),
+          };
+          const erros = validarLinhaGoogle(l);
+          const ok = erros.length === 0;
+          if (ok) googleLinhasParaImportar.push(l);
+
+          const tr = document.createElement('tr');
+          tr.style.background = ok ? '' : 'rgba(220,38,38,0.06)';
+          tr.innerHTML = `
+            <td>${esc(l.nome) || '—'}</td>
+            <td>${esc(l.email) || '—'}</td>
+            <td>${esc(l.papel) || '—'}</td>
+            <td style="font-size:0.8rem;">${ok
+              ? '<span style="color:var(--verde);">✓ OK</span>'
+              : `<span style="color:var(--vermelho-texto);" title="${esc(erros.join(', '))}">✗ ${esc(erros.join(', '))}</span>`
+            }</td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        const nErros = dados.length - googleLinhasParaImportar.length;
+        $('btn-google-importar').textContent = `Adicionar ${googleLinhasParaImportar.length} convite${googleLinhasParaImportar.length !== 1 ? 's' : ''}`;
+        $('btn-google-importar').disabled = googleLinhasParaImportar.length === 0;
+        $('label-erros-google').textContent = nErros > 0
+          ? `${nErros} linha${nErros !== 1 ? 's' : ''} com erro ser${nErros !== 1 ? 'ao' : 'a'} ignorada${nErros !== 1 ? 's' : ''}`
+          : '';
+        previewGL.classList.remove('hidden');
+      } catch (err) {
+        alertaGL.textContent = err.message;
+        alertaGL.className = 'alert alert-danger';
+        alertaGL.classList.remove('hidden');
+      }
+    });
+
+    $('btn-google-importar').onclick = async () => {
+      if (!googleLinhasParaImportar.length) return;
+      const n = googleLinhasParaImportar.length;
+      if (!(await confirmarAsync(
+        `Adicionar ${n} convite${n !== 1 ? 's' : ''} Google?`,
+        { textoOk: 'Adicionar' }
+      ))) return;
+
+      const btn = $('btn-google-importar');
+      btn.disabled = true;
+      btn.textContent = 'Salvando...';
+
+      let criados = 0;
+      const falhas = [];
+      for (const l of googleLinhasParaImportar) {
+        try {
+          await setDoc(doc(db, 'pendentes', l.email), {
+            nome: l.nome, email: l.email, papel: l.papel, criadoEm: new Date(),
+          });
+          criados++;
+        } catch (err) {
+          falhas.push({ email: l.email, motivo: err.message });
+        }
+      }
+
+      $('arquivo-google').value = '';
+      $('preview-google-lote').classList.add('hidden');
+      googleLinhasParaImportar = [];
+      btn.disabled = false;
+      btn.textContent = 'Importar';
+
+      const res = $('resultado-google-lote');
+      res.innerHTML = `
+        <div class="alert ${falhas.length === 0 ? 'alert-success' : 'alert-info'}">
+          <strong>${criados} convite${criados !== 1 ? 's' : ''} adicionado${criados !== 1 ? 's' : ''}!</strong>
+          ${falhas.length > 0 ? ` ${falhas.length} falha${falhas.length !== 1 ? 's' : ''}.` : ' Tudo certo.'}
+        </div>
+        ${falhas.length > 0 ? `
+          <div style="font-size:0.85rem;margin-top:0.35rem;">
+            <strong>Falhas:</strong>
+            <ul style="margin:0.25rem 0 0 1rem;padding:0;">
+              ${falhas.map(f => `<li>${esc(f.email)} — ${esc(f.motivo)}</li>`).join('')}
+            </ul>
+          </div>
+        ` : ''}
+      `;
+      res.classList.remove('hidden');
+    };
+
+    $('btn-modelo-google').onclick = () => {
+      const dados = [
+        ['nome', 'email', 'papel'],
+        ['Maria da Silva', 'maria@gmail.com', 'operador'],
+        ['Joao Santos', 'joao@grupohokkaido.org', 'caixa'],
+        ['Ana Lima', 'ana@gmail.com', 'recepcao'],
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(dados);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Convites Google');
+      XLSX.writeFile(wb, 'modelo-convites-google.xlsx');
+    };
+
+    $('btn-modelo-usuarios').onclick = () => {
+      const dados = [
+        ['nome', 'email', 'senha', 'papel'],
+        ['Maria da Silva', 'maria@grupohokkaido.org', 'geh2026', 'operador'],
+        ['Joao Santos', 'joao@grupohokkaido.org', 'geh2026', 'caixa'],
+        ['Ana Lima', 'ana@grupohokkaido.org', 'geh2026', 'recepcao'],
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(dados);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Usuarios');
+      XLSX.writeFile(wb, 'modelo-usuarios.xlsx');
+    };
+    window.addEventListener('pagehide', () => { unsub1(); unsub2(); });
   </script>
 </body>
 </html>

@@ -6,24 +6,68 @@ import { enhanceAllTables, autoSkeleton } from "../js/ui.js";
 import { instalarAtalhos } from "../js/shortcuts.js";
 import { instalarBannerPWA } from "../js/install-banner.js";
 
-const ITENS = [
-  { href: 'dashboard.html', icone: 'bar-chart',    texto: 'Dashboard' },
-  { href: 'eventos.html',   icone: 'calendar',     texto: 'Eventos'   },
-  { href: 'produtos.html',  icone: 'package',      texto: 'Produtos'  },
-  { href: 'clientes.html',  icone: 'users',        texto: 'Clientes'  },
-  { href: 'historico.html', icone: 'search',       texto: 'Histórico' },
-  { href: 'compras.html',   icone: 'shopping-bag', texto: 'Compras'   },
-  { href: 'relatorio.html', icone: 'trending-up',  texto: 'Relatório' },
-  { href: 'usuarios.html',  icone: 'user-check',   texto: 'Usuários'  },
+// Itens agrupados por área de responsabilidade — ajuda a orientar
+// o olhar na sidebar quando ela cresce.
+const GRUPOS = [
+  {
+    titulo: 'Operação',
+    itens: [
+      { href: 'dashboard.html',   icone: 'bar-chart', texto: 'Dashboard'   },
+      { href: 'comparativo.html', icone: 'git-compare', texto: 'Comparativo' },
+      { href: 'eventos.html',     icone: 'calendar',  texto: 'Eventos'     },
+      { href: 'historico.html',   icone: 'search',    texto: 'Histórico'   },
+      { href: 'predicao.html',   icone: 'sparkles',  texto: 'Predição'    },
+    ],
+  },
+  {
+    titulo: 'Cadastros',
+    itens: [
+      { href: 'produtos.html', icone: 'package', texto: 'Produtos' },
+      { href: 'clientes.html', icone: 'users',   texto: 'Clientes' },
+    ],
+  },
+  {
+    titulo: 'Recepção',
+    itens: [
+      { href: 'recepcao-painel.html',     icone: 'door-open',   texto: 'Painel ao vivo'      },
+      { href: 'convites-antecipados.html', icone: 'ticket',      texto: 'Convites antecipados' },
+      { href: 'historico-recepcao.html',  icone: 'list-checks', texto: 'Histórico'           },
+    ],
+  },
+  {
+    titulo: 'Financeiro',
+    itens: [
+      { href: 'estoque.html',     icone: 'package',      texto: 'Estoque'         },
+      { href: 'despesas.html',    icone: 'dollar-sign',  texto: 'Despesas'        },
+      { href: 'ajuste-saldo.html', icone: 'edit',         texto: 'Ajuste de saldo' },
+      { href: '../caixa/transferir.html', icone: 'arrow-right-left', texto: 'Transferir saldo' },
+      { href: 'relatorio.html',   icone: 'trending-up',  texto: 'Relatório'       },
+      { href: 'fechamento.html',  icone: 'file-text',    texto: 'Fechamento'      },
+    ],
+  },
+  {
+    titulo: 'Sistema',
+    itens: [
+      { href: 'usuarios.html',  icone: 'users',      texto: 'Usuários'  },
+      { href: 'auditoria.html', icone: 'shield',     texto: 'Auditoria' },
+      { href: 'backup.html',    icone: 'hard-drive', texto: 'Backup'    },
+    ],
+  },
 ];
 
 export function montarNav(paginaAtiva = '') {
-  // Dispara checagem de admin em paralelo. Se não passar,
-  // requireAuth redireciona pra login. As regras do Firestore
-  // são a barreira real — esse redirect só evita ver a tela.
+  // Dispara checagem de admin em paralelo. Se não passar (não logada,
+  // perfil ausente, ativo:false, ou papel != admin), requireAuth
+  // redireciona pro login. As regras do Firestore são a barreira real;
+  // esse redirect só evita ver a tela.
   const guardPromise = requireAuth({ papel: 'admin' });
 
-  const links = ITENS.map(i => linkNav(i, paginaAtiva)).join('');
+  const grupos = GRUPOS.map(g => `
+    <div class="sidebar-grupo">
+      <div class="sidebar-grupo-titulo">${g.titulo}</div>
+      ${g.itens.map(i => linkNav(i, paginaAtiva)).join('')}
+    </div>
+  `).join('');
   const nav = `
     <header class="header">
       <button id="btn-menu" class="back" title="Menu" aria-label="Abrir menu">${icon('menu', { size: 22 })}</button>
@@ -33,7 +77,7 @@ export function montarNav(paginaAtiva = '') {
       <button id="btn-logout" class="back" title="Sair" aria-label="Sair">${icon('power', { size: 22 })}</button>
     </header>
     <aside class="sidebar" id="sidebar">
-      <div class="sidebar-links">${links}</div>
+      <div class="sidebar-links">${grupos}</div>
       <div id="sidebar-user" style="margin-top:auto;padding:1rem;border-top:1px solid var(--cinza-claro);font-size:0.8rem;color:var(--cinza);"></div>
     </aside>
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
@@ -80,7 +124,7 @@ export function montarNav(paginaAtiva = '') {
     window.location.href = 'login.html';
   };
 
-  // Quando o guard resolver, preenche o footer da sidebar
+  // Quando o guard resolver (admin OK), preenche o footer da sidebar
   guardPromise.then(({ perfil }) => {
     const box = document.getElementById('sidebar-user');
     if (!box || !perfil) return;
@@ -91,7 +135,15 @@ export function montarNav(paginaAtiva = '') {
     `;
   });
 
-  return guardPromise;
+  // Adiciona busca + ordenação + export CSV em todas as tabelas da página
+  // (opt-out por tabela com data-no-enhance no .table-wrapper)
+  enhanceAllTables();
+  // Substitui placeholders "Carregando..." por linhas-skeleton
+  autoSkeleton();
+  // Atalhos de teclado (/, g d, g h, ?, …)
+  instalarAtalhos();
+  // Banner de instalação PWA — só aparece se o browser oferecer
+  instalarBannerPWA();
 }
 
 function linkNav({ href, icone, texto }, ativa) {
