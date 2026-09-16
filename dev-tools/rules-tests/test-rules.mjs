@@ -6,7 +6,8 @@ import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import {
-  doc, setDoc, updateDoc, deleteDoc, addDoc, getDoc, collection, serverTimestamp,
+  doc, setDoc, updateDoc, deleteDoc, addDoc, getDoc, getDocs, collection,
+  query, where, serverTimestamp,
 } from 'firebase/firestore';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -59,6 +60,17 @@ async function main() {
     await setDoc(doc(db, 'convites_antecipados', 'conv1'), {
       eventoId: 'ev1', familia: 'Silva', numero: '001', nome: 'João', categoria: 'Adulto',
       pago: true, presente: false, checkInEm: null, checkInPor: null,
+    });
+    // Fase 5 — familias e convites vinculados a elas (acesso público por código)
+    await setDoc(doc(db, 'familias', 'fam1abcdefghij1234567890'), { nome: 'Silva', ativo: true, criadoEm: null });
+    await setDoc(doc(db, 'familias', 'fam2abcdefghij1234567890'), { nome: 'Tanaka', ativo: false, criadoEm: null });
+    await setDoc(doc(db, 'convites_antecipados', 'convFam1'), {
+      eventoId: 'ev1', familiaId: 'fam1abcdefghij1234567890', familia: 'Silva', numero: '010',
+      nome: '', categoria: '', pago: true, presente: false, checkInEm: null, checkInPor: null,
+    });
+    await setDoc(doc(db, 'convites_antecipados', 'convFam2'), {
+      eventoId: 'ev1', familiaId: 'fam2abcdefghij1234567890', familia: 'Tanaka', numero: '011',
+      nome: '', categoria: '', pago: true, presente: false, checkInEm: null, checkInPor: null,
     });
   });
 
@@ -157,6 +169,53 @@ async function main() {
     assertFails(updateDoc(doc(recepcaoDb, 'convites_antecipados', 'conv1'), {
       presente: 'sim', checkInEm: serverTimestamp(), checkInPor: 'Recepção Teste',
     }))
+  );
+
+  console.log('\n== familias / convites por família (Fase 5: acesso público por código) ==');
+  await test('não logado PODE listar o próprio convite sabendo o familiaId exato', () =>
+    assertSucceeds(getDocs(query(collection(semAuthDb, 'convites_antecipados'), where('familiaId', '==', 'fam1abcdefghij1234567890'))))
+  );
+  await test('não logado NÃO PODE listar convites com familiaId curto/inválido', () =>
+    assertFails(getDocs(query(collection(semAuthDb, 'convites_antecipados'), where('familiaId', '==', 'x'))))
+  );
+  await test('família PODE preencher o nome do próprio convite', () =>
+    assertSucceeds(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFam1'), { nome: 'Fulano de Tal' }))
+  );
+  await test('família NÃO PODE mudar o número do convite', () =>
+    assertFails(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFam1'), { nome: 'Fulano', numero: '999' }))
+  );
+  await test('família NÃO PODE transferir o convite pra outra família', () =>
+    assertFails(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFam1'), { familiaId: 'fam2abcdefghij1234567890' }))
+  );
+  await test('família NÃO PODE marcar presença/check-in', () =>
+    assertFails(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFam1'), { nome: 'Fulano', presente: true }))
+  );
+  await test('família inativa NÃO PODE editar convite', () =>
+    assertFails(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFam2'), { nome: 'Yuki' }))
+  );
+  await test('não logado NÃO PODE criar convite novo', () =>
+    assertFails(addDoc(collection(semAuthDb, 'convites_antecipados'), {
+      eventoId: 'ev1', familiaId: 'fam1abcdefghij1234567890', familia: 'Silva',
+      numero: '099', nome: 'Invasor', categoria: '', pago: true, presente: false, checkInEm: null, checkInPor: null,
+    }))
+  );
+  await test('não logado NÃO PODE listar todas as famílias (enumeração bloqueada)', () =>
+    assertFails(getDocs(collection(semAuthDb, 'familias')))
+  );
+  await test('não logado PODE ler o próprio doc de família por ID (validar código no portal)', () =>
+    assertSucceeds(getDoc(doc(semAuthDb, 'familias', 'fam1abcdefghij1234567890')))
+  );
+  await test('não logado NÃO PODE criar família nova', () =>
+    assertFails(setDoc(doc(semAuthDb, 'familias', 'fam3xxxxxxxxxxxxxxxxxxxx'), { nome: 'Invasora', ativo: true }))
+  );
+  await test('admin AINDA PODE criar convite pra família (regressão)', () =>
+    assertSucceeds(addDoc(collection(adminDb, 'convites_antecipados'), {
+      eventoId: 'ev1', familiaId: 'fam1abcdefghij1234567890', familia: 'Silva',
+      numero: '020', nome: '', categoria: '', pago: true, presente: false, checkInEm: null, checkInPor: null,
+    }))
+  );
+  await test('admin AINDA PODE editar qualquer campo do convite (regressão)', () =>
+    assertSucceeds(updateDoc(doc(adminDb, 'convites_antecipados', 'convFam1'), { familia: 'Silva Editado' }))
   );
 
   console.log('\n== sanidade (usuário não logado) ==');
