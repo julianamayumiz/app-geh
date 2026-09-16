@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Famílias — Admin GEH</title>
+  <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="manifest" href="../manifest.json">
+  <script src="/js/sw-register.js"></script>
+  <style>
+    .resumo-box {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .resumo-card {
+      background: var(--cinza-fundo);
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      border: 1px solid var(--cinza-claro);
+    }
+    .resumo-card .num { font-size: 1.5rem; font-weight: 700; color: var(--azul); }
+    .resumo-card .lbl { font-size: 0.75rem; color: var(--cinza); text-transform: uppercase; letter-spacing: 0.05em; }
+    .badge-status {
+      display: inline-block;
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+    .badge-ativo    { background: rgba(22,163,74,0.14); color: var(--verde); }
+    .badge-inativo  { background: rgba(220,38,38,0.14); color: #B91C1C; }
+    .form-nova-familia {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    .form-nova-familia input { flex: 1; min-width: 200px; }
+    .gerar-convites-form {
+      display: flex;
+      gap: 0.35rem;
+      align-items: center;
+    }
+    .gerar-convites-form input {
+      width: 60px;
+      padding: 0.35rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <main class="admin">
+    <h2 style="color:var(--azul);margin-bottom:0.25rem;display:inline-flex;align-items:center;gap:0.5rem;">
+      <span data-icon="heart" data-size="24"></span> Famílias
+    </h2>
+    <p style="color:var(--cinza);margin-bottom:1rem;">
+      Cadastro permanente das famílias do GEH. Cada uma recebe um link de acesso próprio pra preencher os convidados dos convites dela.
+    </p>
+
+    <div id="evento-aviso" class="alert alert-warning hidden">
+      Não há evento ativo. Você pode cadastrar famílias, mas gerar convites exige um evento ativo em <a href="eventos.html">Eventos</a>.
+    </div>
+
+    <div class="card">
+      <h3 class="card-title" style="margin-bottom:0.75rem;">Nova família</h3>
+      <form id="form-nova" class="form-nova-familia">
+        <label for="input-nome-familia" class="sr-only">Nome da família</label>
+        <input type="text" id="input-nome-familia" placeholder="Nome da família (ex: Silva)" required maxlength="80">
+        <button type="submit" class="btn btn-primary" style="max-width:220px;">
+          <span data-icon="user-plus" data-size="18"></span> Adicionar família
+        </button>
+      </form>
+      <div id="alerta-nova" class="alert hidden"></div>
+    </div>
+
+    <div class="card">
+      <h3 class="card-title" style="margin-bottom:0.75rem;">Famílias cadastradas</h3>
+      <div class="resumo-box" id="resumo-geral"></div>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Família</th><th>Status</th><th>Convites (evento ativo)</th><th>Link de acesso</th><th>Gerar convites</th><th></th></tr></thead>
+          <tbody id="tbl-familias"><tr><td colspan="6" class="text-center text-muted">Carregando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { montarNav } from "./_nav.js";
+    import { esc } from "../js/helpers.js";
+    import {
+      db, collection, doc, getDoc, getDocs, setDoc, addDoc, deleteDoc, updateDoc,
+      onSnapshot, query, where, writeBatch, serverTimestamp, runTransaction
+    } from "../js/firebase-config.js";
+    import { icon, renderIcons } from "../js/icons.js";
+    import { confirmarAsync, toast } from "../js/ui.js";
+
+    montarNav('familias.html');
+    renderIcons();
+    const $ = id => document.getElementById(id);
+
+    let eventoAtivoId = null;
+    let familias = [];
+    let convitesPorFamilia = {}; // familiaId -> { total, preenchidos }
+
+    function gerarCodigoAcesso() {
+      return crypto.randomUUID().replace(/-/g, '');
+    }
+
+    function linkFamilia(familiaId) {
+      return `${location.origin}/familia/convites.html?codigo=${familiaId}`;
+    }
+
+    async function init() {
+      const cfg = await getDoc(doc(db, 'config', 'eventoAtivo'));
+      eventoAtivoId = cfg.exists() ? cfg.data().id : null;
+      if (!eventoAtivoId) $('evento-aviso').classList.remove('hidden');
+
+      onSnapshot(collection(db, 'familias'), (snap) => {
+        familias = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        render();
+      });
+
+      if (eventoAtivoId) {
+        onSnapshot(
+          query(collection(db, 'convites_antecipados'), where('eventoId', '==', eventoAtivoId)),
+          (snap) => {
+            convitesPorFamilia = {};
+            snap.docs.forEach(d => {
+              const c = d.data();
+              if (!c.familiaId) return;
+              if (!convitesPorFamilia[c.familiaId]) convitesPorFamilia[c.familiaId] = { total: 0, preenchidos: 0 };
+              convitesPorFamilia[c.familiaId].total++;
+              if (c.nome) convitesPorFamilia[c.familiaId].preenchidos++;
+            });
+            render();
+          }
+        );
+      }
+    }
+
+    function render() {
+      familias.sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
+      const total = familias.length;
+      const ativas = familias.filter(f => f.ativo !== false).length;
+      $('resumo-geral').innerHTML = `
+        <div class="resumo-card"><div class="num">${total}</div><div class="lbl">Famílias</div></div>
+        <div class="resumo-card"><div class="num" style="color:var(--verde);">${ativas}</div><div class="lbl">Ativas</div></div>
+      `;
+      const tbody = $('tbl-familias');
+      if (total === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Nenhuma família cadastrada ainda.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = familias.map(f => {
+        const contagem = convitesPorFamilia[f.id] || { total: 0, preenchidos: 0 };
+        return `
+        <tr>
+          <td>${esc(f.nome)}</td>
+          <td><button class="badge-status ${f.ativo === false ? 'badge-inativo' : 'badge-ativo'}" data-toggle-ativo="${f.id}" data-ativo="${f.ativo !== false}" style="border:none;cursor:pointer;font-family:inherit;">${f.ativo === false ? 'Inativa' : 'Ativa'}</button></td>
+          <td>${contagem.preenchidos}/${contagem.total}</td>
+          <td><button class="btn btn-secondary" style="width:auto;padding:0.3rem 0.65rem;font-size:0.8rem;" data-copiar="${f.id}">Copiar link</button></td>
+          <td>
+            <form class="gerar-convites-form" data-gerar="${f.id}" data-nome="${esc(f.nome)}">
+              <input type="number" min="1" max="30" value="5" aria-label="Quantidade de convites para ${esc(f.nome)}">
+              <button type="submit" class="btn btn-primary" style="width:auto;padding:0.3rem 0.65rem;font-size:0.8rem;" ${eventoAtivoId ? '' : 'disabled'}>Gerar</button>
+            </form>
+          </td>
+          <td><button class="btn btn-danger" style="width:auto;padding:0.3rem 0.65rem;font-size:0.75rem;" data-del="${f.id}" aria-label="Excluir família ${esc(f.nome)}">×</button></td>
+        </tr>
+      `;
+      }).join('');
+      renderIcons();
+
+      tbody.querySelectorAll('[data-toggle-ativo]').forEach(b => {
+        b.onclick = async () => {
+          await updateDoc(doc(db, 'familias', b.dataset.toggleAtivo), { ativo: b.dataset.ativo !== 'true' });
+        };
+      });
+
+      tbody.querySelectorAll('[data-copiar]').forEach(b => {
+        b.onclick = async () => {
+          const url = linkFamilia(b.dataset.copiar);
+          try {
+            await navigator.clipboard.writeText(url);
+            toast('Link copiado!', { tipo: 'sucesso' });
+          } catch {
+            toast(url, { tipo: 'info', duracao: 8000 });
+          }
+        };
+      });
+
+      tbody.querySelectorAll('[data-gerar]').forEach(form => {
+        form.onsubmit = async (e) => {
+          e.preventDefault();
+          if (!eventoAtivoId) return;
+          const familiaId = form.dataset.gerar;
+          const familiaNome = form.dataset.nome;
+          const qtd = Math.max(1, Math.min(30, parseInt(form.querySelector('input').value, 10) || 5));
+          const btn = form.querySelector('button');
+          btn.disabled = true;
+          try {
+            await gerarConvites(familiaId, familiaNome, qtd);
+            toast(`${qtd} convite(s) gerado(s) pra ${familiaNome}!`, { tipo: 'sucesso' });
+          } catch (err) {
+            toast(`Erro ao gerar convites: ${err.message}`, { tipo: 'erro' });
+          } finally {
+            btn.disabled = false;
+          }
+        };
+      });
+
+      tbody.querySelectorAll('[data-del]').forEach(b => {
+        b.onclick = async () => {
+          const familiaId = b.dataset.del;
+          const existentes = await getDocs(query(collection(db, 'convites_antecipados'), where('familiaId', '==', familiaId)));
+          if (!existentes.empty) {
+            toast('Essa família já tem convites vinculados — desative em vez de excluir.', { tipo: 'erro', duracao: 5000 });
+            return;
+          }
+          if (!(await confirmarAsync('Excluir essa família? Não dá pra desfazer.', { destrutivo: true, textoOk: 'Excluir' }))) return;
+          await deleteDoc(doc(db, 'familias', familiaId));
+        };
+      });
+    }
+
+    async function gerarConvites(familiaId, familiaNome, quantidade) {
+      const evRef = doc(db, 'eventos', eventoAtivoId);
+      const numeros = await runTransaction(db, async (tx) => {
+        const evSnap = await tx.get(evRef);
+        const atual = evSnap.exists() ? (evSnap.data().proximoNumeroConvite || 1) : 1;
+        const lista = [];
+        for (let i = 0; i < quantidade; i++) lista.push(atual + i);
+        tx.update(evRef, { proximoNumeroConvite: atual + quantidade });
+        return lista;
+      });
+      const batch = writeBatch(db);
+      numeros.forEach(n => {
+        batch.set(doc(collection(db, 'convites_antecipados')), {
+          eventoId: eventoAtivoId,
+          familiaId,
+          familia: familiaNome,
+          numero: String(n).padStart(3, '0'),
+          nome: '',
+          categoria: '',
+          pago: true,
+          presente: false,
+          checkInEm: null,
+          checkInPor: null,
+          criadoEm: serverTimestamp(),
+        });
+      });
+      await batch.commit();
+    }
+
+    $('form-nova').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = $('input-nome-familia');
+      const nome = input.value.trim();
+      if (!nome) return;
+      const alerta = $('alerta-nova');
+      const familiaId = gerarCodigoAcesso();
+      try {
+        await setDoc(doc(db, 'familias', familiaId), { nome, ativo: true, criadoEm: serverTimestamp() });
+        input.value = '';
+        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} Família "${esc(nome)}" cadastrada!</span>`;
+        alerta.className = 'alert alert-success';
+        setTimeout(() => alerta.classList.add('hidden'), 3500);
+      } catch (err) {
+        alerta.textContent = `Erro ao cadastrar: ${err.message}`;
+        alerta.className = 'alert alert-danger';
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>

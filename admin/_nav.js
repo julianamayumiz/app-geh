@@ -24,6 +24,7 @@ const GRUPOS = [
     itens: [
       { href: 'produtos.html', icone: 'package', texto: 'Produtos' },
       { href: 'clientes.html', icone: 'users',   texto: 'Clientes' },
+      { href: 'familias.html', icone: 'heart',   texto: 'Famílias' },
     ],
   },
   {
