@@ -89,7 +89,6 @@
     const $ = id => document.getElementById(id);
     const params = new URLSearchParams(location.search);
     let familiaId = params.get('codigo');
-    let categoriasEvento = [];
 
     async function init() {
       if (!familiaId) {
@@ -103,7 +102,15 @@
         return;
       }
 
-      const familiaSnap = await getDoc(doc(db, 'familias', familiaId));
+      let familiaSnap;
+      try {
+        familiaSnap = await getDoc(doc(db, 'familias', familiaId));
+      } catch (err) {
+        console.error('[familia/convites] erro ao carregar familia:', err);
+        $('tela-erro').classList.remove('hidden');
+        renderIcons();
+        return;
+      }
       if (!familiaSnap.exists() || familiaSnap.data().ativo === false) {
         $('tela-erro').classList.remove('hidden');
         renderIcons();
@@ -116,13 +123,13 @@
 
       onSnapshot(
         query(collection(db, 'convites_antecipados'), where('familiaId', '==', familiaId)),
-        async (snap) => {
+        (snap) => {
           const convites = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          if (convites.length > 0 && categoriasEvento.length === 0) {
-            const evSnap = await getDoc(doc(db, 'eventos', convites[0].eventoId));
-            categoriasEvento = evSnap.exists() ? (evSnap.data().categoriasIngresso || []) : [];
-          }
           renderConvites(convites);
+        },
+        (err) => {
+          console.error('[familia/convites] onSnapshot erro:', err);
+          $('lista-convites').innerHTML = '<div class="alert alert-danger">Erro ao carregar seus convites. Recarregue a página.</div>';
         }
       );
     }
@@ -151,19 +158,13 @@
       const outrosNomes = new Set(); // preenchido depois, ao checar duplicidade
       const backdrop = document.createElement('div');
       backdrop.className = 'confirm-backdrop';
-      const opcoesCategoria = categoriasEvento.length > 0
-        ? `<select id="input-categoria">
-            <option value="">Sem categoria</option>
-            ${categoriasEvento.map(cat => `<option value="${esc(cat.nome)}" ${cat.nome === convite.categoria ? 'selected' : ''}>${esc(cat.nome)}</option>`).join('')}
-          </select>`
-        : `<input type="text" id="input-categoria" value="${esc(convite.categoria || '')}" maxlength="40">`;
       backdrop.innerHTML = `
         <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="conv-titulo">
           <p id="conv-titulo" style="font-weight:700;margin-bottom:0.75rem;">Convite ${esc(convite.numero)}</p>
           <label for="input-nome-convidado">Nome do convidado</label>
           <input type="text" id="input-nome-convidado" value="${esc(convite.nome || '')}" maxlength="80" required style="margin-bottom:0.75rem;">
           <label for="input-categoria">Categoria</label>
-          ${opcoesCategoria}
+          <input type="text" id="input-categoria" value="${esc(convite.categoria || '')}" maxlength="40">
           <div id="aviso-duplicidade" class="alert alert-warning hidden" style="margin-top:0.75rem;"></div>
           <div class="confirm-acoes" style="margin-top:1.25rem;">
             <button type="button" class="btn btn-secondary" data-acao="cancelar">Cancelar</button>
@@ -175,6 +176,12 @@
       const fechar = () => backdrop.remove();
       backdrop.addEventListener('click', (e) => { if (e.target === backdrop) fechar(); });
       backdrop.querySelector('[data-acao="cancelar"]').onclick = fechar;
+      backdrop.querySelector('#input-nome-convidado').addEventListener('input', () => {
+        delete backdrop.dataset.confirmouDup;
+        const aviso = backdrop.querySelector('#aviso-duplicidade');
+        aviso.classList.add('hidden');
+        aviso.textContent = '';
+      });
 
       getDocs(query(collection(db, 'convites_antecipados'), where('familiaId', '==', familiaId))).then(snap => {
         snap.docs.forEach(d => {
