@@ -135,7 +135,7 @@
       $('progresso-fill').style.width = total > 0 ? `${(preenchidos / total) * 100}%` : '0%';
 
       $('lista-convites').innerHTML = convites.map(c => `
-        <div class="convite-card" data-abrir="${c.id}">
+        <div class="convite-card" data-abrir="${esc(c.id)}">
           <span class="num">[${esc(c.numero)}]</span>
           <span class="nome ${c.nome ? '' : 'vazio'}">${c.nome ? esc(c.nome) : '— sem convidado'}</span>
           <span class="acao">${c.nome ? '✓ Editar' : '+ Adicionar'}</span>
