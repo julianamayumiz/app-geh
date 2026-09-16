@@ -178,6 +178,21 @@ Cobertura ponto a ponto dos riscos listados:
 - Campo alternativo pra colar o código manualmente (fallback caso o link
   quebre ao compartilhar por WhatsApp).
 
+## Desvio aceito durante a implementação
+
+- **Categoria no portal da família virou sempre texto livre**, sem o
+  `<select>` com as `categoriasIngresso` do evento que a spec original
+  previa. Motivo: o portal não tem sessão autenticada, e
+  `firestore.rules` restringe leitura de `eventos` a `isEquipe()` (staff
+  logado) — ler `categoriasIngresso` de lá pra popular o `<select>`
+  causava `permission-denied` e quebrava a lista de convites inteira.
+  Abrir uma exceção nas rules pra isso não valia o aumento de superfície
+  de ataque por uma melhoria cosmética. Categoria nunca foi validada
+  contra um enum no servidor, então texto livre é funcionalmente
+  equivalente. Evolução futura, se quiser o `<select>` de volta:
+  denormalizar `categoriasIngresso` no próprio doc de `familias` (que já
+  é `get` público) na hora de gerar os convites, em vez de ler `eventos`.
+
 ## Fora de escopo (evolução futura, não faz parte dessa entrega)
 
 - **Geração automática de JPG do convite** (nome do convidado + dados do
