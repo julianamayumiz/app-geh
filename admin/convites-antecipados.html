@@ -87,8 +87,8 @@
         <div class="resumo-box" id="resumo-geral"></div>
         <div class="table-wrapper">
           <table>
-            <thead><tr><th>Família</th><th>Nº</th><th>Nome</th><th>Categoria</th><th>Pgto</th><th>Status</th><th></th></tr></thead>
-            <tbody id="tbl-convites"><tr><td colspan="7" class="text-center text-muted">Carregando...</td></tr></tbody>
+            <thead><tr><th>Família</th><th>Nº</th><th>Nome</th><th>Categoria</th><th>Pgto</th><th>Preenchido</th><th>Check-in</th><th></th></tr></thead>
+            <tbody id="tbl-convites"><tr><td colspan="8" class="text-center text-muted">Carregando...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -149,7 +149,7 @@
       `;
       const tbody = $('tbl-convites');
       if (total === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Nenhum convite importado pra esse evento.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">Nenhum convite importado pra esse evento.</td></tr>';
         return;
       }
       tbody.innerHTML = lista.map(c => `
@@ -159,6 +159,7 @@
           <td>${esc(c.nome)}</td>
           <td>${esc(c.categoria) || '—'}</td>
           <td><button class="badge-status ${c.pago === false ? 'badge-aberto' : 'badge-pago'}" data-toggle="${c.id}" data-pago="${c.pago !== false}" style="border:none;cursor:pointer;font-family:inherit;">${c.pago === false ? 'Em aberto' : 'Pago'}</button></td>
+          <td>${c.nome ? '<span class="badge-status badge-pago">Preenchido</span>' : '<span class="badge-status badge-aberto">Não preenchido</span>'}</td>
           <td>${c.presente ? '<span class="badge-status badge-presente">Presente</span>' : '<span class="badge-status badge-pendente">Pendente</span>'}</td>
           <td><button class="btn btn-danger" style="width:auto;padding:0.3rem 0.65rem;font-size:0.75rem;" data-del="${c.id}" aria-label="Remover convite">×</button></td>
         </tr>
