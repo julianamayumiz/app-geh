@@ -57,6 +57,7 @@
         <p style="font-size:0.85rem;color:var(--cinza);margin-bottom:0.75rem;">
           Colunas esperadas: <code style="background:var(--cinza-claro);padding:2px 6px;border-radius:4px;">Família GEH | Nº convite | Nome convidado | Categoria | Pago</code>.
           Categoria e Pago são opcionais. "Pago" aceita sim/não, true/false, pago/aberto — se ficar em branco assume <strong>pago</strong>.
+          Famílias que ainda não existem são cadastradas automaticamente (marcadas como "nova" na pré-visualização) e já ficam linkadas aos convites.
         </p>
         <input type="file" id="arquivo" accept=".xlsx,.xls,.csv" style="margin-bottom:0.75rem;">
         <div id="alerta-import" class="alert hidden"></div>
@@ -99,7 +100,7 @@
     import { montarNav } from "./_nav.js";
     import { fmtBRL, esc } from "../js/helpers.js";
     import {
-      db, collection, doc, getDoc, getDocs, addDoc, deleteDoc, updateDoc,
+      db, collection, doc, getDoc, getDocs, addDoc, setDoc, deleteDoc, updateDoc,
       onSnapshot, query, where, writeBatch, serverTimestamp
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
@@ -205,6 +206,13 @@
       }
       return -1;
     }
+    // Normalização pra casar nome de família (acento/caixa/espaços nas
+    // pontas) sem juntar palavras como normalizarHeader faz.
+    function normalizarNomeFamilia(s) {
+      return String(s || '').trim().toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/\s+/g, ' ');
+    }
 
     $('arquivo').onchange = async (e) => {
       const file = e.target.files[0];
@@ -263,6 +271,26 @@
           throw new Error(`Números repetidos no arquivo: ${[...new Set(dups)].join(', ')}.`);
         }
 
+        // Resolve cada nome de família contra as famílias já cadastradas
+        // (ou marca como nova, pra criar na confirmação).
+        const familiasSnap = await getDocs(collection(db, 'familias'));
+        const familiasPorNome = {};
+        familiasSnap.docs.forEach(d => {
+          familiasPorNome[normalizarNomeFamilia(d.data().nome)] = { id: d.id, nome: d.data().nome };
+        });
+        itens.forEach(it => {
+          if (!it.familia) { it.familiaId = null; it.familiaNova = false; return; }
+          const chave = normalizarNomeFamilia(it.familia);
+          const existente = familiasPorNome[chave];
+          if (existente) {
+            it.familiaId = existente.id;
+            it.familiaNova = false;
+          } else {
+            it.familiaId = null;
+            it.familiaNova = true;
+          }
+        });
+
         importBuffer = itens;
         renderPreview(itens);
       } catch (err) {
@@ -274,20 +302,23 @@
     function renderPreview(itens) {
       const porFamilia = {};
       const porCat = {};
+      const familiasNovasSet = new Set();
       itens.forEach(it => {
         porFamilia[it.familia || '(sem família)'] = (porFamilia[it.familia || '(sem família)'] || 0) + 1;
         porCat[it.categoria || '(sem categoria)'] = (porCat[it.categoria || '(sem categoria)'] || 0) + 1;
+        if (it.familiaNova) familiasNovasSet.add(normalizarNomeFamilia(it.familia));
       });
       $('resumo-import').innerHTML = `
         <div class="resumo-card"><div class="num">${itens.length}</div><div class="lbl">Linhas</div></div>
         <div class="resumo-card"><div class="num">${Object.keys(porFamilia).length}</div><div class="lbl">Famílias</div></div>
+        <div class="resumo-card"><div class="num" style="color:var(--verde);">${familiasNovasSet.size}</div><div class="lbl">Famílias novas</div></div>
         <div class="resumo-card"><div class="num">${Object.keys(porCat).length}</div><div class="lbl">Categorias</div></div>
       `;
       const tbody = $('tbl-preview');
       const max = Math.min(50, itens.length);
       tbody.innerHTML = itens.slice(0, max).map(it => `
         <tr>
-          <td>${esc(it.familia) || '—'}</td>
+          <td>${it.familia ? esc(it.familia) : '—'}${it.familiaNova ? ' <span class="badge-status badge-pendente">nova</span>' : ''}</td>
           <td><strong>${esc(it.numero)}</strong></td>
           <td>${esc(it.nome)}</td>
           <td>${esc(it.categoria) || '—'}</td>
@@ -335,6 +366,28 @@
       try {
         // Firestore batch limita a 500 ops — fatia se necessário
         const FATIA = 400;
+
+        // Cria as famílias novas primeiro (uma por nome normalizado único)
+        // e resolve o familiaId de cada item que precisa de uma.
+        const novasPorChave = {};
+        aImportar.forEach(it => {
+          if (!it.familiaNova) return;
+          const chave = normalizarNomeFamilia(it.familia);
+          if (!novasPorChave[chave]) {
+            novasPorChave[chave] = { id: crypto.randomUUID().replace(/-/g, ''), nome: it.familia };
+          }
+          it.familiaId = novasPorChave[chave].id;
+        });
+        const novasFamilias = Object.values(novasPorChave);
+        for (let i = 0; i < novasFamilias.length; i += FATIA) {
+          const lote = novasFamilias.slice(i, i + FATIA);
+          const batch = writeBatch(db);
+          lote.forEach(f => {
+            batch.set(doc(db, 'familias', f.id), { nome: f.nome, ativo: true, criadoEm: serverTimestamp() });
+          });
+          await batch.commit();
+        }
+
         let importados = 0;
         for (let i = 0; i < aImportar.length; i += FATIA) {
           const lote = aImportar.slice(i, i + FATIA);
@@ -343,6 +396,7 @@
             batch.set(doc(collection(db, 'convites_antecipados')), {
               eventoId: eventoAtivoId,
               familia: it.familia,
+              familiaId: it.familiaId || null,
               numero: it.numero,
               nome: it.nome,
               categoria: it.categoria,
@@ -360,7 +414,8 @@
         importBuffer = [];
         $('preview-box').classList.add('hidden');
         $('arquivo').value = '';
-        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} ${importados} convite(s) importado(s)!</span>`;
+        const sufixoFamilias = novasFamilias.length > 0 ? ` e ${novasFamilias.length} família(s) nova(s) criada(s)` : '';
+        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} ${importados} convite(s) importado(s)${sufixoFamilias}!</span>`;
         alerta.className = 'alert alert-success';
         setTimeout(() => alerta.classList.add('hidden'), 3500);
       } catch (err) {
