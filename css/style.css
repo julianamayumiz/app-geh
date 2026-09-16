@@ -464,6 +464,16 @@ a:focus-visible {
   opacity: 0.8;
 }
 
+/* Variante fixa no topo pras telas mobile de operador/caixa — evita que o
+   saldo saia da viewport ao rolar a lista de produtos (feedback #3). Não é
+   o padrão de .cliente-info porque as telas admin usam o mesmo componente
+   dentro de um card estático, onde sticky não faz sentido. */
+.cliente-info.sticky {
+  position: sticky;
+  top: 4.5rem; /* ~altura do .header (botão voltar tem min-height 44px) */
+  z-index: 5;
+}
+
 /* ===== Scanner ===== */
 #scanner-container {
   max-width: 400px;

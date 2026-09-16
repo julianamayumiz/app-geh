@@ -19,7 +19,7 @@
   </header>
 
   <main style="padding-bottom: 6rem;">
-    <div class="cliente-info">
+    <div class="cliente-info sticky">
       <div class="nome" id="cliente-nome"><span class="skel skel-on-dark skel-title" style="width:60%"></span></div>
       <div class="saldo-label">Saldo disponível</div>
       <div class="saldo" id="cliente-saldo"><span class="skel skel-on-dark skel-num" style="width:140px;height:1.8rem"></span></div>
@@ -519,8 +519,10 @@
           tipo: 'sucesso',
           duracao: 4000,
         });
-        // 4s pra dar tempo do operador ler o saldo final em evento barulhento
-        setTimeout(() => window.location.href = 'index.html', 4000);
+        // Redirect só depois do toast já ter sumido — antes os dois timers
+        // coincidiam em 4s e o operador perdia a confirmação visual do
+        // saldo final bem na hora que a tela trocava (feedback #3/#6).
+        setTimeout(() => window.location.href = 'index.html', 5500);
       } catch (err) {
         clearTimeout(timerLento);
         vibrar([100, 50, 100]); // padrão de erro
