@@ -1,4 +1,4 @@
-const CACHE = 'app-geh-v13';
+const CACHE = 'app-geh-v14';
 const ARQUIVOS = [
   '/',
   '/index.html',
@@ -27,6 +27,8 @@ const ARQUIVOS = [
   '/admin/usuarios.html',
   '/admin/ajuste-saldo.html',
   '/admin/convites-antecipados.html',
+  '/admin/familias.html',
+  '/familia/convites.html',
   '/admin/recepcao-painel.html',
   '/admin/historico-recepcao.html',
 ];
