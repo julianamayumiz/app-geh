@@ -59,7 +59,13 @@ service cloud.firestore {
     match /usuarios/{uid} {
       allow get: if isAdmin() || (logado() && request.auth.uid == uid);
       allow list: if isAdmin();
-      allow update, delete: if isAdmin();
+      // Admin não pode alterar/excluir o próprio doc nem o do super-admin —
+      // evita que uma conta admin comprometida se auto-promova ou tranque
+      // o super-admin fora do sistema. Espelha a trava que já existe na UI
+      // (admin/usuarios.html: isMe || isSuper desabilita os botões).
+      allow update, delete: if isAdmin()
+        && request.auth.uid != uid
+        && resource.data.email != 'juliana.mayumi14@gmail.com';
       allow create: if isAdmin()
         || (
           logado()
@@ -83,7 +89,15 @@ service cloud.firestore {
 
     match /produtos/{doc} {
       allow read: if isOperador();
-      allow update: if isOperador();
+      // Operador só pode decrementar estoque via venda (TX no app) — não
+      // pode reescrever nome/preco/categoria direto pelo SDK.
+      allow update: if isAdmin()
+        || (
+          isOperador()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estoque'])
+          && request.resource.data.estoque is number
+          && request.resource.data.estoque >= 0
+        );
       allow create, delete: if isAdmin();
     }
 
@@ -103,7 +117,16 @@ service cloud.firestore {
     }
 
     match /vendas/{doc} {
-      allow read, create: if isOperador();
+      allow read: if isOperador();
+      // Valida o essencial pra integridade financeira: total positivo,
+      // itens não vazio, cliente identificado. O client já confere isso
+      // (operador/vender.html), aqui é o freio de servidor.
+      allow create: if isOperador()
+        && request.resource.data.total is number
+        && request.resource.data.total > 0
+        && request.resource.data.itens is list
+        && request.resource.data.itens.size() > 0
+        && request.resource.data.clienteId is string;
       allow update, delete: if isAdmin();
     }
 
@@ -199,7 +222,12 @@ service cloud.firestore {
     // Vendas na porta — convites criados na hora pela recepção.
     // Histórico imutável (só admin pode corrigir/excluir).
     match /vendas_porta/{doc} {
-      allow read, create: if isRecepcao();
+      allow read: if isRecepcao();
+      allow create: if isRecepcao()
+        && request.resource.data.preco is number
+        && request.resource.data.preco > 0
+        && request.resource.data.categoriaId is string
+        && request.resource.data.eventoId is string;
       allow update, delete: if isAdmin();
     }
 

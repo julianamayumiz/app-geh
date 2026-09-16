@@ -44,7 +44,9 @@
       "Bash(git show *)",
       "Bash(python3 -c ' *)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\julia\\\\Desktop\\\\App GEH\\\\admin\" -File)",
-      "Bash(Select-Object Name)"
+      "Bash(Select-Object Name)",
+      "Bash(python3 -c \"import reportlab; print\\(reportlab.Version\\)\")",
+      "Bash(python3 \"C:\\\\Users\\\\julia\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-julia-Desktop-App-GEH\\\\5296786d-a734-4cf2-8486-037b6191b37d\\\\scratchpad\\\\gerar_auditoria_pdf.py\")"
     ]
   }
 }
