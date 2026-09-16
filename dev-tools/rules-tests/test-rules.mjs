@@ -207,6 +207,12 @@ async function main() {
   await test('família PODE preencher o nome do próprio convite', () =>
     assertSucceeds(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFam1'), { nome: 'Fulano de Tal' }))
   );
+  await test('família NÃO PODE mandar categoria com mais de 40 caracteres', () =>
+    assertFails(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFam1'), { nome: 'Fulano', categoria: 'x'.repeat(41) }))
+  );
+  await test('família NÃO PODE mandar categoria que não é string', () =>
+    assertFails(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFam1'), { nome: 'Fulano', categoria: 123 }))
+  );
   await test('família NÃO PODE mudar o número do convite', () =>
     assertFails(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFam1'), { nome: 'Fulano', numero: '999' }))
   );
