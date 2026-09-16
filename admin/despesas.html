@@ -7,7 +7,7 @@
   <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
   <link rel="stylesheet" href="../css/style.css">
   <link rel="manifest" href="../manifest.json">
-  <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');</script>
+  <script src="/js/sw-register.js"></script>
   <style>
     .dp-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
     .dp-kpi { padding: 0.85rem 1rem; border: 1px solid var(--cinza-claro); border-radius: 10px; background: var(--fundo-card, #fff); }

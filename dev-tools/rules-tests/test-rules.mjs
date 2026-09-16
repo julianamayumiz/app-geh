@@ -1,4 +1,4 @@
-// Testes automatizados das firestore.rules — Fase 1 da auditoria de robustez.
+// Testes automatizados das firestore.rules — Fases 1 e 4 da auditoria de robustez.
 // Roda contra o Firestore Emulator local, NUNCA toca em dados reais.
 // Uso: npm test (dispara o emulador, roda os testes, derruba o emulador).
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
@@ -56,6 +56,10 @@ async function main() {
     await setDoc(doc(db, 'produtos', 'prod1'), { nome: 'Brigadeiro', preco: 3.5, estoque: 100, categoria: 'Doces' });
     await setDoc(doc(db, 'clientes', 'cli1'), { saldo: 50 });
     await setDoc(doc(db, 'eventos', 'ev1'), { nome: 'Evento Teste', status: 'ativo', categoriasIngresso: [] });
+    await setDoc(doc(db, 'convites_antecipados', 'conv1'), {
+      eventoId: 'ev1', familia: 'Silva', numero: '001', nome: 'João', categoria: 'Adulto',
+      pago: true, presente: false, checkInEm: null, checkInPor: null,
+    });
   });
 
   const adminDb = testEnv.authenticatedContext(UID_ADMIN, { email: 'admin@teste.com' }).firestore();
@@ -124,6 +128,35 @@ async function main() {
   );
   await test('super-admin PODE excluir um admin comum (regressão)', () =>
     assertSucceeds(deleteDoc(doc(superDb, 'usuarios', UID_ADMIN)))
+  );
+
+  console.log('\n== eventos (P0 Fase 4: categoriasIngresso precisa ser lista) ==');
+  await test('recepção PODE atualizar categoriasIngresso com uma lista', () =>
+    assertSucceeds(updateDoc(doc(recepcaoDb, 'eventos', 'ev1'), {
+      categoriasIngresso: [{ id: 'cat1', nome: 'Adulto', precoPorta: 20, qtdPorta: 49 }],
+    }))
+  );
+  await test('recepção NÃO PODE mandar categoriasIngresso que não é lista', () =>
+    assertFails(updateDoc(doc(recepcaoDb, 'eventos', 'ev1'), {
+      categoriasIngresso: 'nao é uma lista',
+    }))
+  );
+
+  console.log('\n== convites_antecipados (Fase 4: tipos validados no check-in) ==');
+  await test('recepção PODE marcar presença (check-in válido)', () =>
+    assertSucceeds(updateDoc(doc(recepcaoDb, 'convites_antecipados', 'conv1'), {
+      presente: true, checkInEm: serverTimestamp(), checkInPor: 'Recepção Teste',
+    }))
+  );
+  await test('recepção PODE desfazer presença (check-in nulo)', () =>
+    assertSucceeds(updateDoc(doc(recepcaoDb, 'convites_antecipados', 'conv1'), {
+      presente: false, checkInEm: null, checkInPor: null,
+    }))
+  );
+  await test('recepção NÃO PODE mandar "presente" que não é booleano', () =>
+    assertFails(updateDoc(doc(recepcaoDb, 'convites_antecipados', 'conv1'), {
+      presente: 'sim', checkInEm: serverTimestamp(), checkInPor: 'Recepção Teste',
+    }))
   );
 
   console.log('\n== sanidade (usuário não logado) ==');

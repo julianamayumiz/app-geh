@@ -150,6 +150,7 @@ service cloud.firestore {
           isRecepcao()
           && request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(['categoriasIngresso'])
+          && request.resource.data.categoriasIngresso is list
         );
     }
 
@@ -215,6 +216,9 @@ service cloud.firestore {
           isRecepcao()
           && request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(['presente', 'checkInEm', 'checkInPor'])
+          && request.resource.data.presente is bool
+          && (request.resource.data.checkInEm is timestamp || request.resource.data.checkInEm == null)
+          && (request.resource.data.checkInPor is string || request.resource.data.checkInPor == null)
         );
       allow create, delete: if isAdmin();
     }

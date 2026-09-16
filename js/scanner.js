@@ -27,6 +27,33 @@
 // ============================================================
 
 const STORAGE_KEY = 'scanner-camera-id';
+const START_TIMEOUT_MS = 8000;
+
+// localStorage pode lançar em modo privado agressivo (ex: Safari com
+// "block all cookies") — nunca deixa isso derrubar o scanner.
+function lsGet(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function lsSet(key, val) {
+  try { localStorage.setItem(key, val); } catch {}
+}
+function lsRemove(key) {
+  try { localStorage.removeItem(key); } catch {}
+}
+
+class TimeoutError extends Error {}
+// scanner.start() pode ficar pendurado pra sempre se a API de câmera do
+// navegador travar — sem isso, o operador fica preso numa tela de loading
+// infinito sem nenhum jeito de tentar de novo.
+function comTimeout(promise, ms) {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new TimeoutError(`Câmera não respondeu em ${ms}ms`)), ms);
+    promise.then(
+      (v) => { clearTimeout(t); resolve(v); },
+      (e) => { clearTimeout(t); reject(e); }
+    );
+  });
+}
 
 function escolherTraseiraPrincipal(cameras) {
   if (!cameras || cameras.length < 2) return null;
@@ -202,7 +229,7 @@ export async function iniciarScanner({
   // 2. Heurística (traseira principal pelo label)
   // 3. facingMode environment (browser decide)
   function decidirConfigInicial() {
-    const salvo = localStorage.getItem(STORAGE_KEY);
+    const salvo = lsGet(STORAGE_KEY);
     if (salvo && cameras.some(c => c.id === salvo)) {
       deviceIdAtual = salvo;
       return { deviceId: { exact: salvo } };
@@ -218,26 +245,28 @@ export async function iniciarScanner({
   async function startCom(config) {
     // Tentativa 1: configuracao solicitada (deviceId exact ou facingMode exact)
     try {
-      await scanner.start(config, scanConfig, onDecoded, onFrameErr);
+      await comTimeout(scanner.start(config, scanConfig, onDecoded, onFrameErr), START_TIMEOUT_MS);
       ajustarTrack(elementId);
       const facing = lerFacingModeAtual();
       console.info('[scanner] facingMode real apos start:', facing);
       return facing;
     } catch (e1) {
+      if (e1 instanceof TimeoutError) { try { await scanner.stop(); } catch {} }
       console.warn('[scanner] start falhou, tentando facingMode solto:', e1);
     }
 
     // Tentativa 2: facingMode sem exact (browser escolhe a traseira)
     try {
-      await scanner.start(
+      await comTimeout(scanner.start(
         { facingMode: 'environment' },
         scanConfig, onDecoded, onFrameErr
-      );
+      ), START_TIMEOUT_MS);
       ajustarTrack(elementId);
       const facing = lerFacingModeAtual();
       console.info('[scanner] facingMode real apos start (fallback 2):', facing);
       return facing;
     } catch (e2) {
+      if (e2 instanceof TimeoutError) { try { await scanner.stop(); } catch {} }
       console.warn('[scanner] facingMode solto falhou, tentando cameras por deviceId:', e2);
     }
 
@@ -246,16 +275,17 @@ export async function iniciarScanner({
     const ordem = candidatas.length > 0 ? candidatas : cameras;
     for (const cam of ordem) {
       try {
-        await scanner.start(
+        await comTimeout(scanner.start(
           { deviceId: { exact: cam.id } },
           scanConfig, onDecoded, onFrameErr
-        );
+        ), START_TIMEOUT_MS);
         deviceIdAtual = cam.id;
         ajustarTrack(elementId);
         const facing = lerFacingModeAtual();
         console.info('[scanner] abriu via deviceId fallback:', cam.label, '| facing:', facing);
         return facing;
       } catch (e3) {
+        if (e3 instanceof TimeoutError) { try { await scanner.stop(); } catch {} }
         console.warn('[scanner] deviceId fallback falhou para', cam.label, ':', e3);
       }
     }
@@ -271,7 +301,7 @@ export async function iniciarScanner({
   // salva e tenta uma câmera diferente da que abriu agora.
   if (facing === 'user' && cameras.length > 1) {
     console.warn('[scanner] abriu câmera frontal — tentando outra');
-    localStorage.removeItem(STORAGE_KEY);
+    lsRemove(STORAGE_KEY);
 
     const idAtual = deviceIdAtual;
     const outra = cameras.find(c =>
@@ -283,7 +313,7 @@ export async function iniciarScanner({
       deviceIdAtual = outra.id;
       facing = await startCom({ deviceId: { exact: outra.id } });
       if (facing !== 'user') {
-        localStorage.setItem(STORAGE_KEY, outra.id);
+        lsSet(STORAGE_KEY, outra.id);
       }
     }
   }
@@ -312,7 +342,7 @@ export async function iniciarScanner({
     () => deviceIdAtual,
     async (novoId) => {
       deviceIdAtual = novoId;
-      localStorage.setItem(STORAGE_KEY, novoId);
+      lsSet(STORAGE_KEY, novoId);
       scanAtivo = false;
       try { await scanner.stop(); } catch {}
       scanAtivo = true;
