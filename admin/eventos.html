@@ -119,7 +119,8 @@
     import { fmtBRL, esc } from "../js/helpers.js";
     import {
       db, collection, doc, setDoc, getDoc, updateDoc, getDocs, deleteDoc,
-      addDoc, onSnapshot, query, orderBy, where, serverTimestamp, writeBatch
+      addDoc, onSnapshot, query, orderBy, where, serverTimestamp, writeBatch,
+      getAggregateFromServer, sum, count
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
     import { confirmarAsync, toast } from "../js/ui.js";
@@ -427,10 +428,17 @@
       const linhas = [];
       for (const d of snap.docs) {
         const ev = { id: d.id, ...d.data() };
-        const vendasSnap = await getDocs(query(collection(db, 'vendas'), where('eventoId', '==', ev.id)));
+        // Agregação server-side (sum/count) em vez de baixar todos os docs de
+        // vendas do evento — mesmo resultado, custa ~1 leitura por evento em
+        // vez de 1 leitura por venda (era um N+1 caro, disparado a cada
+        // alteração em qualquer evento, ex: contador de vagas da recepção).
+        const agg = await getAggregateFromServer(
+          query(collection(db, 'vendas'), where('eventoId', '==', ev.id)),
+          { receita: sum('total'), qtd: count() }
+        );
         if (myGen !== renderGen) return; // snapshot mais novo já está rodando
-        let receita = 0;
-        vendasSnap.forEach(v => receita += v.data().total || 0);
+        const receita = agg.data().receita || 0;
+        const numVendas = agg.data().qtd || 0;
         const dataFmt = ev.data ? new Date(ev.data + 'T12:00').toLocaleDateString('pt-BR') : '—';
         const badge = ev.status === 'ativo'
           ? `<span style="background:var(--verde);color:white;padding:2px 8px;border-radius:999px;font-size:0.8rem;">Ativo</span>`
@@ -440,13 +448,13 @@
             <td><strong>${esc(ev.nome)}</strong></td>
             <td>${dataFmt}</td>
             <td>${badge}</td>
-            <td>${vendasSnap.size}</td>
+            <td>${numVendas}</td>
             <td>${fmtBRL(receita)}</td>
             <td>
               <div style="display:flex;gap:0.35rem;justify-content:flex-end;flex-wrap:wrap;">
                 ${ev.status !== 'ativo' ? `<button class="btn btn-secondary" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" data-acao="ativar" data-id="${esc(ev.id)}" data-nome="${esc(ev.nome)}" data-data="${ev.data||''}">Reativar</button>` : ''}
                 <button class="btn btn-secondary" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" data-acao="editar" data-id="${esc(ev.id)}" data-nome="${esc(ev.nome)}">Editar</button>
-                <button class="btn btn-danger" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" data-acao="excluir" data-id="${esc(ev.id)}" data-nome="${esc(ev.nome)}" data-vendas="${vendasSnap.size}">Excluir</button>
+                <button class="btn btn-danger" style="width:auto;padding:0.35rem 0.75rem;font-size:0.8rem;" data-acao="excluir" data-id="${esc(ev.id)}" data-nome="${esc(ev.nome)}" data-vendas="${numVendas}">Excluir</button>
               </div>
             </td>
           </tr>`);
