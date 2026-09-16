@@ -6,6 +6,10 @@ dev-tools/backup/service-account.json
 dev-tools/backup/backups/
 dev-tools/backup/node_modules/
 
+# Testes das firestore.rules — dependencias de dev, nao vai pro repo
+dev-tools/rules-tests/node_modules/
+dev-tools/rules-tests/firestore-debug.log
+
 # Defesa adicional: qualquer arquivo .env, chave privada ou service account
 # que acabe em dev-tools/ (fora do /backup ja coberto acima) tambem nao vai.
 dev-tools/**/*.env
