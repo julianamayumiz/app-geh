@@ -6,15 +6,24 @@ rules_version = '2';
 // - SUPER ADMIN: e-mail hardcoded da Juliana — sempre passa, mesmo
 //   sem doc em /usuarios. Resolve o bootstrap (primeiro acesso) e
 //   garante que ela nunca fica trancada do lado de fora.
-// - ADMIN: tem doc em /usuarios/{uid} com papel='admin' e ativo=true.
+// - ADMIN: token com custom claim papel='admin' e ativo=true.
 //   Faz qualquer coisa.
-// - OPERADOR: doc em /usuarios/{uid} com papel='operador' e ativo=true.
+// - OPERADOR: token com custom claim papel='operador' e ativo=true.
 //   Lê dados do evento e registra vendas.
-// - CAIXA: doc em /usuarios/{uid} com papel='caixa' e ativo=true.
+// - CAIXA: token com custom claim papel='caixa' e ativo=true.
 //   Recarrega saldo dos clientes (lendo o QR).
-// - RECEPCAO: doc em /usuarios/{uid} com papel='recepcao' e ativo=true.
+// - RECEPCAO: token com custom claim papel='recepcao' e ativo=true.
 //   Confere convites antecipados, registra check-in e venda na porta.
 // - QUALQUER OUTRO: bloqueado.
+//
+// O papel/ativo veem do PRÓPRIO TOKEN (custom claims), não de um
+// get(/usuarios/uid) — a Cloud Function `sincronizarClaimsUsuario`
+// (ver /functions) mantém o claim em sincronia toda vez que o doc
+// /usuarios/{uid} muda. Isso existe pra tirar a leitura extra que
+// get()/exists() nas rules cobra em TODA operação feita pela equipe
+// (era 1 leitura oculta a cada venda, recarga, consulta, etc). O doc
+// /usuarios/{uid} continua sendo a fonte da verdade — só deixou de
+// ser consultado a cada avaliação de regra.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -25,25 +34,20 @@ service cloud.firestore {
     function isSuperAdmin() {
       return logado() && request.auth.token.email == 'juliana.mayumi14@gmail.com';
     }
-    function perfil() {
-      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
-    }
     function temPerfilAtivo() {
-      return logado()
-        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
-        && perfil().ativo == true;
+      return logado() && request.auth.token.ativo == true;
     }
     function isAdmin() {
-      return isSuperAdmin() || (temPerfilAtivo() && perfil().papel == 'admin');
+      return isSuperAdmin() || (temPerfilAtivo() && request.auth.token.papel == 'admin');
     }
     function isOperador() {
-      return isAdmin() || (temPerfilAtivo() && perfil().papel == 'operador');
+      return isAdmin() || (temPerfilAtivo() && request.auth.token.papel == 'operador');
     }
     function isCaixa() {
-      return isAdmin() || (temPerfilAtivo() && perfil().papel == 'caixa');
+      return isAdmin() || (temPerfilAtivo() && request.auth.token.papel == 'caixa');
     }
     function isRecepcao() {
-      return isAdmin() || (temPerfilAtivo() && perfil().papel == 'recepcao');
+      return isAdmin() || (temPerfilAtivo() && request.auth.token.papel == 'recepcao');
     }
     // Qualquer membro da equipe (operador, caixa, recepcao ou admin) —
     // usado em leituras compartilhadas como /clientes, /config/eventoAtivo.
@@ -131,7 +135,12 @@ service cloud.firestore {
     }
 
     match /vendas/{doc} {
-      allow read: if isOperador();
+      // isCaixa() além de isOperador(): caixa/carregar.html mostra o
+      // histórico de vendas do cliente junto com recargas/transferências
+      // (bug pré-existente — essa leitura nunca tinha sido liberada pro
+      // caixa). Recepção não lê vendas em lugar nenhum do app, por isso
+      // não entra aqui (menor privilégio).
+      allow read: if isOperador() || isCaixa();
       // Valida o essencial pra integridade financeira: total positivo,
       // itens não vazio, cliente identificado. O client já confere isso
       // (operador/vender.html), aqui é o freio de servidor.

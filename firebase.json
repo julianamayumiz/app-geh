@@ -1,7 +1,7 @@
 {
   "hosting": {
     "public": ".",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**", "firestore.rules", "firestore.indexes.json"],
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**", "firestore.rules", "firestore.indexes.json", "functions/**"],
     "headers": [
       {
         "source": "**/*.js",
@@ -26,8 +26,15 @@
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default"
+    }
+  ],
   "emulators": {
     "firestore": { "port": 8080 },
+    "functions": { "port": 5001 },
     "ui": { "enabled": false }
   }
 }

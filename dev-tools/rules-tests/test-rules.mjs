@@ -45,6 +45,7 @@ async function main() {
   const UID_SUPER = 'super1';
   const UID_OPERADOR = 'operador1';
   const UID_RECEPCAO = 'recepcao1';
+  const UID_CAIXA = 'caixa1';
   const EMAIL_SUPER = 'juliana.mayumi14@gmail.com';
 
   // Seed de dados ignorando as rules — isso é setup, não é o que estamos testando.
@@ -54,8 +55,13 @@ async function main() {
     await setDoc(doc(db, 'usuarios', UID_SUPER), { nome: 'Juliana', email: EMAIL_SUPER, papel: 'admin', ativo: true });
     await setDoc(doc(db, 'usuarios', UID_OPERADOR), { nome: 'Operador Teste', email: 'operador@teste.com', papel: 'operador', ativo: true });
     await setDoc(doc(db, 'usuarios', UID_RECEPCAO), { nome: 'Recepção Teste', email: 'recepcao@teste.com', papel: 'recepcao', ativo: true });
+    await setDoc(doc(db, 'usuarios', UID_CAIXA), { nome: 'Caixa Teste', email: 'caixa@teste.com', papel: 'caixa', ativo: true });
     await setDoc(doc(db, 'produtos', 'prod1'), { nome: 'Brigadeiro', preco: 3.5, estoque: 100, categoria: 'Doces' });
     await setDoc(doc(db, 'clientes', 'cli1'), { saldo: 50 });
+    await setDoc(doc(db, 'vendas', 'venda1'), {
+      clienteId: 'cli1', eventoId: 'ev1', total: 10, operadorId: UID_OPERADOR,
+      itens: [{ produtoId: 'prod1', nome: 'Brigadeiro', qtd: 2, subtotal: 10 }], criadoEm: null,
+    });
     await setDoc(doc(db, 'eventos', 'ev1'), { nome: 'Evento Teste', status: 'ativo', categoriasIngresso: [] });
     await setDoc(doc(db, 'convites_antecipados', 'conv1'), {
       eventoId: 'ev1', familia: 'Silva', numero: '001', nome: 'João', categoria: 'Adulto',
@@ -88,10 +94,16 @@ async function main() {
     });
   });
 
-  const adminDb = testEnv.authenticatedContext(UID_ADMIN, { email: 'admin@teste.com' }).firestore();
-  const superDb = testEnv.authenticatedContext(UID_SUPER, { email: EMAIL_SUPER }).firestore();
-  const operadorDb = testEnv.authenticatedContext(UID_OPERADOR, { email: 'operador@teste.com' }).firestore();
-  const recepcaoDb = testEnv.authenticatedContext(UID_RECEPCAO, { email: 'recepcao@teste.com' }).firestore();
+  // O papel/ativo agora vem do custom claim do token (não mais de um
+  // get(/usuarios/uid) dentro das rules — ver firestore.rules). O 2º
+  // argumento de authenticatedContext vira o token do usuário simulado,
+  // então simulamos exatamente o que a Cloud Function sincronizarClaimsUsuario
+  // grava depois de ler o doc /usuarios/{uid} correspondente.
+  const adminDb = testEnv.authenticatedContext(UID_ADMIN, { email: 'admin@teste.com', papel: 'admin', ativo: true }).firestore();
+  const superDb = testEnv.authenticatedContext(UID_SUPER, { email: EMAIL_SUPER }).firestore(); // sem claim de propósito — super-admin passa só pelo e-mail
+  const operadorDb = testEnv.authenticatedContext(UID_OPERADOR, { email: 'operador@teste.com', papel: 'operador', ativo: true }).firestore();
+  const recepcaoDb = testEnv.authenticatedContext(UID_RECEPCAO, { email: 'recepcao@teste.com', papel: 'recepcao', ativo: true }).firestore();
+  const caixaDb = testEnv.authenticatedContext(UID_CAIXA, { email: 'caixa@teste.com', papel: 'caixa', ativo: true }).firestore();
   const semAuthDb = testEnv.unauthenticatedContext().firestore();
 
   console.log('\n== produtos (P0: operador não pode reescrever qualquer campo) ==');
@@ -125,6 +137,14 @@ async function main() {
     assertFails(addDoc(collection(operadorDb, 'vendas'), {
       clienteId: 'cli1', total: 10, itens: [],
     }))
+  );
+
+  console.log('\n== vendas: leitura pro caixa (bug real do deploy — caixa/carregar.html mostra histórico) ==');
+  await test('caixa PODE ler vendas (histórico do cliente em caixa/carregar.html)', () =>
+    assertSucceeds(getDocs(query(collection(caixaDb, 'vendas'), where('clienteId', '==', 'cli1'))))
+  );
+  await test('recepção NÃO PODE ler vendas (não usa isso em lugar nenhum — menor privilégio)', () =>
+    assertFails(getDocs(query(collection(recepcaoDb, 'vendas'), where('clienteId', '==', 'cli1'))))
   );
 
   console.log('\n== vendas_porta (P0: payload validado no servidor) ==');
@@ -257,6 +277,29 @@ async function main() {
   );
   await test('admin AINDA PODE editar qualquer campo do convite (regressão)', () =>
     assertSucceeds(updateDoc(doc(superDb, 'convites_antecipados', 'convFam1'), { familia: 'Silva Editado' }))
+  );
+
+  console.log('\n== migração pra custom claims (papel vem do token, não mais de get(/usuarios/uid)) ==');
+  // UID sem NENHUM doc em /usuarios — se as rules ainda dependessem de
+  // get(/usuarios/uid), isso teria que falhar mesmo com o claim certo.
+  // Passar aqui prova que o get() foi mesmo removido do caminho quente.
+  const semDocDb = testEnv.authenticatedContext('semdoc1', { email: 'semdoc@teste.com', papel: 'admin', ativo: true }).firestore();
+  await test('token com claim admin=true PASSA mesmo sem doc em /usuarios (prova que não depende mais de get())', () =>
+    assertSucceeds(getDoc(doc(semDocDb, 'produtos', 'prod1')))
+  );
+
+  // Doc em /usuarios diz admin, mas o token não tem o claim (ex: claim
+  // ainda não sincronizado pela Cloud Function) — precisa continuar
+  // bloqueado, porque quem manda agora é o token, não o Firestore.
+  const semClaimDb = testEnv.authenticatedContext(UID_ADMIN, { email: 'admin@teste.com' }).firestore();
+  await test('usuário com doc admin no Firestore mas SEM claim no token NÃO PODE ler produtos', () =>
+    assertFails(getDoc(doc(semClaimDb, 'produtos', 'prod1')))
+  );
+
+  // Claim de papel presente mas ativo:false — precisa continuar bloqueado.
+  const inativoDb = testEnv.authenticatedContext('inativo1', { email: 'inativo@teste.com', papel: 'operador', ativo: false }).firestore();
+  await test('token com papel válido mas ativo=false NÃO PODE ler produtos', () =>
+    assertFails(getDoc(doc(inativoDb, 'produtos', 'prod1')))
   );
 
   console.log('\n== sanidade (usuário não logado) ==');

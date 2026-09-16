@@ -1,0 +1,13 @@
+{
+  "name": "app-geh-functions",
+  "private": true,
+  "description": "Cloud Functions do App GEH — sincroniza papel/ativo de /usuarios como custom claims no token de Auth, pra tirar o get() de leitura das firestore.rules.",
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.4.0",
+    "firebase-functions": "^7.4.0"
+  }
+}

@@ -8,7 +8,8 @@
     "backup": "node backup.js",
     "seed-usuarios": "node seed-usuarios.js",
     "seed-saldos": "node seed-saldos.js",
-    "limpar-evento": "node limpar-evento.js"
+    "limpar-evento": "node limpar-evento.js",
+    "backfill-claims": "node backfill-claims.js"
   },
   "dependencies": {
     "firebase-admin": "^12.7.0",

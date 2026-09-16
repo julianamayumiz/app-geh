@@ -113,7 +113,7 @@
       GoogleAuthProvider, signInWithPopup, signOut, sendPasswordResetEmail,
       doc, getDoc, setDoc, deleteDoc
     } from "../js/firebase-config.js";
-    import { carregarPerfil } from "../js/auth-guard.js";
+    import { carregarPerfil, aguardarPerfil } from "../js/auth-guard.js";
     import { icon } from "../js/icons.js";
 
     const alerta = document.getElementById('alerta');
@@ -160,7 +160,14 @@
               criadoEm: new Date(),
             });
             await deleteDoc(doc(db, 'pendentes', emailKey));
-            perfil = await carregarPerfil(user);
+            // O papel so aparece no token depois que a Cloud Function
+            // sincronizarClaimsUsuario processar essa escrita — espera
+            // com poll em vez de reler na hora (voltaria vazio).
+            alerta.classList.add('hidden');
+            alertaOk.textContent = 'Preparando seu acesso...';
+            alertaOk.classList.remove('hidden');
+            perfil = await aguardarPerfil(user);
+            alertaOk.classList.add('hidden');
           }
         } catch (e) {
           console.warn('[login] erro no auto-provisionamento:', e);

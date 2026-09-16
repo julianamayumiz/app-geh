@@ -8,6 +8,9 @@ dev-tools/backup/node_modules/
 
 # Testes das firestore.rules — dependencias de dev, nao vai pro repo
 dev-tools/rules-tests/node_modules/
+
+# Cloud Functions — dependencias, nao vai pro repo
+functions/node_modules/
 # Log do emulador — sobra onde o comando for rodado (raiz ou dev-tools/rules-tests)
 firestore-debug.log
 
