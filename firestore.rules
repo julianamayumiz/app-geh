@@ -258,6 +258,8 @@ service cloud.firestore {
           && request.resource.data.nome is string
           && request.resource.data.nome.size() >= 2
           && request.resource.data.nome.size() <= 80
+          && (request.resource.data.categoria is string || request.resource.data.categoria == null)
+          && (request.resource.data.categoria == null || request.resource.data.categoria.size() <= 40)
         );
 
       allow create, delete: if isAdmin();

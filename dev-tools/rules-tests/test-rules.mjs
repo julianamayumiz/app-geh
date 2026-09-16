@@ -76,6 +76,16 @@ async function main() {
       eventoId: 'ev1', familiaId: 'curto', familia: 'Curto', numero: '012',
       nome: '', categoria: '', pago: true, presente: false, checkInEm: null, checkInPor: null,
     });
+    // familiaId aponta pra uma familias/{id} que não existe (órfão).
+    await setDoc(doc(db, 'convites_antecipados', 'convFamOrfao'), {
+      eventoId: 'ev1', familiaId: 'famOrfaoxxxxxxxxxxxxxxxx', familia: 'Orfao', numero: '013',
+      nome: '', categoria: '', pago: true, presente: false, checkInEm: null, checkInPor: null,
+    });
+    // Convite importado via planilha, familiaId explicitamente null (formato real do import).
+    await setDoc(doc(db, 'convites_antecipados', 'convFamNull'), {
+      eventoId: 'ev1', familiaId: null, familia: 'Planilha', numero: '014',
+      nome: 'Alguém', categoria: '', pago: true, presente: false, checkInEm: null, checkInPor: null,
+    });
   });
 
   const adminDb = testEnv.authenticatedContext(UID_ADMIN, { email: 'admin@teste.com' }).firestore();
@@ -181,6 +191,18 @@ async function main() {
   );
   await test('não logado NÃO PODE listar convites com familiaId curto/inválido', () =>
     assertFails(getDocs(query(collection(semAuthDb, 'convites_antecipados'), where('familiaId', '==', 'curto'))))
+  );
+  await test('não logado NÃO PODE listar convites_antecipados sem filtro (sem where)', () =>
+    assertFails(getDocs(collection(semAuthDb, 'convites_antecipados')))
+  );
+  await test('não logado NÃO PODE listar convites_antecipados com range query (sem where de igualdade)', () =>
+    assertFails(getDocs(query(collection(semAuthDb, 'convites_antecipados'), where('familiaId', '>=', ''))))
+  );
+  await test('convite com familiaId orfao (familia inexistente) NAO PODE ser editado', () =>
+    assertFails(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFamOrfao'), { nome: 'Teste' }))
+  );
+  await test('convite importado por planilha (familiaId: null) NAO PODE ser editado via posse de familiaId', () =>
+    assertFails(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFamNull'), { nome: 'Teste' }))
   );
   await test('família PODE preencher o nome do próprio convite', () =>
     assertSucceeds(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFam1'), { nome: 'Fulano de Tal' }))
