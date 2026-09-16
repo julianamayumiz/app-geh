@@ -56,7 +56,8 @@
         </div>
         <p style="font-size:0.85rem;color:var(--cinza);margin-bottom:0.75rem;">
           Colunas esperadas: <code style="background:var(--cinza-claro);padding:2px 6px;border-radius:4px;">Família GEH | Nº convite | Nome convidado | Categoria | Pago</code>.
-          Categoria e Pago são opcionais. "Pago" aceita sim/não, true/false, pago/aberto — se ficar em branco assume <strong>pago</strong>.
+          Só "Nº convite" é obrigatória — as demais são opcionais. Linha sem nome importa em aberto, pra família preencher depois pelo portal dela.
+          "Pago" aceita sim/não, true/false, pago/aberto — se ficar em branco assume <strong>pago</strong>.
           Famílias que ainda não existem são cadastradas automaticamente (marcadas como "nova" na pré-visualização) e já ficam linkadas aos convites.
         </p>
         <input type="file" id="arquivo" accept=".xlsx,.xls,.csv" style="margin-bottom:0.75rem;">
@@ -231,8 +232,8 @@
         const idxNome = detectarColuna(headers, 'nome');
         const idxCat = detectarColuna(headers, 'categoria');
         const idxPago = detectarColuna(headers, 'pago');
-        if (idxNum < 0 || idxNome < 0) {
-          throw new Error('Não encontrei colunas obrigatórias "Nº convite" e "Nome convidado". Use o modelo.');
+        if (idxNum < 0) {
+          throw new Error('Não encontrei a coluna obrigatória "Nº convite". Use o modelo.');
         }
         const itens = [];
         let semNumero = 0;
@@ -240,9 +241,9 @@
         for (let i = 1; i < linhas.length; i++) {
           const l = linhas[i];
           const numero = String(l[idxNum] ?? '').trim();
-          let nome = String(l[idxNome] ?? '').trim();
+          const nome = idxNome >= 0 ? String(l[idxNome] ?? '').trim() : '';
           if (!numero) { semNumero++; continue; }
-          if (!nome) { nome = `Convidado ${numero}`; semNome++; }
+          if (!nome) semNome++;
           itens.push({
             familia: idxFam >= 0 ? String(l[idxFam] ?? '').trim() : '',
             numero,
@@ -255,7 +256,7 @@
         if (semNumero > 0 || semNome > 0) {
           const partes = [];
           if (semNumero > 0) partes.push(`${semNumero} linha(s) sem número foram ignoradas`);
-          if (semNome > 0) partes.push(`${semNome} linha(s) sem nome importadas como "Convidado {número}"`);
+          if (semNome > 0) partes.push(`${semNome} linha(s) sem nome (fica em aberto pra família preencher)`);
           alerta.textContent = partes.join('. ') + '.';
           alerta.className = 'alert alert-warning';
         }
@@ -320,7 +321,7 @@
         <tr>
           <td>${it.familia ? esc(it.familia) : '—'}${it.familiaNova ? ' <span class="badge-status badge-pendente">nova</span>' : ''}</td>
           <td><strong>${esc(it.numero)}</strong></td>
-          <td>${esc(it.nome)}</td>
+          <td>${it.nome ? esc(it.nome) : '—'}</td>
           <td>${esc(it.categoria) || '—'}</td>
           <td></td>
         </tr>
