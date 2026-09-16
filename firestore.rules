@@ -87,6 +87,20 @@ service cloud.firestore {
       allow get, delete: if logado() && request.auth.token.email == email;
     }
 
+    // /familias — famílias do GEH, cadastro permanente entre eventos.
+    // O ID do doc É o código de acesso (string aleatória de alta entropia,
+    // gerada no client com crypto.randomUUID()). Não é sequencial, não é
+    // previsível a partir do nome. Segurança = posse do código, mesmo
+    // padrão que /pendentes já usa. list é admin-only pra impedir
+    // enumeração — sem isso, dar `get` público em qualquer doc não vaza
+    // nada, mas listar a coleção inteira revelaria os códigos de todo
+    // mundo.
+    match /familias/{familiaId} {
+      allow get: if true;
+      allow list: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
     match /produtos/{doc} {
       allow read: if isOperador();
       // Operador só pode decrementar estoque via venda (TX no app) — não
@@ -204,22 +218,48 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // Convites antecipados (lista de conferência da recepção):
-    // importados em lote via Excel. Recepção lê, busca e marca check-in
-    // (update do campo presente/checkInEm). Admin gerencia.
+    // Convites antecipados (lista de conferência da recepção): importados
+    // em lote via Excel (admin) OU gerados em branco por família (admin,
+    // via admin/familias.html) e preenchidos pela própria família. Recepção
+    // lê, busca e marca check-in (update do campo presente/checkInEm).
+    // Admin gerencia tudo.
+    //
+    // Acesso da família (sem login, por posse do familiaId — ver
+    // /familias acima): só enxerga/edita convites cujo familiaId ela
+    // já conhece (não dá pra "descobrir" outra família por aqui, porque
+    // pra listar é preciso informar o familiaId exato no where() da
+    // query). Só pode escrever nome/categoria — nunca numero, familia,
+    // familiaId, pago, presente ou os campos de check-in. familiaId
+    // precisa continuar IGUAL ao valor atual — trava qualquer tentativa
+    // de "transferir" o convite pra outra família. Família com
+    // familias/{familiaId}.ativo == false é bloqueada.
     match /convites_antecipados/{doc} {
-      allow read: if isRecepcao();
-      // Recepção só pode marcar/desfazer presença — não pode alterar
-      // dados do convite (nome, familia, categoria, pago).
+      allow read: if isRecepcao()
+        || (resource.data.familiaId is string && resource.data.familiaId.size() >= 16);
+
       allow update: if isAdmin()
         || (
+          // Recepção só pode marcar/desfazer presença — não pode alterar
+          // dados do convite (nome, familia, categoria, pago).
           isRecepcao()
           && request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(['presente', 'checkInEm', 'checkInPor'])
           && request.resource.data.presente is bool
           && (request.resource.data.checkInEm is timestamp || request.resource.data.checkInEm == null)
           && (request.resource.data.checkInPor is string || request.resource.data.checkInPor == null)
+        )
+        || (
+          // Família preenche/edita só o nome (+ categoria) do próprio convite.
+          resource.data.familiaId is string
+          && resource.data.familiaId.size() >= 16
+          && get(/databases/$(database)/documents/familias/$(resource.data.familiaId)).data.ativo == true
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nome', 'categoria'])
+          && request.resource.data.familiaId == resource.data.familiaId
+          && request.resource.data.nome is string
+          && request.resource.data.nome.size() >= 2
+          && request.resource.data.nome.size() <= 80
         );
+
       allow create, delete: if isAdmin();
     }
 
