@@ -204,14 +204,23 @@ async function main() {
   await test('convite importado por planilha (familiaId: null) NAO PODE ser editado via posse de familiaId', () =>
     assertFails(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFamNull'), { nome: 'Teste' }))
   );
-  await test('família PODE preencher o nome do próprio convite', () =>
-    assertSucceeds(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFam1'), { nome: 'Fulano de Tal' }))
+  await test('família PODE preencher nome + situação (pago) do próprio convite', () =>
+    assertSucceeds(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFam1'), { nome: 'Fulano de Tal', situacao: 'pago', pago: true }))
   );
-  await test('família NÃO PODE mandar categoria com mais de 40 caracteres', () =>
-    assertFails(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFam1'), { nome: 'Fulano', categoria: 'x'.repeat(41) }))
+  await test('família PODE marcar convite como "não vendido" sem nome', () =>
+    assertSucceeds(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFam1'), { nome: '', situacao: 'nao_vendido', pago: false }))
   );
-  await test('família NÃO PODE mandar categoria que não é string', () =>
-    assertFails(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFam1'), { nome: 'Fulano', categoria: 123 }))
+  await test('família NÃO PODE salvar sem nome se a situação não for "não vendido"', () =>
+    assertFails(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFam1'), { nome: '', situacao: 'reservado', pago: false }))
+  );
+  await test('família NÃO PODE mandar situação fora do enum permitido', () =>
+    assertFails(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFam1'), { nome: 'Fulano', situacao: 'cancelado', pago: false }))
+  );
+  await test('família NÃO PODE mandar pago inconsistente com a situação', () =>
+    assertFails(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFam1'), { nome: 'Fulano', situacao: 'reservado', pago: true }))
+  );
+  await test('família NÃO PODE mandar categoria (campo removido em favor de situação)', () =>
+    assertFails(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFam1'), { nome: 'Fulano', situacao: 'pago', pago: true, categoria: 'Adulto' }))
   );
   await test('família NÃO PODE mudar o número do convite', () =>
     assertFails(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFam1'), { nome: 'Fulano', numero: '999' }))

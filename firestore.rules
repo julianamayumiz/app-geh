@@ -228,11 +228,16 @@ service cloud.firestore {
     // /familias acima): só enxerga/edita convites cujo familiaId ela
     // já conhece (não dá pra "descobrir" outra família por aqui, porque
     // pra listar é preciso informar o familiaId exato no where() da
-    // query). Só pode escrever nome/categoria — nunca numero, familia,
-    // familiaId, pago, presente ou os campos de check-in. familiaId
+    // query). Só pode escrever nome/situacao/pago — nunca numero, familia,
+    // familiaId, categoria, presente ou os campos de check-in. familiaId
     // precisa continuar IGUAL ao valor atual — trava qualquer tentativa
     // de "transferir" o convite pra outra família. Família com
     // familias/{familiaId}.ativo == false é bloqueada.
+    // "situacao" é o status que a própria família controla no portal dela
+    // (pago/reservado/nao_vendido); "pago" é mantido em sincronia
+    // (pago == (situacao == 'pago')) pra continuar alimentando o badge
+    // "EM ABERTO" que admin/recepção já usam. Nome só é obrigatório fora
+    // do caso "nao_vendido" (vaga que a família decidiu não usar).
     match /convites_antecipados/{doc} {
       allow read: if isRecepcao()
         || (resource.data.familiaId is string && resource.data.familiaId.size() >= 16);
@@ -249,17 +254,18 @@ service cloud.firestore {
           && (request.resource.data.checkInPor is string || request.resource.data.checkInPor == null)
         )
         || (
-          // Família preenche/edita só o nome (+ categoria) do próprio convite.
+          // Família preenche o nome e controla a situação (pago/reservado/
+          // não vendido) do próprio convite.
           resource.data.familiaId is string
           && resource.data.familiaId.size() >= 16
           && get(/databases/$(database)/documents/familias/$(resource.data.familiaId)).data.ativo == true
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nome', 'categoria'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nome', 'situacao', 'pago'])
           && request.resource.data.familiaId == resource.data.familiaId
+          && request.resource.data.situacao in ['pago', 'reservado', 'nao_vendido']
+          && request.resource.data.pago == (request.resource.data.situacao == 'pago')
           && request.resource.data.nome is string
-          && request.resource.data.nome.size() >= 2
           && request.resource.data.nome.size() <= 80
-          && (request.resource.data.categoria is string || request.resource.data.categoria == null)
-          && (request.resource.data.categoria == null || request.resource.data.categoria.size() <= 40)
+          && (request.resource.data.situacao == 'nao_vendido' || request.resource.data.nome.size() >= 2)
         );
 
       allow create, delete: if isAdmin();

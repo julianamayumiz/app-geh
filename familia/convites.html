@@ -48,6 +48,38 @@
     .convite-card .acao { color: var(--azul); font-weight: 600; font-size: 0.85rem; }
     #tela-codigo { text-align: center; padding-top: 2rem; }
     #tela-codigo input { text-align: center; margin: 1rem 0; }
+    .badge-situacao {
+      display: inline-block;
+      padding: 0.1rem 0.5rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      margin-left: 0.4rem;
+      white-space: nowrap;
+    }
+    .badge-situacao.pago { background: rgba(22,163,74,0.14); color: var(--verde); }
+    .badge-situacao.reservado { background: rgba(180,83,9,0.14); color: var(--amarelo-acento); }
+    .badge-situacao.nao_vendido { background: var(--cinza-claro); color: var(--cinza); }
+    .situacao-grupo {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .situacao-btn {
+      flex: 1;
+      padding: 0.5rem 0.25rem;
+      border-radius: 10px;
+      border: 2px solid var(--cinza-claro);
+      background: transparent;
+      color: var(--cinza-escuro);
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: center;
+    }
+    .situacao-btn.ativo.pago { border-color: var(--verde); background: rgba(22,163,74,0.14); color: var(--verde); }
+    .situacao-btn.ativo.reservado { border-color: var(--amarelo-acento); background: rgba(180,83,9,0.14); color: var(--amarelo-acento); }
+    .situacao-btn.ativo.nao_vendido { border-color: var(--cinza); background: var(--cinza-claro); color: var(--cinza-escuro); }
   </style>
 </head>
 <body>
@@ -134,20 +166,34 @@
       );
     }
 
+    // Situação atual do convite, com fallback pros campos antigos
+    // (pago/nome) em convites de antes dessa funcionalidade existir.
+    function situacaoAtual(c) {
+      if (c.situacao) return c.situacao;
+      if (!c.nome) return 'nao_vendido';
+      return c.pago === false ? 'reservado' : 'pago';
+    }
+    const LABEL_SITUACAO = { pago: 'Pago', reservado: 'Reservado', nao_vendido: 'Não vendido' };
+
     function renderConvites(convites) {
       convites.sort((a, b) => (parseInt(a.numero) || 0) - (parseInt(b.numero) || 0));
       const total = convites.length;
       const preenchidos = convites.filter(c => c.nome).length;
-      $('familia-resumo').textContent = `${total} convite${total === 1 ? '' : 's'} · ${preenchidos} preenchido${preenchidos === 1 ? '' : 's'}`;
+      const pagos = convites.filter(c => situacaoAtual(c) === 'pago').length;
+      $('familia-resumo').textContent = `${total} convite${total === 1 ? '' : 's'} · ${preenchidos} preenchido${preenchidos === 1 ? '' : 's'} · ${pagos} pago${pagos === 1 ? '' : 's'}`;
       $('progresso-fill').style.width = total > 0 ? `${(preenchidos / total) * 100}%` : '0%';
 
-      $('lista-convites').innerHTML = convites.map(c => `
+      $('lista-convites').innerHTML = convites.map(c => {
+        const sit = situacaoAtual(c);
+        return `
         <div class="convite-card" data-abrir="${esc(c.id)}">
           <span class="num">[${esc(c.numero)}]</span>
           <span class="nome ${c.nome ? '' : 'vazio'}">${c.nome ? esc(c.nome) : '— sem convidado'}</span>
+          <span class="badge-situacao ${sit}">${LABEL_SITUACAO[sit]}</span>
           <span class="acao">${c.nome ? '✓ Editar' : '+ Adicionar'}</span>
         </div>
-      `).join('');
+      `;
+      }).join('');
 
       document.querySelectorAll('[data-abrir]').forEach(el => {
         el.onclick = () => abrirFormulario(convites.find(c => c.id === el.dataset.abrir));
@@ -156,15 +202,20 @@
 
     function abrirFormulario(convite) {
       const outrosNomes = new Set(); // preenchido depois, ao checar duplicidade
+      let situacaoEscolhida = situacaoAtual(convite);
       const backdrop = document.createElement('div');
       backdrop.className = 'confirm-backdrop';
       backdrop.innerHTML = `
         <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="conv-titulo">
           <p id="conv-titulo" style="font-weight:700;margin-bottom:0.75rem;">Convite ${esc(convite.numero)}</p>
           <label for="input-nome-convidado">Nome do convidado</label>
-          <input type="text" id="input-nome-convidado" value="${esc(convite.nome || '')}" maxlength="80" required style="margin-bottom:0.75rem;">
-          <label for="input-categoria">Categoria</label>
-          <input type="text" id="input-categoria" value="${esc(convite.categoria || '')}" maxlength="40">
+          <input type="text" id="input-nome-convidado" value="${esc(convite.nome || '')}" maxlength="80" style="margin-bottom:0.75rem;">
+          <label id="lbl-situacao" style="display:block;margin-bottom:0.4rem;">Situação</label>
+          <div class="situacao-grupo" role="group" aria-labelledby="lbl-situacao">
+            <button type="button" class="situacao-btn pago" data-situacao="pago" aria-label="Marcar como pago">Pago</button>
+            <button type="button" class="situacao-btn reservado" data-situacao="reservado" aria-label="Marcar como reservado">Reservado</button>
+            <button type="button" class="situacao-btn nao_vendido" data-situacao="nao_vendido" aria-label="Marcar como não vendido">Não vendido</button>
+          </div>
           <div id="aviso-duplicidade" class="alert alert-warning hidden" style="margin-top:0.75rem;"></div>
           <div class="confirm-acoes" style="margin-top:1.25rem;">
             <button type="button" class="btn btn-secondary" data-acao="cancelar">Cancelar</button>
@@ -183,6 +234,14 @@
         aviso.textContent = '';
       });
 
+      const botoesSituacao = backdrop.querySelectorAll('.situacao-btn');
+      const marcarSituacao = (valor) => {
+        situacaoEscolhida = valor;
+        botoesSituacao.forEach(b => b.classList.toggle('ativo', b.dataset.situacao === valor));
+      };
+      botoesSituacao.forEach(b => b.onclick = () => marcarSituacao(b.dataset.situacao));
+      marcarSituacao(situacaoEscolhida);
+
       getDocs(query(collection(db, 'convites_antecipados'), where('familiaId', '==', familiaId))).then(snap => {
         snap.docs.forEach(d => {
           if (d.id === convite.id) return;
@@ -192,13 +251,12 @@
       });
 
       backdrop.querySelector('[data-acao="salvar"]').onclick = async () => {
-        const nome = $('input-nome-convidado').value.trim();
-        const categoria = backdrop.querySelector('#input-categoria').value.trim();
-        if (nome.length < 2) {
-          toast('Digite o nome do convidado.', { tipo: 'erro' });
+        const nome = backdrop.querySelector('#input-nome-convidado').value.trim();
+        if (situacaoEscolhida !== 'nao_vendido' && nome.length < 2) {
+          toast('Digite o nome do convidado (ou marque como "Não vendido").', { tipo: 'erro' });
           return;
         }
-        if (outrosNomes.has(nome.toLowerCase())) {
+        if (nome && outrosNomes.has(nome.toLowerCase())) {
           const aviso = backdrop.querySelector('#aviso-duplicidade');
           aviso.textContent = 'Esse nome já está em outro convite seu. Confirma mesmo assim?';
           aviso.classList.remove('hidden');
@@ -208,7 +266,11 @@
           }
         }
         try {
-          await updateDoc(doc(db, 'convites_antecipados', convite.id), { nome, categoria });
+          await updateDoc(doc(db, 'convites_antecipados', convite.id), {
+            nome,
+            situacao: situacaoEscolhida,
+            pago: situacaoEscolhida === 'pago',
+          });
           toast('Convite atualizado!', { tipo: 'sucesso' });
           fechar();
         } catch (err) {
