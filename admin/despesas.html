@@ -244,7 +244,7 @@
 
   <script type="module">
     import { montarNav } from "./_nav.js";
-    import { fmtBRL } from "../js/helpers.js";
+    import { fmtBRL, esc } from "../js/helpers.js";
     import {
       db, collection, doc, getDoc, addDoc, updateDoc, deleteDoc, onSnapshot,
       query, orderBy, serverTimestamp, writeBatch
@@ -475,10 +475,10 @@
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${dataFmt}</td>
-          <td>${d.descricao || '—'}${badge}</td>
-          <td>${d.categoria || '—'}</td>
-          <td>${d.insumoNome || '—'}</td>
-          <td>${d.responsavel || '—'}</td>
+          <td>${esc(d.descricao) || '—'}${badge}</td>
+          <td>${esc(d.categoria) || '—'}</td>
+          <td>${esc(d.insumoNome) || '—'}</td>
+          <td>${esc(d.responsavel) || '—'}</td>
           <td>${FORMAS_LABEL[d.formaPagamento] || d.formaPagamento || '—'}</td>
           <td style="text-align:right;">${valorHtml}</td>
           <td>

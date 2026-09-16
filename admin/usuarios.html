@@ -332,14 +332,14 @@
           const tr = document.createElement('tr');
           tr.className = 'user-row';
           tr.innerHTML = `
-            <td>${u.nome || '—'} ${isMe ? '<span style="color:var(--cinza);font-size:0.78rem;">(você)</span>' : ''}</td>
-            <td>${u.email || '—'}</td>
+            <td>${esc(u.nome) || '—'} ${isMe ? '<span style="color:var(--cinza);font-size:0.78rem;">(você)</span>' : ''}</td>
+            <td>${esc(u.email) || '—'}</td>
             <td>${badgePapel}</td>
             <td>${badgeStatus}</td>
             <td>
               <div class="acoes-linha">
-                <button data-acao="papel" data-id="${d.id}" data-papel="${u.papel}">Mudar papel</button>
-                <button data-acao="reset" data-email="${u.email}">Reset senha</button>
+                <button data-acao="papel" data-id="${d.id}" data-papel="${esc(u.papel)}">Mudar papel</button>
+                <button data-acao="reset" data-email="${esc(u.email)}">Reset senha</button>
                 ${u.ativo === false
                   ? `<button data-acao="ativar" data-id="${d.id}">Reativar</button>`
                   : `<button data-acao="desativar" data-id="${d.id}" class="danger" ${isMe || isSuper ? 'disabled title="Não dá pra desativar a si mesma nem o super-admin"' : ''}>Desativar</button>`}

@@ -67,7 +67,7 @@
 
   <script type="module">
     import { montarNav } from "./_nav.js";
-    import { fmtBRL } from "../js/helpers.js";
+    import { fmtBRL, esc } from "../js/helpers.js";
     import {
       db, collection, doc, getDoc, getDocs, onSnapshot, query, where, orderBy
     } from "../js/firebase-config.js";
@@ -96,7 +96,7 @@
     async function carregarEventos() {
       const snap = await getDocs(query(collection(db, 'eventos'), orderBy('criadoEm', 'desc')));
       const sel = $('seletor-evento');
-      sel.innerHTML = snap.docs.map(d => `<option value="${d.id}">${d.data().nome}${d.data().status === 'ativo' ? ' (ativo)' : ''}</option>`).join('');
+      sel.innerHTML = snap.docs.map(d => `<option value="${esc(d.id)}">${esc(d.data().nome)}${d.data().status === 'ativo' ? ' (ativo)' : ''}</option>`).join('');
       const cfg = await getDoc(doc(db, 'config', 'eventoAtivo'));
       const ativoId = cfg.exists() ? cfg.data().id : null;
       if (ativoId && snap.docs.find(d => d.id === ativoId)) sel.value = ativoId;
@@ -187,10 +187,10 @@
         <tr>
           <td>${fmtHora(r.quando)}</td>
           <td><span class="chip-origem ${r.origem === 'antecipado' ? 'ant' : 'porta'}">${r.origem === 'antecipado' ? 'Antecipado' : 'Porta'}</span></td>
-          <td>${r.familia || '—'}</td>
-          <td>${r.numero || '—'}</td>
-          <td><strong>${r.nome}</strong></td>
-          <td>${r.categoria || '—'}</td>
+          <td>${esc(r.familia) || '—'}</td>
+          <td>${esc(r.numero) || '—'}</td>
+          <td><strong>${esc(r.nome)}</strong></td>
+          <td>${esc(r.categoria) || '—'}</td>
           <td>${r.formaPagamento.startsWith('(') ? `<span style="color:var(--cinza);font-size:0.8rem;">${r.formaPagamento}</span>` : `<span class="chip-origem chip-pgto ${r.formaPagamento}">${r.formaPagamento}</span>`}</td>
           <td style="text-align:right;">${r.valor > 0 ? fmtBRL(r.valor) : '—'}</td>
           <td>${r.por || '—'}</td>

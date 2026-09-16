@@ -82,7 +82,7 @@ Suco de Laranja, 5.00, 50, Bebidas
 
   <script type="module">
     import { montarNav } from "./_nav.js";
-    import { fmtBRL } from "../js/helpers.js";
+    import { fmtBRL, esc } from "../js/helpers.js";
     import { db, collection, doc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, writeBatch } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
     import { confirmarAsync } from "../js/ui.js";
@@ -127,6 +127,7 @@ Suco de Laranja, 5.00, 50, Bebidas
         alerta.className = 'alert alert-warning';
         return;
       }
+      $('btn-salvar').disabled = true;
       try {
         if (id) {
           await updateDoc(doc(db, 'produtos', id), dados);
@@ -137,6 +138,8 @@ Suco de Laranja, 5.00, 50, Bebidas
       } catch (err) {
         alerta.textContent = `Erro: ${err.message}`;
         alerta.className = 'alert alert-danger';
+      } finally {
+        $('btn-salvar').disabled = false;
       }
     };
 
@@ -188,16 +191,22 @@ Suco de Laranja, 5.00, 50, Bebidas
       $('btn-lote').disabled = true;
       $('btn-lote').innerHTML = '<div class="loader"></div> Importando...';
 
-      const batch = writeBatch(db);
-      produtos.forEach(p => batch.set(doc(collection(db, 'produtos')), p));
-      await batch.commit();
+      try {
+        const batch = writeBatch(db);
+        produtos.forEach(p => batch.set(doc(collection(db, 'produtos')), p));
+        await batch.commit();
 
-      $('lote-produtos').value = '';
-      alertaLote.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} ${produtos.length} produtos cadastrados!</span>`;
-      alertaLote.className = 'alert alert-success';
-      $('btn-lote').disabled = false;
-      $('btn-lote').innerHTML = 'Importar lote';
-      setTimeout(() => alertaLote.classList.add('hidden'), 3000);
+        $('lote-produtos').value = '';
+        alertaLote.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} ${produtos.length} produtos cadastrados!</span>`;
+        alertaLote.className = 'alert alert-success';
+        setTimeout(() => alertaLote.classList.add('hidden'), 3000);
+      } catch (err) {
+        alertaLote.textContent = `Erro ao importar: ${err.message}`;
+        alertaLote.className = 'alert alert-danger';
+      } finally {
+        $('btn-lote').disabled = false;
+        $('btn-lote').innerHTML = 'Importar lote';
+      }
     };
 
     const unsub = onSnapshot(collection(db, 'produtos'), (snap) => {
@@ -226,8 +235,8 @@ Suco de Laranja, 5.00, 50, Bebidas
           ? `<span style="text-decoration:line-through;color:var(--cinza);font-size:0.85rem;">${fmtBRL(p.preco)}</span> <strong style="color:var(--vermelho);">${fmtBRL(p.precoPromo)}</strong>`
           : fmtBRL(p.preco);
         tr.innerHTML = `
-          <td>${p.nome}${badgeFav}${badgePromo}${badgeEstoque}</td>
-          <td>${p.categoria || '—'}</td>
+          <td>${esc(p.nome)}${badgeFav}${badgePromo}${badgeEstoque}</td>
+          <td>${esc(p.categoria) || '—'}</td>
           <td>${precoHtml}</td>
           <td>${p.estoque}</td>
           <td>
@@ -250,7 +259,12 @@ Suco de Laranja, 5.00, 50, Bebidas
         };
         tr.querySelector('[data-del]').onclick = async () => {
           if (!(await confirmarAsync(`Excluir "${p.nome}"?`, { destrutivo: true, textoOk: 'Excluir' }))) return;
-          await deleteDoc(doc(db, 'produtos', p.id));
+          try {
+            await deleteDoc(doc(db, 'produtos', p.id));
+          } catch (err) {
+            alerta.textContent = `Erro ao excluir: ${err.message}`;
+            alerta.className = 'alert alert-danger';
+          }
         };
         tbody.appendChild(tr);
       });

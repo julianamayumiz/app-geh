@@ -58,7 +58,7 @@
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
     import { requireAuth } from "../js/auth-guard.js";
-    import { fmtBRL } from "../js/helpers.js";
+    import { fmtBRL, esc } from "../js/helpers.js";
 
     // Aceita admin também (homeFor não redireciona, e admin pode atender o caixa).
     const { perfil } = await requireAuth({ papel: 'caixa' });
@@ -154,7 +154,7 @@
               <span class="hist-quando">${dt} · ${hr}</span>
               <span class="hist-valor" style="color:${cor};">${sinal} ${fmtBRL(m.valor)}</span>
             </div>
-            <div class="hist-detalhe">${m.detalhe}</div>
+            <div class="hist-detalhe">${esc(m.detalhe)}</div>
           </div>`;
         }).join('');
       }

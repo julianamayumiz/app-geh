@@ -134,7 +134,7 @@
     import { renderIcons } from "../js/icons.js";
     import { requireAuth } from "../js/auth-guard.js";
     import { instalarBannerPWA } from "../js/install-banner.js";
-    import { fmtBRL } from "../js/helpers.js";
+    import { fmtBRL, esc } from "../js/helpers.js";
 
     const { perfil } = await requireAuth({ papel: 'recepcao' });
     renderIcons();
@@ -179,7 +179,7 @@
         const baixo = c.qtdPorta != null && c.qtdPorta > 0 && c.qtdPorta <= 5;
         return `
           <button class="cat-btn ${esgotada ? 'esgotada' : ''}" data-cat="${c.id}" ${esgotada ? 'disabled' : ''}>
-            <div class="nome">${c.nome}</div>
+            <div class="nome">${esc(c.nome)}</div>
             <div class="preco">${fmtBRL(c.precoPorta)}</div>
             <div class="estoque ${baixo ? 'baixo' : ''}">${c.qtdPorta != null ? `Estoque porta: ${c.qtdPorta}` : 'Estoque livre'}</div>
           </button>

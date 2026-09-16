@@ -105,7 +105,7 @@
   <script type="module" src="../js/icons.js"></script>
   <script type="module">
     import { montarNav } from "./_nav.js";
-    import { fmtBRL } from "../js/helpers.js";
+    import { fmtBRL, esc } from "../js/helpers.js";
     import {
       db, collection, doc, getDoc, getDocs, addDoc, query, orderBy, limit,
       onSnapshot, runTransaction, serverTimestamp
@@ -298,14 +298,14 @@
           const dt = a.criadoEm?.toDate?.()?.toLocaleString('pt-BR') || '—';
           const cor = (a.valor || 0) >= 0 ? 'var(--verde)' : 'var(--vermelho)';
           const sinal = (a.valor || 0) >= 0 ? '+' : '';
-          const cli = a.clienteNome ? `${a.clienteId} — ${a.clienteNome}` : a.clienteId;
-          const quem = a.adminNome || a.adminEmail || '—';
+          const cli = a.clienteNome ? `${esc(a.clienteId)} — ${esc(a.clienteNome)}` : esc(a.clienteId);
+          const quem = esc(a.adminNome) || esc(a.adminEmail) || '—';
           tbl.innerHTML += `
             <tr>
               <td style="font-size:0.85rem;">${dt}</td>
               <td>${cli}</td>
               <td style="font-weight:700;color:${cor};">${sinal}${fmtBRL(a.valor)}</td>
-              <td style="font-size:0.85rem;max-width:280px;">${(a.motivo || '').replace(/[<>]/g, '')}</td>
+              <td style="font-size:0.85rem;max-width:280px;">${esc(a.motivo)}</td>
               <td style="font-size:0.85rem;">${quem}</td>
             </tr>
           `;

@@ -97,7 +97,7 @@
 
   <script type="module">
     import { montarNav } from "./_nav.js";
-    import { fmtBRL } from "../js/helpers.js";
+    import { fmtBRL, esc } from "../js/helpers.js";
     import {
       db, collection, doc, getDoc, getDocs, addDoc, deleteDoc, updateDoc,
       onSnapshot, query, where, writeBatch, serverTimestamp
@@ -154,10 +154,10 @@
       }
       tbody.innerHTML = lista.map(c => `
         <tr>
-          <td>${c.familia || '—'}</td>
-          <td><strong>${c.numero}</strong></td>
-          <td>${c.nome}</td>
-          <td>${c.categoria || '—'}</td>
+          <td>${esc(c.familia) || '—'}</td>
+          <td><strong>${esc(c.numero)}</strong></td>
+          <td>${esc(c.nome)}</td>
+          <td>${esc(c.categoria) || '—'}</td>
           <td><button class="badge-status ${c.pago === false ? 'badge-aberto' : 'badge-pago'}" data-toggle="${c.id}" data-pago="${c.pago !== false}" style="border:none;cursor:pointer;font-family:inherit;">${c.pago === false ? 'Em aberto' : 'Pago'}</button></td>
           <td>${c.presente ? '<span class="badge-status badge-presente">Presente</span>' : '<span class="badge-status badge-pendente">Pendente</span>'}</td>
           <td><button class="btn btn-danger" style="width:auto;padding:0.3rem 0.65rem;font-size:0.75rem;" data-del="${c.id}" aria-label="Remover convite">×</button></td>
@@ -226,11 +226,14 @@
           throw new Error('Não encontrei colunas obrigatórias "Nº convite" e "Nome convidado". Use o modelo.');
         }
         const itens = [];
+        let semNumero = 0;
+        let semNome = 0;
         for (let i = 1; i < linhas.length; i++) {
           const l = linhas[i];
           const numero = String(l[idxNum] ?? '').trim();
-          const nome = String(l[idxNome] ?? '').trim();
-          if (!numero || !nome) continue;
+          let nome = String(l[idxNome] ?? '').trim();
+          if (!numero) { semNumero++; continue; }
+          if (!nome) { nome = `Convidado ${numero}`; semNome++; }
           itens.push({
             familia: idxFam >= 0 ? String(l[idxFam] ?? '').trim() : '',
             numero,
@@ -240,6 +243,13 @@
           });
         }
         if (itens.length === 0) throw new Error('Nenhuma linha válida encontrada.');
+        if (semNumero > 0 || semNome > 0) {
+          const partes = [];
+          if (semNumero > 0) partes.push(`${semNumero} linha(s) sem número foram ignoradas`);
+          if (semNome > 0) partes.push(`${semNome} linha(s) sem nome importadas como "Convidado {número}"`);
+          alerta.textContent = partes.join('. ') + '.';
+          alerta.className = 'alert alert-warning';
+        }
 
         // Detecta duplicatas dentro do arquivo
         const numSet = new Set();
@@ -276,10 +286,10 @@
       const max = Math.min(50, itens.length);
       tbody.innerHTML = itens.slice(0, max).map(it => `
         <tr>
-          <td>${it.familia || '—'}</td>
-          <td><strong>${it.numero}</strong></td>
-          <td>${it.nome}</td>
-          <td>${it.categoria || '—'}</td>
+          <td>${esc(it.familia) || '—'}</td>
+          <td><strong>${esc(it.numero)}</strong></td>
+          <td>${esc(it.nome)}</td>
+          <td>${esc(it.categoria) || '—'}</td>
           <td></td>
         </tr>
       `).join('');
@@ -321,36 +331,44 @@
       $('btn-confirmar-import').disabled = true;
       $('btn-confirmar-import').innerHTML = '<div class="loader"></div> Importando...';
 
-      // Firestore batch limita a 500 ops — fatia se necessário
-      const FATIA = 400;
-      for (let i = 0; i < aImportar.length; i += FATIA) {
-        const lote = aImportar.slice(i, i + FATIA);
-        const batch = writeBatch(db);
-        lote.forEach(it => {
-          batch.set(doc(collection(db, 'convites_antecipados')), {
-            eventoId: eventoAtivoId,
-            familia: it.familia,
-            numero: it.numero,
-            nome: it.nome,
-            categoria: it.categoria,
-            pago: it.pago !== false,
-            presente: false,
-            checkInEm: null,
-            checkInPor: null,
-            criadoEm: serverTimestamp(),
+      try {
+        // Firestore batch limita a 500 ops — fatia se necessário
+        const FATIA = 400;
+        let importados = 0;
+        for (let i = 0; i < aImportar.length; i += FATIA) {
+          const lote = aImportar.slice(i, i + FATIA);
+          const batch = writeBatch(db);
+          lote.forEach(it => {
+            batch.set(doc(collection(db, 'convites_antecipados')), {
+              eventoId: eventoAtivoId,
+              familia: it.familia,
+              numero: it.numero,
+              nome: it.nome,
+              categoria: it.categoria,
+              pago: it.pago !== false,
+              presente: false,
+              checkInEm: null,
+              checkInPor: null,
+              criadoEm: serverTimestamp(),
+            });
           });
-        });
-        await batch.commit();
-      }
+          await batch.commit();
+          importados += lote.length;
+        }
 
-      importBuffer = [];
-      $('preview-box').classList.add('hidden');
-      $('arquivo').value = '';
-      alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} ${aImportar.length} convite(s) importado(s)!</span>`;
-      alerta.className = 'alert alert-success';
-      $('btn-confirmar-import').disabled = false;
-      $('btn-confirmar-import').textContent = 'Confirmar importação';
-      setTimeout(() => alerta.classList.add('hidden'), 3500);
+        importBuffer = [];
+        $('preview-box').classList.add('hidden');
+        $('arquivo').value = '';
+        alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} ${importados} convite(s) importado(s)!</span>`;
+        alerta.className = 'alert alert-success';
+        setTimeout(() => alerta.classList.add('hidden'), 3500);
+      } catch (err) {
+        alerta.textContent = `Erro ao importar: ${err.message}. Os lotes já enviados antes do erro foram salvos — confira a lista e reenvie só o que faltar.`;
+        alerta.className = 'alert alert-danger';
+      } finally {
+        $('btn-confirmar-import').disabled = false;
+        $('btn-confirmar-import').textContent = 'Confirmar importação';
+      }
     };
 
     $('btn-modelo').onclick = () => {

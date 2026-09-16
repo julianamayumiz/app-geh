@@ -391,10 +391,10 @@
           const sinal = v >= 0 ? '+' : '';
           tblAj.innerHTML += `<tr>
             <td>${dt}</td>
-            <td>${a.clienteNome || a.clienteId || '—'}</td>
+            <td>${esc(a.clienteNome) || esc(a.clienteId) || '—'}</td>
             <td style="text-align:right;color:${cor};font-weight:600;">${sinal}${fmtBRL(v)}</td>
-            <td>${a.motivo || '—'}</td>
-            <td>${a.adminNome || a.adminEmail || '—'}</td>
+            <td>${esc(a.motivo) || '—'}</td>
+            <td>${esc(a.adminNome) || esc(a.adminEmail) || '—'}</td>
           </tr>`;
         });
       }

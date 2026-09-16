@@ -87,7 +87,7 @@
 
     const { perfil } = await requireAuth({ papel: 'operador' });
     import { toast } from "../js/ui.js";
-    import { fmtBRL } from "../js/helpers.js";
+    import { fmtBRL, esc } from "../js/helpers.js";
 
     // Evento ativo — await garante que o valor esta pronto antes do primeiro clique
     const eventoAtivoPromise = getDoc(doc(db, 'config', 'eventoAtivo'))
@@ -291,7 +291,7 @@
         <span class="qtd-badge" id="badge-${p.id}" aria-hidden="true">0</span>
         ${starHtml}
         ${badgePromo}
-        <div class="prod-nome">${p.nome}</div>
+        <div class="prod-nome">${esc(p.nome)}</div>
         ${precoHtml}
         <div class="prod-estoque" style="${estoqueBaixo ? 'color:var(--vermelho);font-weight:600;display:inline-flex;align-items:center;gap:3px;' : ''}">
           ${estoqueHtml}
@@ -398,7 +398,7 @@
           ? ` <span style="color:var(--vermelho);display:inline-flex;vertical-align:middle;">${icon('tag', { size: 12 })}</span>`
           : '';
         div.innerHTML = `
-          <div class="modal-item-nome">${produto.nome}${promoTag}<br>
+          <div class="modal-item-nome">${esc(produto.nome)}${promoTag}<br>
             <span style="font-size:0.8rem;color:var(--cinza);">${fmtBRL(preco)} cada</span>
           </div>
           <div class="modal-item-ctrl">

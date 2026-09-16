@@ -208,7 +208,7 @@
       }
       tbody.innerHTML = lista.map(c => `
         <tr>
-          <td><strong>${c.nome}</strong></td>
+          <td><strong>${esc(c.nome)}</strong></td>
           <td>${c.precoAntecipado != null ? fmtBRL(c.precoAntecipado) : '—'}</td>
           <td>${c.precoPorta != null ? fmtBRL(c.precoPorta) : '—'}</td>
           <td>${c.qtdPorta != null ? c.qtdPorta : '—'}</td>

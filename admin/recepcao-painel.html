@@ -192,7 +192,7 @@
 
   <script type="module">
     import { montarNav } from "./_nav.js";
-    import { fmtBRL } from "../js/helpers.js";
+    import { fmtBRL, esc } from "../js/helpers.js";
     import {
       db, collection, doc, getDoc, onSnapshot, query, where, runTransaction
     } from "../js/firebase-config.js";
@@ -249,7 +249,7 @@
       vazio.style.display = 'none';
       grid.innerHTML = cats.map(c => `
         <div class="estoque-card" data-cat="${c.id}">
-          <div class="titulo">${c.nome}</div>
+          <div class="titulo">${esc(c.nome)}</div>
           <div class="row">
             <span class="lbl">Preço</span>
             <input type="number" step="0.50" min="0" value="${c.precoPorta != null ? c.precoPorta : ''}" data-campo="preco">
@@ -354,7 +354,7 @@
       } else {
         tbF.innerHTML = familias.map(f => `
           <tr>
-            <td>${f.nome}</td>
+            <td>${esc(f.nome)}</td>
             <td style="text-align:right;${f.pendentes === 0 ? 'color:var(--verde);' : 'color:#B45309;font-weight:700;'}">${f.pendentes}</td>
             <td style="text-align:right;color:var(--cinza);">${f.total}</td>
           </tr>

@@ -288,18 +288,18 @@
       const quando = v.criadoEm?.toDate?.()?.toLocaleString('pt-BR') || '—';
       const itensHtml = (v.itens || []).map(i => `
         <div class="item">
-          <div><span class="qtd">${i.qtd}×</span>${i.nome}</div>
+          <div><span class="qtd">${i.qtd}×</span>${esc(i.nome)}</div>
           <div>${fmtBRL(i.subtotal ?? (i.qtd * i.preco))}</div>
         </div>
       `).join('');
       const corpo = `
         <div class="meta">
           ${quando}
-          ${v.eventoNome ? ` · <strong>${v.eventoNome}</strong>` : ''}
-          ${v.operadorNome ? ` · operador: ${v.operadorNome}` : ''}
+          ${v.eventoNome ? ` · <strong>${esc(v.eventoNome)}</strong>` : ''}
+          ${v.operadorNome ? ` · operador: ${esc(v.operadorNome)}` : ''}
         </div>
         <div style="font-size:0.85rem;color:var(--cinza);">Cliente</div>
-        <div style="font-weight:600;margin-bottom:0.5rem;">${v.clienteNome || ''} <span style="color:var(--cinza);font-weight:400;">(${v.clienteId})</span></div>
+        <div style="font-weight:600;margin-bottom:0.5rem;">${esc(v.clienteNome) || ''} <span style="color:var(--cinza);font-weight:400;">(${esc(v.clienteId)})</span></div>
         <div class="itens">
           ${itensHtml || '<p class="text-muted" style="padding:0.5rem 0;">Sem itens registrados.</p>'}
         </div>

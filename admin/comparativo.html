@@ -210,7 +210,7 @@
 
   <script type="module">
     import { montarNav } from "./_nav.js";
-    import { fmtBRL } from "../js/helpers.js";
+    import { fmtBRL, esc } from "../js/helpers.js";
     import { icon } from "../js/icons.js";
     import {
       db, collection, getDocs, query, orderBy
@@ -342,7 +342,7 @@
       const destaqueHTML = (cls, iconeNome, lbl, ev, valor) => `
         <div class="cmp-destaque ${cls}">
           <span class="lbl">${icon(iconeNome, { size: 13 })} ${lbl}</span>
-          <div class="nome">${ev.nome}</div>
+          <div class="nome">${esc(ev.nome)}</div>
           <div class="val">${valor}</div>
         </div>`;
       $('destaques').innerHTML =
@@ -445,7 +445,7 @@
         const barW = Math.round((e.receita / maxReceita) * 80);
         return `
           <tr>
-            <td><strong>${e.nome}</strong>${e.status === 'ativo' ? ' <span style="background:var(--verde);color:#fff;padding:1px 6px;border-radius:999px;font-size:0.7rem;">ativo</span>' : ''}</td>
+            <td><strong>${esc(e.nome)}</strong>${e.status === 'ativo' ? ' <span style="background:var(--verde);color:#fff;padding:1px 6px;border-radius:999px;font-size:0.7rem;">ativo</span>' : ''}</td>
             <td>${dataFmt}</td>
             <td>${e.numVendas}</td>
             <td><span class="cmp-mini-bar" style="width:${barW}px;"></span>${fmtBRL(e.receita)}</td>
