@@ -58,6 +58,7 @@
     </h2>
     <p style="color:var(--cinza);margin-bottom:1rem;">
       Cadastro permanente das famílias do GEH. Cada uma recebe um link de acesso próprio pra preencher os convidados dos convites dela.
+      "Gerar convites" continua a numeração a partir do maior número já usado no evento (inclusive os importados por planilha) — seguro pra usar depois de um import, por exemplo pra convites extras de crianças.
     </p>
 
     <div id="evento-aviso" class="alert alert-warning hidden">
@@ -93,7 +94,7 @@
     import { esc } from "../js/helpers.js";
     import {
       db, collection, doc, getDoc, getDocs, setDoc, addDoc, deleteDoc, updateDoc,
-      onSnapshot, query, where, writeBatch, serverTimestamp, runTransaction
+      onSnapshot, query, where, writeBatch, serverTimestamp
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
     import { confirmarAsync, toast } from "../js/ui.js";
@@ -228,15 +229,17 @@
     }
 
     async function gerarConvites(familiaId, familiaNome, quantidade) {
-      const evRef = doc(db, 'eventos', eventoAtivoId);
-      const numeros = await runTransaction(db, async (tx) => {
-        const evSnap = await tx.get(evRef);
-        const atual = evSnap.exists() ? (evSnap.data().proximoNumeroConvite || 1) : 1;
-        const lista = [];
-        for (let i = 0; i < quantidade; i++) lista.push(atual + i);
-        tx.update(evRef, { proximoNumeroConvite: atual + quantidade });
-        return lista;
-      });
+      // Continua a numeração a partir do maior número já usado no evento
+      // (import ou geração manual) — não confia em contador separado,
+      // que ficava dessincronizado da planilha importada.
+      const existentesSnap = await getDocs(query(collection(db, 'convites_antecipados'), where('eventoId', '==', eventoAtivoId)));
+      const maxNumero = existentesSnap.docs.reduce((max, d) => {
+        const n = parseInt(d.data().numero, 10);
+        return Number.isFinite(n) && n > max ? n : max;
+      }, 0);
+      const numeros = [];
+      for (let i = 1; i <= quantidade; i++) numeros.push(maxNumero + i);
+
       const batch = writeBatch(db);
       numeros.forEach(n => {
         batch.set(doc(collection(db, 'convites_antecipados')), {
