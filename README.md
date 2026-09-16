@@ -74,6 +74,7 @@ Sidebar agrupada por área de responsabilidade:
 **Cadastros**
 - 📦 **Produtos** — CRUD; cadastro em lote (CSV); promoções; badges de estoque baixo/sem estoque.
 - 👥 **Clientes** — cadastro por ID do QR (individual ou em lote); busca; exclusão.
+- 👨‍👩‍👧 **Famílias** — cadastro permanente, gera link de acesso público + convites em branco numerados pro evento.
 
 **Recepção**
 - 🚪 **Painel ao vivo** — quantos antecipados chegaram, vendas na porta em tempo real, edição rápida de estoque/preço da porta.
@@ -141,6 +142,9 @@ App GEH/
 │   ├── conferencia.html        # Check-in dos antecipados
 │   └── venda-porta.html        # Venda de convite na porta
 │
+├── familia/
+│   └── convites.html           # Portal público — família preenche convidados dos seus convites
+│
 ├── admin/
 │   ├── login.html              # Login Google / email
 │   ├── _nav.js                 # Sidebar agrupada + auth + tema
@@ -150,6 +154,7 @@ App GEH/
 │   ├── historico.html          # Histórico por cliente
 │   ├── produtos.html           # CRUD de produtos
 │   ├── clientes.html           # CRUD de clientes
+│   ├── familias.html           # CRUD de famílias + geração de convites em branco
 │   ├── recepcao-painel.html    # Painel ao vivo da recepção
 │   ├── convites-antecipados.html
 │   ├── historico-recepcao.html
@@ -183,7 +188,8 @@ App GEH/
 | `despesas` | admin | descricao, categoria, valor, data, eventoId |
 | `insumos` | admin | nome, categoria (catálogo de despesas recorrentes) |
 | `ajustes_saldo` | admin | clienteId, valorAntes, valorDepois, motivo, eventoId, criadoEm |
-| `convites_antecipados` | admin · recepção (check-in) | eventoId, nome, valor, statusPagamento, checkInEm |
+| `familias` | admin | nome, ativo (ID do doc = código de acesso público) |
+| `convites_antecipados` | admin · recepção (check-in) · família (preenche convidado) | eventoId, familia, familiaId, numero, nome, categoria, pago, presente, checkInEm, checkInPor, criadoEm |
 | `vendas_porta` | recepção | eventoId, valor, formaPagamento, observacao, criadoEm |
 | `usuarios` | admin | email, nome, papel (admin/…), ativo |
 
