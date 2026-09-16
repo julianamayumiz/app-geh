@@ -72,6 +72,10 @@ async function main() {
       eventoId: 'ev1', familiaId: 'fam2abcdefghij1234567890', familia: 'Tanaka', numero: '011',
       nome: '', categoria: '', pago: true, presente: false, checkInEm: null, checkInPor: null,
     });
+    await setDoc(doc(db, 'convites_antecipados', 'convFamCurto'), {
+      eventoId: 'ev1', familiaId: 'curto', familia: 'Curto', numero: '012',
+      nome: '', categoria: '', pago: true, presente: false, checkInEm: null, checkInPor: null,
+    });
   });
 
   const adminDb = testEnv.authenticatedContext(UID_ADMIN, { email: 'admin@teste.com' }).firestore();
@@ -176,7 +180,7 @@ async function main() {
     assertSucceeds(getDocs(query(collection(semAuthDb, 'convites_antecipados'), where('familiaId', '==', 'fam1abcdefghij1234567890'))))
   );
   await test('não logado NÃO PODE listar convites com familiaId curto/inválido', () =>
-    assertFails(getDocs(query(collection(semAuthDb, 'convites_antecipados'), where('familiaId', '==', 'x'))))
+    assertFails(getDocs(query(collection(semAuthDb, 'convites_antecipados'), where('familiaId', '==', 'curto'))))
   );
   await test('família PODE preencher o nome do próprio convite', () =>
     assertSucceeds(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFam1'), { nome: 'Fulano de Tal' }))
@@ -185,7 +189,7 @@ async function main() {
     assertFails(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFam1'), { nome: 'Fulano', numero: '999' }))
   );
   await test('família NÃO PODE transferir o convite pra outra família', () =>
-    assertFails(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFam1'), { familiaId: 'fam2abcdefghij1234567890' }))
+    assertFails(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFam1'), { nome: 'Fulano', familiaId: 'fam2abcdefghij1234567890' }))
   );
   await test('família NÃO PODE marcar presença/check-in', () =>
     assertFails(updateDoc(doc(semAuthDb, 'convites_antecipados', 'convFam1'), { nome: 'Fulano', presente: true }))
@@ -209,13 +213,13 @@ async function main() {
     assertFails(setDoc(doc(semAuthDb, 'familias', 'fam3xxxxxxxxxxxxxxxxxxxx'), { nome: 'Invasora', ativo: true }))
   );
   await test('admin AINDA PODE criar convite pra família (regressão)', () =>
-    assertSucceeds(addDoc(collection(adminDb, 'convites_antecipados'), {
+    assertSucceeds(addDoc(collection(superDb, 'convites_antecipados'), {
       eventoId: 'ev1', familiaId: 'fam1abcdefghij1234567890', familia: 'Silva',
       numero: '020', nome: '', categoria: '', pago: true, presente: false, checkInEm: null, checkInPor: null,
     }))
   );
   await test('admin AINDA PODE editar qualquer campo do convite (regressão)', () =>
-    assertSucceeds(updateDoc(doc(adminDb, 'convites_antecipados', 'convFam1'), { familia: 'Silva Editado' }))
+    assertSucceeds(updateDoc(doc(superDb, 'convites_antecipados', 'convFam1'), { familia: 'Silva Editado' }))
   );
 
   console.log('\n== sanidade (usuário não logado) ==');
