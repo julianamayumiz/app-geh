@@ -19,3 +19,6 @@ firestore-debug.log
 dev-tools/**/*.env
 dev-tools/**/*service-account*.json
 dev-tools/**/*-key.json
+
+# PoC temporaria de leitura de QR (libs vendorizadas, nao entra no repo)
+dev-tools/poc-qr/
