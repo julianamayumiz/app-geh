@@ -115,27 +115,33 @@ App GEH/
 ├── .firebaserc                 # Projeto Firebase vinculado
 │
 ├── css/
-│   └── style.css               # Estilos globais, paleta GEH, tema claro/escuro
+│   ├── style.css               # Estilos globais, paleta GEH, tema claro/escuro
+│   ├── pdv.css                 # Estilos do PDV (operador/caixa)
+│   ├── vender.css              # Telas de venda/recarga
+│   └── dashboard.css           # Dashboard admin
 │
 ├── js/
 │   ├── firebase-config.js      # Inicialização do Firebase + exports
 │   ├── auth-guard.js           # requireAuth({ papel }) — checa login + perfil ativo
+│   ├── helpers.js              # fmtBRL, esc (formatters genéricos)
 │   ├── ui.js                   # Toasts, busca/ordenação/export CSV, skeleton
 │   ├── icons.js                # Sprite SVG Lucide (inlinado)
 │   ├── shortcuts.js            # Atalhos de teclado globais
-│   └── install-banner.js       # Banner "Instalar app" do PWA
+│   ├── install-banner.js       # Banner "Instalar app" do PWA
+│   ├── sw-register.js          # Registra o Service Worker e recarrega em nova versão
+│   ├── scanner.js              # Wrapper de câmera/QR sobre html5-qrcode
+│   ├── pdv-core.js             # Shell do PDV de página única (rotas por hash, câmera persistente)
+│   ├── views/                  # Telas do PDV: inicio, venda, recarga, consulta
+│   └── vendor/                 # html5-qrcode (hospedado localmente)
 │
 ├── operador/
 │   ├── index.html              # Home do operador (evento ativo + ações)
-│   ├── scanner.html            # Scanner de QR
-│   ├── vender.html             # Carrinho de venda (barra POS fixa)
-│   ├── carregar.html           # Recarga de saldo
-│   └── consultar.html          # Consulta de extrato
+│   └── pdv.html                # PDV de página única: scan, venda e consulta
 │
 ├── caixa/
 │   ├── index.html              # Home do caixa
-│   ├── scanner.html            # Scanner
-│   └── carregar.html           # Recarga + extrato
+│   ├── pdv.html                # PDV de página única: scan, recarga e consulta
+│   └── transferir.html         # Transferência de saldo entre dois clientes
 │
 ├── recepcao/
 │   ├── index.html              # Home da recepção
