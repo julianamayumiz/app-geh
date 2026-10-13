@@ -321,7 +321,7 @@ export async function montar(container, ctx) {
       ? 'Sem estoque'
       : estoqueBaixo
         ? `${icon('alert-triangle', { size: 12 })} Restam ${p.estoque}`
-        : `Est: ${p.estoque}`;
+        : `Estoque: ${p.estoque}`;
     const starHtml = p.favorito
       ? `<span class="fav-star" aria-label="Favorito">${icon('star', { size: 14 })}</span>`
       : '';
