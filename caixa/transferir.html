@@ -825,6 +825,10 @@
     let transfOp = null;   // { chave, id } da transferencia em andamento
     const pendenteTransf = armazenar('pdv-pendente-transferir', 24 * 60 * 60 * 1000);
 
+    // Avisa o sw-register pra nao recarregar a pagina no meio da transacao
+    let ocupados = 0;
+    window.pdvOcupado = () => ocupados > 0;
+
     $('btn-confirmar').onclick = async () => {
       if (!origem || !destino) return showAlerta('Selecione origem e destino.', 'warning');
       if (origem.id === destino.id) return showAlerta('Origem e destino não podem ser iguais.', 'warning');
@@ -837,6 +841,7 @@
       const ok = await abrirConfirmacao({ valor, origem, destino });
       if (!ok) return;
 
+      ocupados++;
       $('btn-confirmar').disabled = true;
       $('btn-confirmar').innerHTML = '<div class="loader"></div> Processando…';
       const timerLento = setTimeout(() => {
@@ -848,7 +853,11 @@
       // gravada e NAO move o saldo duas vezes.
       const chaveOp = `${origem.id}|${destino.id}|${valor}|${motivo}`;
       if (!transfOp || transfOp.chave !== chaveOp) {
-        transfOp = { chave: chaveOp, id: doc(collection(db, 'transferencias_saldo')).id };
+        // Reaproveita o id do pendente salvo (sobrevive a reload da pagina)
+        const pendSalvo = pendenteTransf.ler();
+        transfOp = (pendSalvo && pendSalvo.chave === chaveOp && pendSalvo.id)
+          ? { chave: chaveOp, id: pendSalvo.id }
+          : { chave: chaveOp, id: doc(collection(db, 'transferencias_saldo')).id };
       }
       const idTransf = transfOp.id;
       const idOrigem = origem.id;       // captura antes dos awaits
@@ -870,7 +879,7 @@
           }
         }
         if (!jaRegistrada) {
-          pendenteTransf.gravar({ colecao: 'transferencias_saldo', id: idTransf, rotulo: 'Transferência', clienteId: `${idOrigem} → ${idDestino}`, valor });
+          pendenteTransf.gravar({ colecao: 'transferencias_saldo', id: idTransf, rotulo: 'Transferência', clienteId: `${idOrigem} → ${idDestino}`, valor, chave: chaveOp });
         }
 
         if (!jaRegistrada) await runTransaction(db, async (tx) => {
@@ -953,6 +962,7 @@
             : `Sem confirmação do servidor (${err.message}). Pode confirmar de novo: se já tiver sido registrada, NÃO será transferida duas vezes.`;
         showAlerta(msg, 'danger');
       } finally {
+        ocupados = Math.max(0, ocupados - 1);
         atualizarBotao();
         $('btn-confirmar').innerHTML = `${icon('check', { size: 16 })} Confirmar transferência`;
       }
@@ -1013,7 +1023,7 @@
         renderHistorico();
       },
       (err) => {
-        $('lista-tx').innerHTML = `<div class="alert alert-danger">Erro ao carregar histórico: ${err.message}</div>`;
+        $('lista-tx').innerHTML = `<div class="alert alert-danger">Erro ao carregar histórico: ${esc(err.message)}</div>`;
       }
     );
 
