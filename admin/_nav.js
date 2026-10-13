@@ -47,6 +47,14 @@ const GRUPOS = [
     ],
   },
   {
+    titulo: 'Apps de campo',
+    itens: [
+      { href: '../operador/index.html', icone: 'shopping-cart', texto: 'Vendas (operador)' },
+      { href: '../caixa/index.html',    icone: 'wallet',        texto: 'Caixa'             },
+      { href: '../recepcao/index.html', icone: 'door-open',     texto: 'Recepção (app)'    },
+    ],
+  },
+  {
     titulo: 'Sistema',
     itens: [
       { href: 'usuarios.html',  icone: 'users',      texto: 'Usuários'  },
