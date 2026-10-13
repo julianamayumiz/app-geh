@@ -505,6 +505,7 @@
     let origem = null;
     let destino = null;
     let scannerHandle = null;
+    let scannerSeq = 0; // invalida aberturas ainda pendentes quando o overlay fecha
     let scannerLado = null;
 
     // Estados por lado: 'vazio' (acoes) | 'buscando' (input + chips) | 'selecionado'
@@ -683,23 +684,41 @@
     });
 
     // ---- Scanner ----
-    async function abrirScanner(lado) {
+    let scannerFila = Promise.resolve(); // aberturas em serie: nunca duas inicializacoes concorrentes
+    function abrirScanner(lado) {
+      // reabrir com uma abertura anterior ainda em curso: invalida a anterior
+      if (scannerHandle || !$('scanner-overlay').classList.contains('hidden')) fecharScanner();
+      const seq = ++scannerSeq;
       scannerLado = lado;
       $('scanner-sub').textContent = lado === 'origem' ? 'Selecionando origem' : 'Selecionando destino';
       $('scanner-status').textContent = 'Inicializando câmera…';
       $('scanner-status').style.color = '';
       $('scanner-overlay').classList.remove('hidden');
       renderIcons($('scanner-overlay'));
+      scannerFila = scannerFila.then(() => iniciarScannerSeq(seq));
+    }
+
+    async function iniciarScannerSeq(seq) {
+      if (seq !== scannerSeq) return; // fechado/reaberto antes da vez dele
       try {
-        scannerHandle = await iniciarScanner({
+        const handle = await iniciarScanner({
           elementId: 'reader-tx',
-          onDetected: (texto) => tratarScan(texto),
+          onDetected: (texto) => { if (seq === scannerSeq) tratarScan(texto); },
           onReady: () => {
+            if (seq !== scannerSeq) return;
             $('scanner-status').textContent = 'Câmera pronta — aproxime o QR code';
             $('scanner-status').style.color = '#93c5fd';
           }
         });
+        if (seq !== scannerSeq) {
+          // overlay foi fechado (ou reaberto) enquanto a camera abria: nao deixa stream ativa
+          try { await handle?.stop?.(); } catch (_) {}
+          document.getElementById('btn-trocar-camera')?.remove();
+          return;
+        }
+        scannerHandle = handle;
       } catch (err) {
+        if (seq !== scannerSeq) return;
         console.error('Erro scanner:', err);
         $('scanner-status').textContent = 'Câmera indisponível — use o botão abaixo pra digitar o ID';
         $('scanner-status').style.color = '#fca5a5';
@@ -707,6 +726,7 @@
     }
 
     function fecharScanner() {
+      scannerSeq++;
       try { scannerHandle?.stop?.(); } catch (_) {}
       scannerHandle = null;
       // O botao de troca de camera tem id fixo dentro do reader; remove

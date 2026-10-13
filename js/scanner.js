@@ -42,6 +42,10 @@ function lsRemove(key) {
 }
 
 class TimeoutError extends Error {}
+// Falha do fluxo rapido em que o fluxo legado nao ajudaria (embrulha o erro original).
+class SemFallbackError extends Error {
+  constructor(original) { super(String(original)); this.original = original; }
+}
 // scanner.start() pode ficar pendurado pra sempre se a API de câmera do
 // navegador travar — sem isso, o operador fica preso numa tela de loading
 // infinito sem nenhum jeito de tentar de novo.
@@ -193,6 +197,18 @@ export async function iniciarScanner({
   };
   const onFrameErr = () => {};
 
+  // O start() da lib resolve ANTES do evento 'playing' do <video>; so nesse
+  // evento ela marca isScanning=true e cria o canvas. Um stop() nesse intervalo
+  // lanca (removeChild de canvas nulo) e deixa a lib travada ("Cannot clear
+  // while scan is ongoing"). Espera a lib ficar pronta (no maximo ~3s).
+  async function pararSeguro() {
+    const fim = performance.now() + 3000;
+    while (scanner.getState() === Html5QrcodeScannerState.SCANNING && !scanner.isScanning && performance.now() < fim) {
+      await new Promise(r => setTimeout(r, 30));
+    }
+    try { await scanner.stop(); } catch {}
+  }
+
   // IMPORTANTE: NÃO definir videoConstraints aqui — o html5-qrcode
   // sobrescreve o cameraConfig com videoConstraints, fazendo o
   // navegador escolher a default (frontal em alguns Samsungs).
@@ -208,14 +224,6 @@ export async function iniciarScanner({
     },
     showTorchButtonIfSupported: true
   };
-
-  // Lista câmeras (precisa de permissão — getCameras() já pede)
-  try {
-    cameras = await Html5Qrcode.getCameras();
-    console.info('[scanner] câmeras detectadas:', cameras.map(c => ({ id: c.id.slice(0, 8), label: c.label })));
-  } catch (e) {
-    console.warn('[scanner] getCameras falhou:', e);
-  }
 
   // Lê o facingMode REAL da track aberta (post-start).
   function lerFacingModeAtual() {
@@ -294,28 +302,121 @@ export async function iniciarScanner({
     throw new Error('Nenhuma camera disponivel respondeu');
   }
 
-  let cameraConfig = decidirConfigInicial();
-  let facing = await startCom(cameraConfig);
+  // Fluxo LEGADO (fallback): getCameras() abre e fecha uma stream so pra
+  // liberar labels/permissao, depois start() abre outra. Mantido intacto.
+  async function iniciarLegado() {
+    try {
+      cameras = await Html5Qrcode.getCameras();
+      console.info('[scanner] câmeras detectadas:', cameras.map(c => ({ id: c.id.slice(0, 8), label: c.label })));
+    } catch (e) {
+      console.warn('[scanner] getCameras falhou:', e);
+    }
+
+    const cameraConfig = decidirConfigInicial();
+    let facing = await startCom(cameraConfig);
+    return corrigirFrontal(facing);
+  }
 
   // Se abriu a frontal sem nossa intenção, descarta a preferência
   // salva e tenta uma câmera diferente da que abriu agora.
-  if (facing === 'user' && cameras.length > 1) {
-    console.warn('[scanner] abriu câmera frontal — tentando outra');
-    lsRemove(STORAGE_KEY);
+  async function corrigirFrontal(facing) {
+    if (facing === 'user' && cameras.length > 1) {
+      console.warn('[scanner] abriu câmera frontal — tentando outra');
+      lsRemove(STORAGE_KEY);
 
-    const idAtual = deviceIdAtual;
-    const outra = cameras.find(c =>
-      c.id !== idAtual && !/(front|user|frontal|frente)/i.test(c.label)
-    ) || cameras.find(c => c.id !== idAtual);
+      const idAtual = deviceIdAtual;
+      const outra = cameras.find(c =>
+        c.id !== idAtual && !/(front|user|frontal|frente)/i.test(c.label)
+      ) || cameras.find(c => c.id !== idAtual);
 
-    if (outra) {
-      try { await scanner.stop(); } catch {}
-      deviceIdAtual = outra.id;
-      facing = await startCom({ deviceId: { exact: outra.id } });
-      if (facing !== 'user') {
-        lsSet(STORAGE_KEY, outra.id);
+      if (outra) {
+        await pararSeguro();
+        deviceIdAtual = outra.id;
+        facing = await startCom({ deviceId: { exact: outra.id } });
+        if (facing !== 'user') {
+          lsSet(STORAGE_KEY, outra.id);
+        }
       }
     }
+    return facing;
+  }
+
+  // Fluxo RAPIDO: abre direto (1 getUserMedia) e so depois, com a permissao
+  // ja concedida, lista as cameras via enumerateDevices() (sem abrir stream).
+  // Lanca se nao conseguiu abrir; o chamador cai no fluxo legado, exceto
+  // em timeout e permissao negada (ver SemFallbackError).
+  async function iniciarRapido() {
+    if (!navigator.mediaDevices?.enumerateDevices) throw new Error('enumerateDevices indisponivel');
+
+    const salvo = lsGet(STORAGE_KEY);
+    const config = salvo ? { deviceId: { exact: salvo } } : { facingMode: 'environment' };
+
+    const p = (() => {
+      try { return scanner.start(config, scanConfig, onDecoded, onFrameErr); }
+      catch (e) { return Promise.reject(e); }
+    })();
+    try {
+      await comTimeout(p, START_TIMEOUT_MS);
+    } catch (e) {
+      if (e instanceof TimeoutError) {
+        // start() ainda pendente: se resolver depois, ninguem tem o handle —
+        // fecha a stream pra nao ficar camera aberta. Sem fallback: o legado
+        // esbarraria na transicao pendente da lib e falharia igual.
+        p.then(() => pararSeguro(), () => {});
+        throw new SemFallbackError(e);
+      } else if (/NotAllowed|Permission|SecurityError/i.test(String(e))) {
+        throw new SemFallbackError(e);
+      } else if (salvo && /Overconstrained|NotFound/i.test(String(e))) {
+        lsRemove(STORAGE_KEY);
+      }
+      throw e;
+    }
+
+    // Aberto. Descobre qual camera abriu e monta a lista (mesmo formato do getCameras).
+    const track = document.querySelector(`#${elementId} video`)?.srcObject?.getVideoTracks?.()[0];
+    let facing = track?.getSettings?.().facingMode || null;
+    console.info('[scanner] facingMode real apos start (rapido):', facing);
+    try {
+      cameras = (await navigator.mediaDevices.enumerateDevices())
+        .filter(d => d.kind === 'videoinput')
+        .map(d => ({ id: d.deviceId, label: d.label }));
+      console.info('[scanner] câmeras detectadas:', cameras.map(c => ({ id: c.id.slice(0, 8), label: c.label })));
+    } catch (e) {
+      console.warn('[scanner] enumerateDevices falhou:', e);
+    }
+    ajustarTrack(elementId);
+
+    const idAbriu = track?.getSettings?.().deviceId || cameras.find(c => c.label && c.label === track?.label)?.id || null;
+    deviceIdAtual = idAbriu;
+
+    // facingMode so garante "traseira", nao "a traseira principal": se a
+    // heuristica por label aponta outra camera, troca (igual o legado faria).
+    // Sem escolha salva pelo usuario e so quando conseguimos comparar ids.
+    if (!salvo && facing !== 'user' && idAbriu && scanAtivo) {
+      const escolhida = escolherTraseiraPrincipal(cameras);
+      if (escolhida && escolhida.id !== idAbriu) {
+        console.info('[scanner] heuristica prefere outra traseira:', escolhida.label);
+        scanAtivo = false;
+        await pararSeguro();
+        scanAtivo = true;
+        deviceIdAtual = escolhida.id;
+        facing = await startCom({ deviceId: { exact: escolhida.id } });
+        // proximas aberturas vao direto nela (1 abertura so)
+        lsSet(STORAGE_KEY, escolhida.id);
+      }
+    }
+    return corrigirFrontal(facing);
+  }
+
+  try {
+    await iniciarRapido();
+  } catch (e) {
+    if (e instanceof SemFallbackError) throw e.original;
+    console.warn('[scanner] fluxo rapido falhou, usando fluxo legado:', e);
+    // garante que nenhuma stream/estado do rapido sobrou antes de recomecar
+    await pararSeguro();
+    deviceIdAtual = null;
+    await iniciarLegado();
   }
 
   // Tap-to-focus
@@ -355,7 +456,7 @@ export async function iniciarScanner({
   return {
     stop: async () => {
       scanAtivo = false;
-      try { await scanner.stop(); } catch {}
+      await pararSeguro();
     }
   };
 }
