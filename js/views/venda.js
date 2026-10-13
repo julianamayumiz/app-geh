@@ -690,9 +690,13 @@ export async function montar(container, ctx) {
         if (saldoAtual < total) throw new Error('Saldo insuficiente');
 
         itensCarrinho.forEach(({ produto, qtd }, i) => {
-          const estAtual = prodSnaps[i].data().estoque || 0;
+          // `vendidos` sai do mesmo snapshot lido na TX que o estoque: contencao
+          // refaz a TX e nenhum incremento se perde. As rules exigem os dois
+          // campos mudando juntos, com o mesmo delta.
+          const dados = prodSnaps[i].data();
+          const estAtual = dados.estoque || 0;
           if (estAtual < qtd) throw new Error(`Estoque insuficiente: ${produto.nome}`);
-          tx.update(prodRefs[i], { estoque: estAtual - qtd });
+          tx.update(prodRefs[i], { estoque: estAtual - qtd, vendidos: (Number(dados.vendidos) || 0) + qtd });
         });
 
         // Captura o saldo final DA TX — o `cliente.saldo` em memoria pode

@@ -1,4 +1,4 @@
-const CACHE = 'app-geh-v23';
+const CACHE = 'app-geh-v24';
 const ARQUIVOS = [
   '/',
   '/index.html',
@@ -13,6 +13,8 @@ const ARQUIVOS = [
   '/js/views/venda.js',
   '/js/views/consulta.js',
   '/js/views/inicio.js',
+  '/js/views/painel.js',
+  '/js/painel-calc.js',
   '/caixa/index.html',
   '/caixa/pdv.html',
   '/js/views/recarga.js',

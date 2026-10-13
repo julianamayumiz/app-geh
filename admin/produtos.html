@@ -34,6 +34,11 @@
           <input type="number" id="prod-estoque" min="0" step="1">
         </div>
         <div class="form-group">
+          <label for="prod-planejado">Planejado (painel de vendas)</label>
+          <input type="number" id="prod-planejado" min="1" step="1" placeholder="Vazio = estoque inicial" aria-describedby="prod-planejado-dica">
+          <small id="prod-planejado-dica" class="text-muted">Quantidade prevista para o evento (vazio = igual ao estoque inicial). O contador de vendidos começa em 0 e só soma vendas.</small>
+        </div>
+        <div class="form-group">
           <label for="prod-categoria">Categoria</label>
           <input type="text" id="prod-categoria" placeholder="Ex: Doces">
         </div>
@@ -99,6 +104,7 @@ Suco de Laranja, 5.00, 50, Bebidas
       $('prod-preco').value = '';
       $('prod-preco-promo').value = '';
       $('prod-estoque').value = '';
+      $('prod-planejado').value = '';
       $('prod-categoria').value = '';
       $('prod-promocao').checked = false;
       $('prod-favorito').checked = false;
@@ -119,6 +125,11 @@ Suco de Laranja, 5.00, 50, Bebidas
         promocao: promocao,
         favorito: $('prod-favorito').checked,
         estoque: parseInt($('prod-estoque').value) || 0,
+        // Painel de vendas: planejado vazio = estoque inicial. Nunca toca em `vendidos`
+        // (so a venda soma); produto novo nasce com vendidos: 0 (ver abaixo).
+        estoquePlanejado: parseInt($('prod-planejado').value) > 0
+          ? parseInt($('prod-planejado').value)
+          : (parseInt($('prod-estoque').value) || null),
         categoria: $('prod-categoria').value.trim() || 'Geral'
       };
       // preco 0 e permitido: itens servidos a vontade, registrados so pra contar quantidade
@@ -132,7 +143,7 @@ Suco de Laranja, 5.00, 50, Bebidas
         if (id) {
           await updateDoc(doc(db, 'produtos', id), dados);
         } else {
-          await addDoc(collection(db, 'produtos'), dados);
+          await addDoc(collection(db, 'produtos'), { ...dados, vendidos: 0 });
         }
         resetForm();
       } catch (err) {
@@ -176,7 +187,8 @@ Suco de Laranja, 5.00, 50, Bebidas
         if (!nome || isNaN(preco) || preco < 0) {
           erros.push(`Linha ${i + 1}: "${linha}" — nome ou preço inválido`);
         } else {
-          produtos.push({ nome, preco, estoque, categoria });
+          // planejado = estoque informado; vendidos comeca em 0 e so a venda soma
+          produtos.push({ nome, preco, estoque, categoria, estoquePlanejado: estoque > 0 ? estoque : null, vendidos: 0 });
         }
       });
 
@@ -252,6 +264,7 @@ Suco de Laranja, 5.00, 50, Bebidas
           $('prod-promocao').checked = p.promocao || false;
           $('prod-favorito').checked = p.favorito || false;
           $('prod-estoque').value = p.estoque;
+          $('prod-planejado').value = p.estoquePlanejado || '';
           $('prod-categoria').value = p.categoria || '';
           $('form-titulo').textContent = `Editando "${p.nome}"`;
           $('btn-cancelar').classList.remove('hidden');

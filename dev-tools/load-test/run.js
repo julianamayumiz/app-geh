@@ -107,7 +107,8 @@ async function vender(cx, produtos, clienteId, evento, itens) {
     itens.forEach(({ produto, qtd }, i) => {
       const est = prodSnaps[i].data().estoque || 0;
       if (est < qtd) throw new Error('Estoque insuficiente: ' + produto.nome);
-      tx.update(prodRefs[i], { estoque: est - qtd });
+      // vendidos sai do mesmo snapshot da TX (igual a venda.js); as rules exigem os dois campos.
+      tx.update(prodRefs[i], { estoque: est - qtd, vendidos: (Number(prodSnaps[i].data().vendidos) || 0) + qtd });
     });
     tx.update(clienteRef, { saldo: saldoAtual - total });
     tx.set(vendaRef, {
@@ -155,15 +156,23 @@ async function carregarProdutos(db) {
 
 async function snapshotTotais(db) {
   const [cs, ps] = await Promise.all([getDocs(collection(db, 'clientes')), getDocs(collection(db, 'produtos'))]);
-  let saldo = 0, estoque = 0;
+  let saldo = 0, estoque = 0, vendidos = 0;
   const ids = [];
+  const porProduto = new Map();
   cs.forEach(d => { if (d.id.startsWith('LT')) { saldo += d.data().saldo || 0; ids.push(d.id); } });
-  ps.forEach(d => { if (d.id.startsWith('lt-')) estoque += d.data().estoque || 0; });
-  return { saldo, estoque, ids };
+  ps.forEach(d => {
+    if (!d.id.startsWith('lt-')) return;
+    const x = d.data();
+    estoque += x.estoque || 0;
+    vendidos += Number(x.vendidos) || 0;   // produto antigo (sem campo) conta 0, como na TX
+    porProduto.set(d.id, { estoque: x.estoque || 0, vendidos: Number(x.vendidos) || 0, temVendidos: x.vendidos !== undefined });
+  });
+  return { saldo, estoque, vendidos, ids, porProduto };
 }
 
 // ---------- loops dos VUs ----------
 let fim = 0;
+const qtdPorProduto = new Map();   // produtoId -> unidades vendidas com sucesso nesta rodada
 async function loopOperador(i, cx, clientes, evento, inicial) {
   let cache = null, cacheEm = 0;
   const pesos = inicial.map(p => p.estoque0);
@@ -199,6 +208,7 @@ async function loopOperador(i, cx, clientes, evento, inicial) {
         const total = await vender(cx, cache, clienteId, evento, itens);
         cont.vender.ok++; somaVendida += total;
         unidadesVendidas += itens.reduce((s, x) => s + x.qtd, 0);
+        for (const x of itens) qtdPorProduto.set(x.produto.id, (qtdPorProduto.get(x.produto.id) || 0) + x.qtd);
       } catch (e) {
         if (/Saldo insuficiente/.test(e.message)) cont.vender.saldo_insuf++;
         else if (/Estoque insuficiente/.test(e.message)) { cont.vender.estoque_insuf++; cache = null; }
@@ -263,6 +273,19 @@ const nMovDocs = (await getCountFromServer(query(collection(cxOp.db, 'movimentac
 
 const okSaldo = Math.abs(deltaSaldo - esperadoSaldo) < 0.005;
 const okEstoque = deltaEstoque === unidadesVendidas;
+// Por produto: queda do estoque == aumento de vendidos == soma das qtd das vendas ok.
+// Cobre vendas concorrentes no mesmo produto, carrinhos multi-produto e produtos
+// antigos (sem o campo vendidos antes da rodada).
+const divergentes = [];
+for (const [id, a] of antes.porProduto) {
+  const d = depois.porProduto.get(id);
+  const vend = qtdPorProduto.get(id) || 0;
+  if (!d || a.estoque - d.estoque !== vend || d.vendidos - a.vendidos !== vend) {
+    divergentes.push({ id, vendidoOk: vend, estoque: [a.estoque, d?.estoque], vendidos: [a.vendidos, d?.vendidos] });
+  }
+}
+const okVendidos = divergentes.length === 0 && depois.vendidos - antes.vendidos === unidadesVendidas;
+const antigosAntes = [...antes.porProduto.values()].filter(x => !x.temVendidos).length;
 const okVendas = nVendasDocs === cont.vender.ok;
 const okMov = nMovDocs === cont.carregar.ok;
 
@@ -285,9 +308,11 @@ console.log(`Erros genuinos: ${genuinos} (${base ? (100 * genuinos / base).toFix
 console.log(`\nIntegridade:`);
 console.log(`  saldo   : delta ${fmt(deltaSaldo)} | esperado ${fmt(esperadoSaldo)} ${okSaldo ? 'OK' : 'DIVERGE'}`);
 console.log(`  estoque : delta ${deltaEstoque} un. | vendido ${unidadesVendidas} un. ${okEstoque ? 'OK' : 'DIVERGE'}`);
+console.log(`  vendidos: delta ${depois.vendidos - antes.vendidos} un. | vendido ${unidadesVendidas} un. | ${antes.porProduto.size} produtos conferidos um a um (${antigosAntes} comecaram sem o campo) ${okVendidos ? 'OK' : 'DIVERGE'}`);
+if (divergentes.length) console.log('  produtos divergentes:', JSON.stringify(divergentes.slice(0, 5)));
 console.log(`  vendas  : ${nVendasDocs} docs | ${cont.vender.ok} ok ${okVendas ? 'OK' : 'DIVERGE'}`);
 console.log(`  recargas: ${nMovDocs} docs | ${cont.carregar.ok} ok ${okMov ? 'OK' : 'DIVERGE'}`);
-if (genuinos && !(okSaldo && okEstoque && okVendas && okMov)) {
+if (genuinos && !(okSaldo && okEstoque && okVendidos && okVendas && okMov)) {
   console.log('  (divergencia com erros genuinos pode ser commit ambiguo: erro de rede apos gravar)');
 }
 
@@ -302,7 +327,7 @@ fs.writeFileSync(saida, JSON.stringify({
   runId: RUN_ID, vus: VUS, duracaoS: dur, pensar: [PENSAR_MIN, PENSAR_MAX], cont, erros,
   p50: Object.fromEntries(Object.entries(lat).map(([k, v]) => [k, pct(v, 0.5)])),
   p95: Object.fromEntries(Object.entries(lat).map(([k, v]) => [k, pct(v, 0.95)])),
-  integridade: { okSaldo, okEstoque, okVendas, okMov, deltaSaldo, esperadoSaldo, deltaEstoque, unidadesVendidas },
+  integridade: { okSaldo, okEstoque, okVendidos, okVendas, okMov, deltaSaldo, esperadoSaldo, deltaEstoque, unidadesVendidas },
   leituras, escritas
 }, null, 2));
 console.log(`\nResultado salvo em ${path.basename(saida)}`);

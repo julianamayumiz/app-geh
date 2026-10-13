@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import {
   doc, setDoc, updateDoc, deleteDoc, addDoc, getDoc, getDocs, collection,
-  query, where, serverTimestamp,
+  query, where, serverTimestamp, runTransaction, onSnapshot,
 } from 'firebase/firestore';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -106,19 +106,156 @@ async function main() {
   const caixaDb = testEnv.authenticatedContext(UID_CAIXA, { email: 'caixa@teste.com', papel: 'caixa', ativo: true }).firestore();
   const semAuthDb = testEnv.unauthenticatedContext().firestore();
 
-  console.log('\n== produtos (P0: operador não pode reescrever qualquer campo) ==');
-  await test('operador PODE atualizar só o estoque', () =>
-    assertSucceeds(updateDoc(doc(operadorDb, 'produtos', 'prod1'), { estoque: 90 }))
-  );
-  await test('operador NÃO PODE reescrever o nome do produto', () =>
-    assertFails(updateDoc(doc(operadorDb, 'produtos', 'prod1'), { nome: 'Hackeado' }))
-  );
-  await test('operador NÃO PODE mandar estoque negativo', () =>
-    assertFails(updateDoc(doc(operadorDb, 'produtos', 'prod1'), { estoque: -5 }))
-  );
-  await test('admin AINDA PODE editar qualquer campo do produto (regressão)', () =>
-    assertSucceeds(updateDoc(doc(adminDb, 'produtos', 'prod1'), { nome: 'Brigadeiro Gourmet', preco: 4 }))
-  );
+  console.log('\n== produtos (P0: operador só move estoque+vendidos, juntos e coerentes) ==');
+  // Cada teste recomeça de um produto conhecido (seed ignora as rules).
+  const resetProd = (id, dados) => testEnv.withSecurityRulesDisabled(
+    (ctx) => setDoc(doc(ctx.firestore(), 'produtos', id), dados));
+  const BASE = { nome: 'Brigadeiro', preco: 3.5, estoque: 100, vendidos: 0, categoria: 'Doces', estoquePlanejado: 200 };
+  const COM_VENDIDOS = { ...BASE, estoque: 90, vendidos: 10 };
+  const upd = (db, dados) => updateDoc(doc(db, 'produtos', 'prodX'), dados);
+
+  await test('operador PODE vender em produto novo (vendidos 0): estoque -3, vendidos +3', async () => {
+    await resetProd('prodX', BASE);
+    await assertSucceeds(upd(operadorDb, { estoque: 97, vendidos: 3 }));
+  });
+  await test('operador PODE vender em produto que já tem vendidos', async () => {
+    await resetProd('prodX', COM_VENDIDOS);
+    await assertSucceeds(upd(operadorDb, { estoque: 88, vendidos: 12 }));
+  });
+  await test('operador PODE vender até zerar o estoque', async () => {
+    await resetProd('prodX', { ...BASE, estoque: 2 });
+    await assertSucceeds(upd(operadorDb, { estoque: 0, vendidos: 2 }));
+  });
+  await test('operador NÃO PODE reescrever o nome do produto', async () => {
+    await resetProd('prodX', BASE);
+    await assertFails(upd(operadorDb, { nome: 'Hackeado' }));
+  });
+  await test('operador NÃO PODE alterar o preço (nem junto de uma venda válida)', async () => {
+    await resetProd('prodX', BASE);
+    await assertFails(upd(operadorDb, { preco: 0.01 }));
+    await assertFails(upd(operadorDb, { estoque: 99, vendidos: 1, preco: 0.01 }));
+  });
+  await test('operador NÃO PODE alterar estoquePlanejado (nem junto de uma venda válida)', async () => {
+    await resetProd('prodX', BASE);
+    await assertFails(upd(operadorDb, { estoquePlanejado: 1 }));
+    await assertFails(upd(operadorDb, { estoque: 99, vendidos: 1, estoquePlanejado: 1 }));
+  });
+  await test('operador NÃO PODE mexer só no estoque (sem somar em vendidos)', async () => {
+    await resetProd('prodX', BASE);
+    await assertFails(upd(operadorDb, { estoque: 90 }));
+  });
+  await test('operador NÃO PODE mandar estoque negativo', async () => {
+    await resetProd('prodX', { ...BASE, estoque: 2 });
+    await assertFails(upd(operadorDb, { estoque: -1, vendidos: 3 }));
+  });
+  await test('operador NÃO PODE mandar vendidos negativo', async () => {
+    await resetProd('prodX', COM_VENDIDOS);
+    await assertFails(upd(operadorDb, { estoque: 91, vendidos: -1 }));
+  });
+  await test('operador NÃO PODE mandar estoque/vendidos decimais ou texto', async () => {
+    await resetProd('prodX', BASE);
+    await assertFails(upd(operadorDb, { estoque: 99.5, vendidos: 0.5 }));
+    await assertFails(upd(operadorDb, { estoque: 99, vendidos: '1' }));
+    await assertFails(upd(operadorDb, { estoque: '99', vendidos: 1 }));
+  });
+  // Invariante das rules: estoque + vendidos nao muda numa venda. A soma e igual
+  // no doc velho e no atual, entao nao quebra vendas simultaneas (ver TX abaixo).
+  await test('operador NÃO PODE gravar par arbitrário (estoque 9999, vendidos 0)', async () => {
+    await resetProd('prodX', BASE);
+    await assertFails(upd(operadorDb, { estoque: 9999, vendidos: 0 }));
+  });
+  await test('operador NÃO PODE subir o estoque nem zerar vendidos', async () => {
+    await resetProd('prodX', COM_VENDIDOS);
+    await assertFails(upd(operadorDb, { estoque: 95, vendidos: 10 }));
+    await assertFails(upd(operadorDb, { estoque: 90, vendidos: 0 }));
+  });
+  await test('operador NÃO PODE mandar deltas diferentes (estoque -5, vendidos +3)', async () => {
+    await resetProd('prodX', BASE);
+    await assertFails(upd(operadorDb, { estoque: 95, vendidos: 3 }));
+    await assertFails(upd(operadorDb, { estoque: 99, vendidos: 50 }));
+  });
+  await test('operador NÃO PODE vender em produto sem o campo vendidos (todo produto nasce com ele)', async () => {
+    await testEnv.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'produtos', 'prodX'),
+      { nome: 'Antigo', preco: 1, estoque: 10, categoria: 'x' }));
+    await assertFails(upd(operadorDb, { estoque: 9, vendidos: 1 }));
+  });
+  await test('caixa e recepção NÃO PODEM atualizar produto', async () => {
+    await resetProd('prodX', BASE);
+    await assertFails(upd(caixaDb, { estoque: 99, vendidos: 1 }));
+    await assertFails(upd(recepcaoDb, { estoque: 99, vendidos: 1 }));
+  });
+  await test('operador NÃO PODE criar nem apagar produto', async () => {
+    await assertFails(setDoc(doc(operadorDb, 'produtos', 'novo'), { ...BASE }));
+    await resetProd('prodX', BASE);
+    await assertFails(deleteDoc(doc(operadorDb, 'produtos', 'prodX')));
+  });
+  await test('admin AINDA PODE editar qualquer campo do produto, inclusive estoquePlanejado (regressão)', async () => {
+    await resetProd('prodX', BASE);
+    await assertSucceeds(upd(adminDb, { nome: 'Brigadeiro Gourmet', preco: 4, estoquePlanejado: 300 }));
+  });
+
+  console.log('\n== produtos: transações (várias vendas e vários produtos) ==');
+  // Mesmo formato da TX de js/views/venda.js: lê dentro da TX e grava estoque+vendidos juntos.
+  const venderTx = (db, itens) => runTransaction(db, async (tx) => {
+    const refs = itens.map(i => doc(db, 'produtos', i.id));
+    const snaps = await Promise.all(refs.map(r => tx.get(r)));
+    itens.forEach((i, k) => {
+      const d = snaps[k].data();
+      tx.update(refs[k], { estoque: d.estoque - i.qtd, vendidos: (Number(d.vendidos) || 0) + i.qtd });
+    });
+  });
+  await test('TX com vários produtos grava estoque+vendidos coerentes em todos', async () => {
+    await resetProd('pA', { ...BASE, estoque: 50 });
+    await resetProd('pB', { ...BASE, estoque: 40, vendidos: 5 });
+    await resetProd('pC', { ...BASE, estoque: 30 });
+    await assertSucceeds(venderTx(operadorDb, [{ id: 'pA', qtd: 2 }, { id: 'pB', qtd: 3 }, { id: 'pC', qtd: 1 }]));
+    let lido;
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      lido = {
+        a: (await getDoc(doc(db, 'produtos', 'pA'))).data(),
+        b: (await getDoc(doc(db, 'produtos', 'pB'))).data(),
+        c: (await getDoc(doc(db, 'produtos', 'pC'))).data(),
+      };
+    });
+    if (lido.a.estoque !== 48 || lido.a.vendidos !== 2) throw new Error('pA incoerente');
+    if (lido.b.estoque !== 37 || lido.b.vendidos !== 8) throw new Error('pB incoerente');
+    if (lido.c.estoque !== 29 || lido.c.vendidos !== 1) throw new Error('pC incoerente');
+  });
+  await test('vendas simultâneas no mesmo produto não perdem incremento', async () => {
+    await resetProd('pS', { ...BASE, estoque: 100 });
+    const qtds = [1, 2, 3, 4, 5, 1, 2, 3];
+    await Promise.all(qtds.map(q => assertSucceeds(venderTx(operadorDb, [{ id: 'pS', qtd: q }]))));
+    const soma = qtds.reduce((s, q) => s + q, 0);
+    let d;
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      d = (await getDoc(doc(ctx.firestore(), 'produtos', 'pS'))).data();
+    });
+    if (d.vendidos !== soma) throw new Error(`vendidos=${d.vendidos}, esperado ${soma}`);
+    if (d.estoque !== 100 - soma) throw new Error(`estoque=${d.estoque}, esperado ${100 - soma}`);
+  });
+
+  console.log('\n== produtos: listener (permissão e recuperação) ==');
+  await test('operador PODE ouvir produtos em tempo real (onSnapshot)', () => new Promise((resolve, reject) => {
+    const unsub = onSnapshot(collection(operadorDb, 'produtos'),
+      () => { unsub(); resolve(); },
+      (e) => { reject(e); });
+    setTimeout(() => { unsub(); reject(new Error('timeout')); }, 5000);
+  }));
+  await test('sem permissão, o onSnapshot entrega o erro ao callback (base da recuperação)', () => new Promise((resolve, reject) => {
+    const unsub = onSnapshot(collection(semAuthDb, 'produtos'),
+      () => { unsub(); reject(new Error('leu sem permissão')); },
+      (e) => { unsub(); e.code === 'permission-denied' ? resolve() : reject(e); });
+    setTimeout(() => { unsub(); reject(new Error('timeout')); }, 5000);
+  }));
+  await test('depois de um erro, novo listener com permissão volta a funcionar', async () => {
+    await new Promise((resolve) => {
+      const u = onSnapshot(collection(semAuthDb, 'produtos'), () => {}, () => { u(); resolve(); });
+    });
+    await new Promise((resolve, reject) => {
+      const u = onSnapshot(collection(operadorDb, 'produtos'), () => { u(); resolve(); }, reject);
+    });
+  });
 
   console.log('\n== vendas (P0: payload validado no servidor) ==');
   await test('operador PODE criar venda válida', () =>

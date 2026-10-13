@@ -107,14 +107,27 @@ service cloud.firestore {
 
     match /produtos/{doc} {
       allow read: if isOperador();
-      // Operador só pode decrementar estoque via venda (TX no app) — não
-      // pode reescrever nome/preco/categoria direto pelo SDK.
+      // Operador só mexe em estoque+vendidos, SEMPRE juntos, via venda (TX no
+      // app). Não pode reescrever nome/preco/categoria/estoquePlanejado pelo SDK.
+      // Invariante: estoque + vendidos NÃO muda numa venda (o que sai do estoque
+      // entra em vendidos). Diferente de comparar delta/monotonia, a soma é a
+      // mesma no doc "velho" e no atual, então vendas simultâneas (TX velha
+      // avaliada contra o doc já alterado) continuam passando. Produto sempre
+      // nasce com vendidos (admin/produtos.html), então o campo tem que existir.
+      // Se o admin corrigir o estoque no meio de uma venda, essa venda falha e
+      // o operador repete.
       allow update: if isAdmin()
         || (
           isOperador()
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estoque'])
-          && request.resource.data.estoque is number
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estoque', 'vendidos'])
+          && request.resource.data.keys().hasAll(['estoque', 'vendidos'])
+          && resource.data.vendidos is int
+          && request.resource.data.estoque is int
+          && request.resource.data.vendidos is int
           && request.resource.data.estoque >= 0
+          && request.resource.data.vendidos >= 0
+          && request.resource.data.estoque + request.resource.data.vendidos
+             == resource.data.estoque + resource.data.vendidos
         );
       allow create, delete: if isAdmin();
     }

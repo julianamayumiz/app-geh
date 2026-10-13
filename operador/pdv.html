@@ -83,7 +83,8 @@
         acoes: [
           { href: '#/scan?acao=vender',    icone: 'shopping-cart',    titulo: 'Vender',          sub: 'Escanear e registrar uma venda',                   estilo: 'btn-primary' },
           { href: '#/scan?acao=consultar', icone: 'eye',              titulo: 'Consultar Saldo', sub: 'Ver quanto o cliente ainda tem',                   estilo: 'btn-secondary' },
-          { href: '#/scan?acao=transferir', icone: 'arrow-right-left', titulo: 'Transferir Saldo', sub: 'Juntar crédito de dois QRs pra fechar a venda', estilo: 'btn-secondary' }
+          { href: '#/scan?acao=transferir', icone: 'arrow-right-left', titulo: 'Transferir Saldo', sub: 'Juntar crédito de dois QRs pra fechar a venda', estilo: 'btn-secondary' },
+          { href: '#/painel',              icone: 'bar-chart',        titulo: 'Painel de Vendas', sub: 'Vendido x planejado por produto',               estilo: 'btn-secondary' }
         ]
       },
       opcoes: { transferencias: true },
@@ -97,7 +98,8 @@
         inicio:   () => import('../js/views/inicio.js'),
         venda:    () => import('../js/views/venda.js'),
         consulta: () => import('../js/views/consulta.js'),
-        transferir: () => import('../js/views/transferir.js')
+        transferir: () => import('../js/views/transferir.js'),
+        painel:   () => import('../js/views/painel.js')
       },
       rascunhoBanner: (r) => {
         if (r && r.tipo === 'transferir' && r.temItens) {

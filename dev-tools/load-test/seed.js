@@ -61,8 +61,9 @@ const db = admin.firestore();
 const slug = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
 const writer = db.bulkWriter();
+// Painel de vendas: todo produto nasce com vendidos: 0 e planejado = estoque (como o admin cadastra).
 for (const [nome, preco, estoque, categoria] of PRODUTOS) {
-  writer.set(db.collection('produtos').doc('lt-' + slug(nome)), { nome, preco, estoque, categoria, promocao: false });
+  writer.set(db.collection('produtos').doc('lt-' + slug(nome)), { nome, preco, estoque, categoria, promocao: false, vendidos: 0, estoquePlanejado: estoque });
 }
 for (let i = 1; i <= N_CLIENTES; i++) {
   writer.set(db.collection('clientes').doc('LT' + String(i).padStart(3, '0')), { saldo: SALDO });

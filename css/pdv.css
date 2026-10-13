@@ -129,3 +129,83 @@
 .tf-chip { min-height:48px; min-width:72px; padding:0 1rem; border-radius:12px; border:1px solid var(--azul); background:transparent; color:inherit; font-weight:700; font-size:1rem; cursor:pointer; }
 .tf-link { background:none; border:0; color:var(--azul); text-align:left; padding:0.5rem 0; min-height:44px; cursor:pointer; font-size:1rem; }
 .tf-total { font-size:2.2rem; font-weight:700; text-align:center; }
+
+/* ── View painel (vendido x planejado) ────────────────────── */
+.pn { display:flex; flex-direction:column; gap:0.75rem; font-variant-numeric:tabular-nums; }
+.pn-topo { display:flex; align-items:center; justify-content:space-between; gap:0.5rem; flex-wrap:wrap; }
+.pn-fresco { font-size:0.85rem; color:var(--cinza-escuro); font-weight:600; }
+.pn-fresco.antigo { color:var(--amarelo-acento); }
+.pn-acoes { display:flex; gap:0.4rem; }
+.pn-btn { display:inline-flex; align-items:center; gap:0.35rem; min-height:40px; padding:0 0.8rem; border-radius:999px; border:1px solid var(--cinza); background:var(--branco); color:var(--cinza-escuro); font-size:0.85rem; font-weight:600; cursor:pointer; }
+.pn-btn:disabled { opacity:0.5; cursor:default; }
+.pn-btn.on { border-color:var(--verde); background:color-mix(in srgb, var(--verde) 14%, var(--branco)); }
+.pn-dot { width:8px; height:8px; border-radius:50%; background:var(--cinza); }
+.pn-btn.on .pn-dot { background:var(--verde); }
+
+.pn-banner { display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; padding:0.6rem 0.75rem; border-radius:var(--radius-sm); border:1px solid var(--amarelo); background:color-mix(in srgb, var(--amarelo) 18%, var(--branco)); color:var(--cinza-escuro); font-size:0.85rem; }
+.pn-banner.grave { border-color:var(--vermelho); background:color-mix(in srgb, var(--vermelho) 12%, var(--branco)); }
+.pn-banner-ic { display:inline-flex; color:var(--amarelo-acento); }
+.pn-banner.grave .pn-banner-ic { color:var(--vermelho-texto); }
+.pn-banner-tx { flex:1 1 12rem; }
+
+/* Dado velho/erro/offline: continua visivel, mas nunca com cara de atual */
+.pn-antigo { opacity:0.55; }
+
+.pn-resumo { display:flex; align-items:center; gap:1rem; padding:0.85rem 1rem; border-radius:var(--radius); background:var(--cinza-claro); }
+.pn-anel { flex:0 0 auto; }
+.pn-anel-fundo { stroke:var(--branco); }
+.pn-anel-val { stroke:var(--azul); }
+.pn-anel-tx { font-size:17px; font-weight:700; fill:var(--cinza-escuro); }
+.pn-rot { font-size:0.8rem; color:var(--cinza-escuro); opacity:0.75; }
+.pn-grande { font-size:1.7rem; font-weight:700; line-height:1.15; color:var(--cinza-escuro); }
+.pn-grande span { font-size:0.95rem; font-weight:600; opacity:0.7; }
+.pn-nota { font-size:0.75rem; color:var(--amarelo-acento); margin-top:0.2rem; }
+
+.pn-abas { display:flex; gap:0.25rem; padding:0.2rem; border-radius:12px; background:var(--cinza-claro); }
+.pn-aba { flex:1; display:inline-flex; align-items:center; justify-content:center; gap:0.35rem; min-height:44px; border:0; border-radius:10px; background:transparent; color:var(--cinza-escuro); font-size:0.9rem; font-weight:600; cursor:pointer; opacity:0.75; }
+.pn-aba.ativa { background:var(--branco); opacity:1; box-shadow:0 1px 3px rgba(0,0,0,0.18); }
+.pn-cont { min-width:1.4rem; padding:0 0.4rem; border-radius:999px; background:color-mix(in srgb, var(--cinza) 30%, transparent); font-size:0.75rem; line-height:1.4rem; text-align:center; }
+.pn-cont.alerta { background:var(--vermelho); color:#fff; }
+
+.pn-sec { display:flex; align-items:center; gap:0.4rem; margin:0.9rem 0 0.4rem; font-size:0.8rem; font-weight:700; color:var(--cinza-escuro); opacity:0.8; text-transform:uppercase; letter-spacing:0.03em; }
+
+.pn-card { padding:0.7rem 0.85rem; margin-bottom:0.55rem; border-radius:var(--radius); border:1px solid var(--cinza-claro); background:var(--branco); }
+.pn-card.crit-fim, .pn-card.crit-inv { border-color:var(--vermelho); }
+.pn-card.crit-baixo { border-color:var(--amarelo); }
+.pn-card-hd { display:flex; align-items:center; gap:0.4rem; }
+.pn-nome { flex:1; min-width:0; font-weight:700; font-size:0.95rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pn-st { display:inline-flex; align-items:center; gap:0.25rem; padding:0.15rem 0.55rem; border-radius:999px; font-size:0.75rem; font-weight:700; color:var(--cinza-escuro); white-space:nowrap; }
+.pn-st.ok    { background:color-mix(in srgb, var(--verde) 20%, transparent); }
+.pn-st.baixo { background:color-mix(in srgb, var(--amarelo) 32%, transparent); }
+.pn-st.fim   { background:color-mix(in srgb, var(--vermelho) 20%, transparent); }
+.pn-st.inv   { background:color-mix(in srgb, var(--cinza) 28%, transparent); }
+.pn-st.ok svg { color:var(--verde); }
+.pn-st.baixo svg { color:var(--amarelo-acento); }
+.pn-st.fim svg { color:var(--vermelho); }
+.pn-num { display:flex; align-items:baseline; gap:0.4rem; margin:0.35rem 0 0.4rem; }
+.pn-num b { font-size:1.6rem; line-height:1; }
+.pn-num span { font-size:0.8rem; opacity:0.75; }
+.pn-barra { height:11px; border-radius:6px; background:var(--cinza-claro); overflow:hidden; }
+.pn-barra i, .pn-mini i { display:block; height:100%; border-radius:inherit; }
+i.ok { background:var(--verde); }
+i.baixo { background:var(--amarelo); }
+i.fim { background:var(--vermelho); }
+i.inv { background:var(--cinza); }
+.pn-card-ft { display:flex; justify-content:space-between; gap:0.5rem; margin-top:0.35rem; font-size:0.8rem; opacity:0.85; }
+.pn-rest { font-weight:700; }
+.pn-selo { display:inline-block; padding:0 0.4rem; margin-left:0.25rem; border-radius:6px; background:var(--cinza-claro); font-size:0.7rem; font-weight:600; }
+
+.pn-star { flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; width:40px; height:40px; margin:-6px 0 -6px -8px; border:0; background:transparent; color:var(--cinza); cursor:pointer; }
+.pn-star.on { color:var(--amarelo-acento); }
+.pn-star.on svg { fill:currentColor; }
+
+.pn-cab { display:flex; gap:0.5rem; padding:0 0.25rem 0.25rem 2.1rem; font-size:0.7rem; font-weight:700; opacity:0.65; text-transform:uppercase; }
+.pn-cab span:first-child { flex:1; }
+.pn-cab-v { width:4.6rem; text-align:right; }
+.pn-cab-r { width:3rem; text-align:right; }
+.pn-linha { display:flex; align-items:center; gap:0.5rem; min-height:44px; padding:0 0.25rem; border-top:1px solid var(--cinza-claro); }
+.pn-linha .pn-nome { font-weight:600; font-size:0.9rem; }
+.pn-mini { flex:0 0 3.2rem; height:7px; border-radius:4px; background:var(--cinza-claro); overflow:hidden; }
+.pn-mini.vazio { background:transparent; }
+.pn-linha-v { width:4.6rem; text-align:right; font-size:0.85rem; }
+.pn-linha-r { width:3rem; text-align:right; font-size:0.85rem; font-weight:700; }

@@ -317,7 +317,9 @@ export async function iniciarPdv(cfg) {
     }
 
     const loader = cfg.views[rota.nome];
-    if (!loader || (!rota.id && rota.nome !== 'inicio')) { ir('#/inicio', { replace: true }); return; }
+    // inicio e painel nao dependem de um cliente (sem id na rota).
+    const semCliente = rota.nome === 'inicio' || rota.nome === 'painel';
+    if (!loader || (!rota.id && !semCliente)) { ir('#/inicio', { replace: true }); return; }
 
     handle?.pausar();
     el.scan.classList.add('hidden');
