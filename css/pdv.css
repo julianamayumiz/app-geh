@@ -5,9 +5,105 @@
 #pdv-banner .btn { flex:1; }
 .venda-sucesso { position:fixed; inset:0; z-index:300; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,0.85); padding:1rem; }
 .venda-sucesso.hidden { display:none; }
-.venda-sucesso-box { width:100%; max-width:360px; text-align:center; background:var(--card, #fff); color:var(--texto, inherit); border-radius:16px; padding:1.5rem 1rem; }
+.venda-sucesso-box { width:100%; max-width:360px; text-align:center; background:var(--branco); color:var(--cinza-escuro); border-radius:16px; padding:1.5rem 1rem; }
 .venda-sucesso-ic { color:var(--verde); display:inline-flex; }
-.venda-sucesso-tit { font-weight:700; margin-top:0.5rem; }
-.venda-sucesso-val { font-size:1.5rem; font-weight:800; margin:0.25rem 0 0.75rem; }
+.venda-sucesso-tit { font-weight:700; color:var(--cinza-escuro); margin-top:0.5rem; }
+.venda-sucesso-val { color:var(--cinza-escuro); font-size:1.5rem; font-weight:800; margin:0.25rem 0 0.75rem; }
 .venda-sucesso-sub { font-size:0.85rem; color:var(--cinza); }
 .venda-sucesso-saldo { font-size:1.6rem; font-weight:800; color:var(--azul); margin-bottom:1rem; }
+
+/* Tela de inicio (copiado do menu antigo operador/caixa index.html) */
+.evento-hero {
+  background:
+    radial-gradient(ellipse at 90% 120%, rgba(251,191,36,0.18) 0%, transparent 55%),
+    linear-gradient(135deg, var(--azul) 0%, var(--azul-escuro) 100%);
+  color: #fff;
+  border-radius: 16px;
+  padding: 1.1rem 1.25rem;
+  box-shadow: 0 20px 40px -20px rgba(15,29,77,0.5);
+  margin-bottom: 1.25rem;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.evento-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.08;
+  background-image: radial-gradient(circle at 1px 1px, #fff 1px, transparent 0);
+  background-size: 22px 22px;
+}
+.evento-hero .evento-nome {
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+  margin-top: 0.25rem;
+}
+.evento-hero .evento-sub {
+  color: rgba(255,255,255,0.7);
+  font-size: 0.85rem;
+  margin-top: 0.15rem;
+}
+.evento-hero.sem-evento {
+  background:
+    radial-gradient(ellipse at 90% 120%, rgba(220,38,38,0.25) 0%, transparent 55%),
+    linear-gradient(135deg, #2a1a1a 0%, #1a0f0f 100%);
+}
+
+.grid-acoes .btn-lg {
+  flex-direction: row;
+  justify-content: flex-start;
+  text-align: left;
+  gap: 1rem;
+  padding: 1.2rem 1.25rem;
+  min-height: unset;
+}
+.grid-acoes .btn-lg .icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.15);
+}
+.grid-acoes .btn-lg .seta {
+  margin-left: auto;
+  opacity: 0.55;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.grid-acoes .btn-lg:hover .seta,
+.grid-acoes .btn-lg:active .seta {
+  transform: translateX(3px);
+  opacity: 1;
+}
+.grid-acoes .btn-secondary .icon-wrap {
+  background: rgba(30,58,138,0.08);
+}
+:root[data-theme="dark"] .grid-acoes .btn-secondary .icon-wrap {
+  background: rgba(59,130,246,0.15);
+}
+.grid-acoes .btn-accent .icon-wrap {
+  background: rgba(0,0,0,0.1);
+}
+.grid-acoes .label-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.grid-acoes .label-principal {
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+}
+.grid-acoes .label-sec {
+  font-size: 0.78rem;
+  font-weight: 500;
+  opacity: 0.7;
+}
+@media (min-width: 768px) {
+  .grid-acoes { grid-template-columns: 1fr; }
+}

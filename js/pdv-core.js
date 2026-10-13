@@ -23,7 +23,7 @@
 import { db, doc, getDoc } from './firebase-config.js';
 import { requireAuth } from './auth-guard.js';
 import { iniciarScanner } from './scanner.js';
-import { toast, confirmarAsync } from './ui.js';
+import { confirmarAsync } from './ui.js';
 
 const TTL_RASCUNHO_MS = 2 * 60 * 60 * 1000;
 const IDLE_CAMERA_MS = 90 * 1000;
@@ -103,6 +103,16 @@ export async function iniciarPdv(cfg) {
     el.status.style.color = cor || '';
   }
 
+  // Mensagem dentro da tela de scan (sem notificacao flutuante). ms=0 deixa fixa
+  // ate a proxima mensagem.
+  let avisoTimer = null;
+  function avisoScan(texto, tipo = 'info', ms = 6000) {
+    clearTimeout(avisoTimer);
+    el.alerta.textContent = texto;
+    el.alerta.className = `alert alert-${tipo} mt-2`;
+    if (ms > 0) avisoTimer = setTimeout(() => el.alerta.classList.add('hidden'), ms);
+  }
+
   async function abrirCamera() {
     el.btnCamera?.classList.add('hidden');
     try {
@@ -159,7 +169,7 @@ export async function iniciarPdv(cfg) {
   async function usarId(bruto) {
     const id = (bruto || '').trim();
     if (!id || id.includes('/')) {
-      toast('QR inválido. Tente de novo.', { tipo: 'erro' });
+      avisoScan('QR inválido. Tente de novo.', 'danger', 4000);
       handle?.retomar();
       return;
     }
@@ -196,7 +206,11 @@ export async function iniciarPdv(cfg) {
   window.addEventListener('popstate', () => render());
 
   el.voltar.addEventListener('click', (e) => {
-    if (parseHash().nome !== 'scan') { e.preventDefault(); voltarParaScan(); }
+    const n = parseHash().nome;
+    if (n === 'inicio') return;          // link normal pra pagina inicial do app
+    e.preventDefault();
+    if (n === 'scan') ir('#/inicio', { replace: true });
+    else voltarParaScan();
   });
 
   async function desmontarView() {
@@ -232,7 +246,7 @@ export async function iniciarPdv(cfg) {
     const meu = ++renderSeq;
     const rota = parseHash();
 
-    if (!rota.nome) { history.replaceState(history.state, '', `#/scan?acao=${enc(acao)}`); return render(); }
+    if (!rota.nome) { history.replaceState(history.state, '', '#/inicio'); return render(); }
 
     if (rota.nome === 'scan') {
       const pedida = rota.params.get('acao');
@@ -246,7 +260,7 @@ export async function iniciarPdv(cfg) {
         location.reload(); return;
       }
       el.titulo.textContent = a.titulo;
-      el.voltar.setAttribute('href', cfg.hubUrl);
+      el.voltar.setAttribute('href', '#');
       el.conteudo.classList.add('hidden');
       el.scan.classList.remove('hidden');
       mostrarBanner();
@@ -259,12 +273,13 @@ export async function iniciarPdv(cfg) {
     }
 
     const loader = cfg.views[rota.nome];
-    if (!loader || !rota.id) { ir(`#/scan?acao=${enc(acao)}`, { replace: true }); return; }
+    if (!loader || (!rota.id && rota.nome !== 'inicio')) { ir('#/inicio', { replace: true }); return; }
 
     handle?.pausar();
     el.scan.classList.add('hidden');
     el.conteudo.classList.remove('hidden');
-    el.voltar.setAttribute('href', '#');
+    el.voltar.setAttribute('href', rota.nome === 'inicio' ? cfg.landingUrl : '#');
+    if (rota.nome === 'inicio') mostrarBanner(); else el.banner?.classList.add('hidden');
     clearTimeout(idleTimer);
     idleTimer = setTimeout(() => { handle?.liberar(); }, IDLE_CAMERA_MS);
 
@@ -280,6 +295,9 @@ export async function iniciarPdv(cfg) {
         rascunho,
         pendente,
         voltar: voltarParaScan,
+        fim: () => ir('#/inicio', { replace: true }),
+        ir: (h) => ir(h),
+        cfgInicio: cfg.inicio,
         setOcupado: (b) => { ocupados = Math.max(0, ocupados + (b ? 1 : -1)); },
         getEvento: () => getDoc(doc(db, 'config', 'eventoAtivo'))
           .then(s => s.exists() ? s.data() : null)
@@ -291,8 +309,8 @@ export async function iniciarPdv(cfg) {
       viewAtual = { nome: rota.nome, desmontar: v?.desmontar };
     } catch (err) {
       console.error('[pdv] erro ao montar view:', err);
-      toast('Erro ao abrir a tela. Tente de novo.', { tipo: 'erro' });
       voltarParaScan();
+      avisoScan('Erro ao abrir a tela. Tente de novo.', 'danger', 0);
     }
   }
 
@@ -303,11 +321,11 @@ export async function iniciarPdv(cfg) {
     try {
       const snap = await getDoc(doc(db, p.colecao, p.id));
       if (snap.exists()) {
-        toast(`${p.rotulo} registrada (recuperada) — ${p.clienteId}`, { tipo: 'sucesso', duracao: 6000 });
+        avisoScan(`${p.rotulo} registrada (recuperada) — ${p.clienteId}`, 'success', 0);
         const r = rascunho.ler();
         if (r && r.opId === p.id) rascunho.limpar();
       } else {
-        toast(`A última ${p.rotulo.toLowerCase()} NÃO foi registrada. Os dados foram mantidos.`, { tipo: 'erro', duracao: 8000 });
+        avisoScan(`A última ${p.rotulo.toLowerCase()} NÃO foi registrada. Os dados foram mantidos.`, 'danger', 0);
       }
       pendente.limpar();
     } catch (e) {
@@ -322,7 +340,7 @@ export async function iniciarPdv(cfg) {
   };
   const enviarManual = () => {
     const id = el.idManual.value.trim();
-    if (!id) { toast('Digite um ID', { tipo: 'erro' }); return; }
+    if (!id) { avisoScan('Digite um ID', 'warning', 3000); return; }
     el.idManual.value = '';
     el.formManual.classList.add('hidden');
     usarId(id);

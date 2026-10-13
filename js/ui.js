@@ -19,21 +19,48 @@ export function toast(mensagem, { tipo = 'info', duracao = 3000, vibrar } = {}) 
   el.className = `toast toast-${tipo}`;
   el.setAttribute('role', tipo === 'erro' ? 'alert' : 'status');
   el.setAttribute('aria-live', tipo === 'erro' ? 'assertive' : 'polite');
-  el.textContent = mensagem;
+  const msg = document.createElement('span');
+  msg.className = 'toast-msg';
+  msg.textContent = mensagem;
+  const x = document.createElement('button');
+  x.type = 'button';
+  x.className = 'toast-x';
+  x.setAttribute('aria-label', 'Fechar notificação');
+  x.textContent = '×';
+  el.append(msg, x);
   host.appendChild(el);
 
   // Vibração háptica — explícita, ou padrão do tipo, ou nada se for false
   const padrao = vibrar === false ? null : (vibrar ?? VIBRACOES_PADRAO[tipo]);
   if (padrao) { try { navigator.vibrate?.(padrao); } catch (_) {} }
 
-  // Permite clicar pra dispensar
+  // Clicar na notificacao ou no X dispensa
   el.addEventListener('click', () => fechar());
   const t = setTimeout(fechar, duracao);
   function fechar() {
     clearTimeout(t);
     el.classList.add('saindo');
     el.addEventListener('transitionend', () => el.remove(), { once: true });
+    // Rede de seguranca: se a transicao nao disparar (aba em segundo plano), remove assim mesmo.
+    setTimeout(() => el.remove(), 400);
   }
+
+  // Arrastar pra cima dispensa (celular)
+  let y0 = null;
+  el.addEventListener('touchstart', (e) => { y0 = e.touches[0].clientY; }, { passive: true });
+  el.addEventListener('touchmove', (e) => {
+    if (y0 === null) return;
+    const dy = e.touches[0].clientY - y0;
+    if (dy < 0) { el.style.transition = 'none'; el.style.transform = `translateY(${dy}px)`; el.style.opacity = String(Math.max(0, 1 + dy / 80)); }
+  }, { passive: true });
+  el.addEventListener('touchend', (e) => {
+    if (y0 === null) return;
+    const dy = (e.changedTouches[0]?.clientY ?? y0) - y0;
+    y0 = null;
+    el.style.transition = '';
+    if (dy < -25) { e.preventDefault?.(); fechar(); }
+    else { el.style.transform = ''; el.style.opacity = ''; }
+  });
 }
 
 // Enhancement progressivo de tabelas: busca por texto + ordenação por coluna.

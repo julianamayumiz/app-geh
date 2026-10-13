@@ -1,4 +1,4 @@
-const CACHE = 'app-geh-v15';
+const CACHE = 'app-geh-v21';
 const ARQUIVOS = [
   '/',
   '/index.html',
@@ -15,6 +15,7 @@ const ARQUIVOS = [
   '/js/pdv-core.js',
   '/js/views/venda.js',
   '/js/views/consulta.js',
+  '/js/views/inicio.js',
   '/caixa/index.html',
   '/caixa/pdv.html',
   '/js/views/recarga.js',
@@ -82,7 +83,9 @@ self.addEventListener('fetch', e => {
         if (cached) {
           // Revalida em segundo plano pra proxima visita ter a versao mais
           // recente. Se a rede falhar, ok — o cache ja foi servido.
-          fetch(e.request).then(resp => {
+          // no-cache: revalida de verdade no servidor (sem isso o cache HTTP do
+          // navegador pode devolver o arquivo velho e a atualizacao nunca chega).
+          fetch(e.request, { cache: 'no-cache' }).then(resp => {
             if (resp && resp.ok) {
               caches.open(CACHE).then(c => c.put(e.request, resp.clone()));
             }
@@ -90,7 +93,7 @@ self.addEventListener('fetch', e => {
           return cached;
         }
         // Nao tem em cache — busca da rede e cacheia pra proxima.
-        return fetch(e.request).then(resp => {
+        return fetch(e.request, { cache: 'no-cache' }).then(resp => {
           if (resp && resp.ok && resp.type === 'basic') {
             const clone = resp.clone();
             caches.open(CACHE).then(c => c.put(e.request, clone));

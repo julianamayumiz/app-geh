@@ -46,7 +46,7 @@ const TEMPLATE = `
       <div class="venda-sucesso-val" id="sucesso-total"></div>
       <div class="venda-sucesso-sub">Saldo agora</div>
       <div class="venda-sucesso-saldo" id="sucesso-saldo"></div>
-      <button type="button" class="btn btn-primary" id="btn-proximo">Próximo cliente</button>
+      <button type="button" class="btn btn-primary" id="btn-proximo">Voltar ao início</button>
     </div>
   </div>
 `;
@@ -132,9 +132,9 @@ export async function montar(container, ctx) {
     $('sucesso-saldo').textContent = fmtBRL(saldoFinal);
     $('venda-sucesso').classList.remove('hidden');
     $('btn-proximo').focus();
-    timerSucesso = setTimeout(() => ctx.voltar(), 3000);
+    timerSucesso = setTimeout(() => ctx.fim(), 3000);
   }
-  $('btn-proximo').onclick = () => { clearTimeout(timerSucesso); ctx.voltar(); };
+  $('btn-proximo').onclick = () => { clearTimeout(timerSucesso); ctx.fim(); };
 
   $('btn-carregar').addEventListener('click', async () => {
     if (enviando) return;

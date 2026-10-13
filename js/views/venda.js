@@ -15,8 +15,9 @@ import {
   db, doc, getDoc, collection, getDocs, serverTimestamp, runTransaction
 } from '../firebase-config.js';
 import { icon, renderIcons } from '../icons.js';
-import { toast } from '../ui.js';
 import { fmtBRL, esc } from '../helpers.js';
+
+const QUEBRA = String.fromCharCode(10);
 
 // Preco efetivo (promocao vale so com precoPromo preenchido). Mesma regra na
 // lista e na trava da transacao.
@@ -105,7 +106,7 @@ const TEMPLATE = `
       <div class="venda-sucesso-val" id="sucesso-total"></div>
       <div class="venda-sucesso-sub">Saldo final</div>
       <div class="venda-sucesso-saldo" id="sucesso-saldo"></div>
-      <button type="button" class="btn btn-primary" id="btn-proximo">Próximo cliente</button>
+      <button type="button" class="btn btn-primary" id="btn-proximo">Voltar ao início</button>
     </div>
   </div>
 `;
@@ -125,16 +126,22 @@ export async function montar(container, ctx) {
   let produtos = [];
   let categoriaAtiva = 'Todos';
   let finalizando = false;
+  let avisoInicial = null;   // mensagem de restauracao/descarte do rascunho, mostrada apos a carga
   let vendaId = null;
   let timerSucesso = null;
   let ativo = true;
 
   const vibrar = (padrao) => { try { navigator.vibrate?.(padrao); } catch (_) {} };
 
-  function mostrarAlerta(msg, tipo = 'info') {
+  // Mensagem fixa no topo da venda (sem notificacao flutuante). ms>0 some sozinha.
+  let avisoTimer = null;
+  function mostrarAlerta(msg, tipo = 'info', ms = 0) {
+    clearTimeout(avisoTimer);
     const a = $('alerta-venda');
     a.textContent = msg;
     a.className = `alert alert-${tipo}`;
+    a.style.whiteSpace = 'pre-line';
+    if (ms > 0) avisoTimer = setTimeout(() => a.classList.add('hidden'), ms);
   }
 
   // ── Rascunho ─────────────────────────────────────
@@ -156,7 +163,7 @@ export async function montar(container, ctx) {
     if (r.clienteId !== clienteId) { rascunho.limpar(); return false; }
     if ((r.eventoId || null) !== (eventoAtivo?.id || null)) {
       rascunho.limpar();
-      toast('O evento ativo mudou. O carrinho anterior foi descartado.', { tipo: 'erro', duracao: 5000 });
+      avisoInicial = ['O evento ativo mudou. O carrinho anterior foi descartado.', 'warning'];
       return false;
     }
     vendaId = r.opId || null;
@@ -167,7 +174,7 @@ export async function montar(container, ctx) {
       const q = Math.min(Number(qtd) || 0, produto.estoque ?? 0);
       if (q > 0) { carrinho.set(id, { produto, qtd: q }); restaurou++; }
     });
-    if (restaurou > 0) toast('Carrinho restaurado.', { tipo: 'info' });
+    if (restaurou > 0) avisoInicial = ['Carrinho restaurado.', 'info'];
     return restaurou > 0;
   }
 
@@ -342,11 +349,87 @@ export async function montar(container, ctx) {
     return card;
   }
 
+  // Troca a lista pela versao fresca preservando o carrinho: itens apontam pro
+  // produto novo, qtd e limitada ao estoque atual e o operador e avisado do que mudou.
+  function aplicarProdutos(novos) {
+    produtos = novos;
+    const mudancas = [];
+    const nomesPreco = [];
+    const nomesEstoque = [];
+    Array.from(carrinho.entries()).forEach(([id, item]) => {
+      const novo = novos.find(p => p.id === id);
+      if (!novo) {
+        carrinho.delete(id);
+        mudancas.push(`${item.produto.nome} saiu da lista`);
+        nomesEstoque.push(item.produto.nome);
+        return;
+      }
+      if (novo.precoFinal !== item.produto.precoFinal) {
+        mudancas.push(`${novo.nome}: ${fmtBRL(item.produto.precoFinal)} → ${fmtBRL(novo.precoFinal)}`);
+        nomesPreco.push({ nome: novo.nome, de: item.produto.precoFinal, para: novo.precoFinal });
+      }
+      const max = novo.estoque ?? 0;
+      if (item.qtd > max) {
+        mudancas.push(`${novo.nome}: estoque agora ${max}`);
+        nomesEstoque.push(novo.nome);
+        if (max <= 0) carrinho.delete(id); else item.qtd = max;
+      }
+      if (carrinho.has(id)) item.produto = novo;
+    });
+    renderizarCategorias();
+    renderizarProdutos();
+    atualizarFab();
+    if ($('modal-overlay').classList.contains('aberto')) atualizarModal();
+    if (mudancas.length) {
+      salvarRascunho();
+      conferir = true;
+      // Um bloco por produto: titulo + valor antigo -> valor novo
+      const blocos = [];
+      nomesPreco.forEach(({ nome, de, para }) => {
+        blocos.push([`Atenção: o valor do produto ${nome} mudou!`, `${fmtBRL(de)} -> ${fmtBRL(para)}`].join(QUEBRA));
+      });
+      nomesEstoque.forEach(nome => {
+        blocos.push(`Atenção: o estoque do produto ${nome} mudou!`);
+      });
+      avisoConferir = [blocos.join(QUEBRA + QUEBRA), 'Confira o total e finalize a compra novamente'].join(QUEBRA);
+      if ($('modal-overlay').classList.contains('aberto')) mostrarAvisoConferir();
+      mostrarAlerta(blocos.join(QUEBRA + QUEBRA), 'warning');
+    }
+  }
+
+  // Preco/estoque de item do carrinho mudou: o operador precisa ver e confirmar
+  // o novo total (o Finalizar do proximo toque so passa depois do aviso).
+  let conferir = false;
+  let avisoConferir = '';
+  function mostrarAvisoConferir() {
+    const a = $('alerta-modal');
+    a.textContent = avisoConferir;
+    a.className = 'alert alert-warning';
+    a.style.whiteSpace = 'pre-line';
+  }
+
+  let atualizando = null;
+  // Busca produtos frescos (promocao/preco/estoque mudaram). Uma busca por vez;
+  // nao mexe na lista durante o envio da venda.
+  function atualizarProdutos() {
+    if (!ativo || finalizando) return Promise.resolve();
+    if (atualizando) return atualizando;
+    atualizando = buscarProdutos()
+      .then(novos => { if (ativo && !finalizando) aplicarProdutos(novos); })
+      .catch(e => console.warn('[venda] nao consegui atualizar produtos:', e))
+      .finally(() => { atualizando = null; });
+    return atualizando;
+  }
+
+  const onVisivel = () => { if (document.visibilityState === 'visible') atualizarProdutos(); };
+  document.addEventListener('visibilitychange', onVisivel);
+  limpezas.push(() => document.removeEventListener('visibilitychange', onVisivel));
+
   // ── Carrinho ──────────────────────────────────────
   function adicionar(p) {
     const atual = carrinho.get(p.id) || { produto: p, qtd: 0 };
     if (atual.qtd + 1 > p.estoque) {
-      toast(`Estoque máximo de ${p.nome} atingido`, { tipo: 'erro' });
+      mostrarAlerta(`Estoque máximo de ${p.nome} atingido`, 'warning', 3000);
       return;
     }
     if (!vendaId) vendaId = doc(collection(db, 'vendas')).id;
@@ -377,6 +460,8 @@ export async function montar(container, ctx) {
     atualizarFab();
     fecharModal();
     rascunho.limpar();
+    conferir = false;
+    $('alerta-venda').classList.add('hidden');
   }
 
   function atualizarCardProduto(id, qtd) {
@@ -457,6 +542,8 @@ export async function montar(container, ctx) {
     atualizarModal();
     $('modal-overlay').classList.add('aberto');
     $('alerta-modal').classList.add('hidden');
+    if (conferir) mostrarAvisoConferir();
+    atualizarProdutos();   // confere preco/estoque antes de fechar a conta
   };
   $('modal-overlay').onclick = (e) => { if (e.target === $('modal-overlay')) fecharModal(); };
 
@@ -478,9 +565,9 @@ export async function montar(container, ctx) {
     $('venda-sucesso').classList.remove('hidden');
     $('btn-proximo').focus();
     // Tempo suficiente pra ler o saldo final (feedback #3/#6), depois volta pro scanner.
-    timerSucesso = setTimeout(() => ctx.voltar(), 4000);
+    timerSucesso = setTimeout(() => ctx.fim(), 4000);
   }
-  $('btn-proximo').onclick = () => { clearTimeout(timerSucesso); ctx.voltar(); };
+  $('btn-proximo').onclick = () => { clearTimeout(timerSucesso); ctx.fim(); };
 
   function liberarBotaoFinalizar() {
     $('btn-finalizar').disabled = false;
@@ -498,6 +585,14 @@ export async function montar(container, ctx) {
   $('btn-finalizar').onclick = async () => {
     if (finalizando) return;
     const alertaModal = $('alerta-modal');
+    if (conferir) {
+      // Primeiro toque depois de uma mudanca de preco/estoque: so mostra o aviso.
+      conferir = false;
+      $('alerta-venda').classList.add('hidden');
+      mostrarAvisoConferir();
+      atualizarModal();
+      return;
+    }
     if (!cliente) {
       try { await carregarCliente(); } catch (e) { console.warn(e); }
     }
@@ -535,6 +630,7 @@ export async function montar(container, ctx) {
     const idVenda = vendaId || (vendaId = doc(collection(db, 'vendas')).id);
     let saldoFinal = null;
     let jaRegistrada = false;
+    let falhou = false;
 
     try {
       // Tentativa anterior sem resposta (rede caiu): confere se ja foi gravada.
@@ -565,6 +661,15 @@ export async function montar(container, ctx) {
         const prodSnaps = await Promise.all(prodRefs.map(r => tx.get(r)));
 
         const saldoAtual = clienteSnap.data().saldo || 0;
+
+        // Trava de preco: o carrinho foi montado com um preco que mudou no
+        // banco (promocao entrou/saiu). Nada e cobrado; o operador confere o novo total.
+        if (!vendaSnap.exists()) {
+          itensCarrinho.forEach(({ produto }, i) => {
+            const d = prodSnaps[i].data();
+            if (d && precoDe(d) !== produto.precoFinal) throw new Error(`PRECO_MUDOU:${produto.nome}`);
+          });
+        }
 
         // Idempotencia: a venda ja foi gravada por uma tentativa anterior.
         if (vendaSnap.exists()) {
@@ -615,6 +720,7 @@ export async function montar(container, ctx) {
       concluir({ total, saldoFinal, jaRegistrada });
     } catch (err) {
       clearTimeout(timerLento);
+      falhou = true;
       vibrar([100, 50, 100]); // padrao de erro
 
       // Contencao de transacao (varios operadores no mesmo produto) gera
@@ -623,10 +729,14 @@ export async function montar(container, ctx) {
       const eContencao = err.code === 'failed-precondition'
                       || err.code === 'aborted'
                       || /stored version/i.test(err.message || '');
+      const precoMudou = (err.message || '').startsWith('PRECO_MUDOU:');
       const definitivo = eContencao
+                      || precoMudou
                       || err.message === 'Saldo insuficiente'
                       || (err.message || '').startsWith('Estoque insuficiente');
-      if (err.message === 'Saldo insuficiente') {
+      if (precoMudou) {
+        mensagem = `O preço de "${err.message.slice('PRECO_MUDOU:'.length)}" mudou. A venda NÃO foi cobrada — confira o novo total e finalize de novo.`;
+      } else if (err.message === 'Saldo insuficiente') {
         mensagem = 'Saldo insuficiente pra essa venda.';
       } else if ((err.message || '').startsWith('Estoque insuficiente')) {
         mensagem = err.message + '. Atualize a tela e tente de novo.';
@@ -644,15 +754,21 @@ export async function montar(container, ctx) {
       finalizando = false;
       ctx.setOcupado(false);
     }
+    // Estoque/preco podem ter causado o erro: puxa a versao atual pro operador ver.
+    if (falhou) atualizarProdutos();
   };
 
   // ── Carga inicial ─────────────────────────────────
+  // Com cache da venda anterior mostra a lista na hora e busca a versao fresca
+  // em paralelo; sem cache (1a venda) espera a busca.
+  const tinhaCache = !!produtosCache;
+  const frescoPromise = buscarProdutos();
   const [eventoRes, clienteRes, produtosRes] = await Promise.allSettled([
     ctx.getEvento(),
     carregarCliente(),
-    obterProdutos()
+    tinhaCache ? Promise.resolve(produtosCache) : frescoPromise
   ]);
-  if (!ativo) return { desmontar() {} };
+  if (!ativo) { frescoPromise.catch(() => {}); return { desmontar() {} }; }
 
   eventoAtivo = eventoRes.status === 'fulfilled' ? eventoRes.value : null;
   if (clienteRes.status === 'rejected') {
@@ -668,15 +784,24 @@ export async function montar(container, ctx) {
   } else {
     produtos = produtosRes.value;
     restaurarRascunho();
+    if (avisoInicial) mostrarAlerta(avisoInicial[0], avisoInicial[1], 4000);
     renderizarCategorias();
     renderizarProdutos();
     atualizarFab();
+  }
+
+  if (tinhaCache) {
+    // troca pela versao fresca assim que chegar (re-render + aviso se o carrinho mudou)
+    frescoPromise
+      .then(novos => { if (ativo && !finalizando) aplicarProdutos(novos); })
+      .catch(e => console.warn('[venda] usando produtos da venda anterior:', e));
   }
 
   return {
     desmontar() {
       ativo = false;
       clearTimeout(timerSucesso);
+      clearTimeout(avisoTimer);
       limpezas.forEach(fn => { try { fn(); } catch (_) {} });
       carrinho.clear();
     }

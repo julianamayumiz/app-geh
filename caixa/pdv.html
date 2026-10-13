@@ -16,7 +16,7 @@
 </head>
 <body>
   <header class="header">
-    <a href="index.html" class="back" id="pdv-voltar" aria-label="Voltar"><span data-icon="arrow-left" data-size="24"></span></a>
+    <a href="../index.html" class="back" id="pdv-voltar" aria-label="Voltar"><span data-icon="arrow-left" data-size="24"></span></a>
     <h1 id="pdv-titulo">Escanear QR</h1>
   </header>
 
@@ -76,7 +76,16 @@
     iniciarPdv({
       papel: 'caixa',
       chave: 'caixa',
-      hubUrl: 'index.html',
+      landingUrl: '../index.html',
+      inicio: {
+        titulo: 'Caixa',
+        subtitulo: 'Pronto para receber recargas.',
+        acoes: [
+          { href: '#/scan?acao=carregar',  icone: 'wallet',           titulo: 'Carregar Saldo',  sub: 'Adicionar crédito ao cliente',      estilo: 'btn-accent' },
+          { href: '#/scan?acao=consultar', icone: 'eye',              titulo: 'Consultar Saldo', sub: 'Ver quanto o cliente ainda tem',    estilo: 'btn-secondary' },
+          { href: 'transferir.html',       icone: 'arrow-right-left', titulo: 'Transferir Saldo', sub: 'Mover saldo entre dois clientes',  estilo: 'btn-secondary' }
+        ]
+      },
       opcoes: { transferencias: true },
       acoes: {
         carregar:  { titulo: 'Carregar saldo',  view: 'recarga' },
@@ -84,6 +93,7 @@
       },
       viewComRascunho: 'recarga',
       views: {
+        inicio:   () => import('../js/views/inicio.js'),
         recarga:  () => import('../js/views/recarga.js'),
         consulta: () => import('../js/views/consulta.js')
       },

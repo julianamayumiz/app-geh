@@ -16,7 +16,7 @@
 </head>
 <body>
   <header class="header">
-    <a href="index.html" class="back" id="pdv-voltar" aria-label="Voltar"><span data-icon="arrow-left" data-size="24"></span></a>
+    <a href="../index.html" class="back" id="pdv-voltar" aria-label="Voltar"><span data-icon="arrow-left" data-size="24"></span></a>
     <h1 id="pdv-titulo">Escanear QR</h1>
   </header>
 
@@ -76,13 +76,23 @@
     iniciarPdv({
       papel: 'operador',
       chave: 'operador',
-      hubUrl: 'index.html',
+      landingUrl: '../index.html',
+      inicio: {
+        titulo: 'Operador de Venda',
+        subtitulo: 'Pronto para registrar vendas.',
+        acoes: [
+          { href: '#/scan?acao=vender',    icone: 'shopping-cart',    titulo: 'Vender',          sub: 'Escanear e registrar uma venda',                   estilo: 'btn-primary' },
+          { href: '#/scan?acao=consultar', icone: 'eye',              titulo: 'Consultar Saldo', sub: 'Ver quanto o cliente ainda tem',                   estilo: 'btn-secondary' },
+          { href: '../caixa/transferir.html', icone: 'arrow-right-left', titulo: 'Transferir Saldo', sub: 'Juntar crédito de dois QRs pra fechar a venda', estilo: 'btn-secondary' }
+        ]
+      },
       acoes: {
         vender:    { titulo: 'Vender para cliente', view: 'venda' },
         consultar: { titulo: 'Consultar saldo',     view: 'consulta' }
       },
       viewComRascunho: 'venda',
       views: {
+        inicio:   () => import('../js/views/inicio.js'),
         venda:    () => import('../js/views/venda.js'),
         consulta: () => import('../js/views/consulta.js')
       },
