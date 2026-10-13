@@ -156,10 +156,17 @@ function montarBotaoTroca(elementId, cameras, getDeviceIdAtual, onTrocar) {
 
 const ehFrontal = (label) => /(front|user|frontal|frente)/i.test(label || '');
 
+// opcoes:
+//   manterAberta: true -> ao ler um QR a camera so PAUSA a decodificacao (stream
+//     continua viva) em vez de parar; use handle.retomar() pra ler o proximo.
+//     Evita reabrir a camera (e o prompt de permissao) a cada leitura.
+//   onProblema(err): chamado se a camera morreu e a recuperacao automatica falhou.
 export async function iniciarScanner({
   elementId = 'reader',
   onDetected,
-  onReady
+  onReady,
+  manterAberta = false,
+  onProblema
 }) {
   if (typeof Html5Qrcode === 'undefined') {
     throw new Error('html5-qrcode não carregado');
@@ -168,12 +175,21 @@ export async function iniciarScanner({
   const scanner = new Html5Qrcode(elementId);
   let scanAtivo = true;
   let parado = false;
+  let reiniciando = false;
+  let falhasSeguidas = 0;
   let deviceIdAtual = null;
+  let cameras = [];
+  let botaoMontado = false;
 
   const onDecoded = (decoded) => {
     if (!scanAtivo) return;
     scanAtivo = false;
     const texto = (decoded || '').trim();
+    if (manterAberta) {
+      try { scanner.pause(false); } catch {}
+      try { onDetected?.(texto); } catch (e) { console.error(e); }
+      return;
+    }
     scanner.stop().catch(() => {}).finally(() => {
       try { onDetected?.(texto); } catch (e) { console.error(e); }
     });
@@ -204,6 +220,14 @@ export async function iniciarScanner({
     showTorchButtonIfSupported: true
   };
 
+  function trackAtual() {
+    return document.querySelector(`#${elementId} video`)?.srcObject?.getVideoTracks?.()[0] || null;
+  }
+  function streamViva() {
+    const t = trackAtual();
+    return !!t && t.readyState === 'live';
+  }
+
   // Abre a camera (1 getUserMedia) e devolve o que realmente abriu.
   async function abrir(config) {
     const p = (() => {
@@ -218,9 +242,11 @@ export async function iniciarScanner({
       throw e;
     }
     ajustarTrack(elementId);
-    const track = document.querySelector(`#${elementId} video`)?.srcObject?.getVideoTracks?.()[0];
+    const track = trackAtual();
     const s = track?.getSettings?.() || {};
     deviceIdAtual = s.deviceId || null;
+    // Camera morreu sozinha (outro app pegou, tela bloqueou): recupera.
+    if (track) track.onended = () => { if (!parado) reiniciar(); };
     console.info('[scanner] aberta:', { facing: s.facingMode || null, id: (deviceIdAtual || '').slice(0, 8) });
     return s.facingMode || null;
   }
@@ -238,53 +264,118 @@ export async function iniciarScanner({
 
   // Traseira por padrao: escolha salva do usuario, senao facingMode environment.
   // Unico fallback: id salvo que nao existe mais -> descarta e vai de environment.
-  const salvo = lsGet(STORAGE_KEY);
-  let facing;
-  try {
-    facing = await abrir(salvo ? { deviceId: { exact: salvo } } : { facingMode: 'environment' });
-  } catch (e) {
-    if (!salvo || !/Overconstrained|NotFound/i.test(String(e))) throw e;
-    lsRemove(STORAGE_KEY);
-    facing = await abrir({ facingMode: 'environment' });
-  }
-
-  // Guard: abriu a frontal mesmo assim -> troca pra outra camera.
-  let cameras = [];
-  if (facing === 'user') {
-    cameras = await listarCameras();
-    const outra = cameras.find(c => c.id !== deviceIdAtual && !ehFrontal(c.label))
-      || cameras.find(c => c.id !== deviceIdAtual);
-    if (outra) {
+  async function iniciar() {
+    const salvo = lsGet(STORAGE_KEY);
+    let facing;
+    try {
+      facing = await abrir(salvo ? { deviceId: { exact: salvo } } : { facingMode: 'environment' });
+    } catch (e) {
+      if (!salvo || !/Overconstrained|NotFound/i.test(String(e))) throw e;
       lsRemove(STORAGE_KEY);
-      await pararSeguro();
-      facing = await abrir({ deviceId: { exact: outra.id } });
-      if (facing !== 'user') lsSet(STORAGE_KEY, outra.id);
+      facing = await abrir({ facingMode: 'environment' });
+    }
+
+    // Guard: abriu a frontal mesmo assim -> troca pra outra camera.
+    if (facing === 'user') {
+      cameras = await listarCameras();
+      const outra = cameras.find(c => c.id !== deviceIdAtual && !ehFrontal(c.label))
+        || cameras.find(c => c.id !== deviceIdAtual);
+      if (outra) {
+        lsRemove(STORAGE_KEY);
+        await pararSeguro();
+        facing = await abrir({ deviceId: { exact: outra.id } });
+        if (facing !== 'user') lsSet(STORAGE_KEY, outra.id);
+      }
+    }
+    scanAtivo = true;
+
+    // Tap-to-focus (o <video> e recriado a cada start)
+    const video = document.querySelector(`#${elementId} video`);
+    if (video) {
+      video.addEventListener('click', () => {
+        try {
+          const track = video.srcObject?.getVideoTracks?.()[0];
+          if (!track || !track.getCapabilities) return;
+          const caps = track.getCapabilities();
+          if (caps.focusMode && caps.focusMode.includes('single-shot')) {
+            track.applyConstraints({
+              advanced: [{ focusMode: 'single-shot' }]
+            }).catch(() => {});
+          }
+        } catch {}
+      });
     }
   }
 
-  // Tap-to-focus
-  const video = document.querySelector(`#${elementId} video`);
-  if (video) {
-    video.addEventListener('click', () => {
-      try {
-        const track = video.srcObject?.getVideoTracks?.()[0];
-        if (!track || !track.getCapabilities) return;
-        const caps = track.getCapabilities();
-        if (caps.focusMode && caps.focusMode.includes('single-shot')) {
-          track.applyConstraints({
-            advanced: [{ focusMode: 'single-shot' }]
-          }).catch(() => {});
-        }
-      } catch {}
-    });
+  // Fecha e reabre a camera (recuperacao). Preserva o estado pausado.
+  async function reiniciar() {
+    if (reiniciando || parado) return;
+    reiniciando = true;
+    const estavaPausada = scanner.getState() === Html5QrcodeScannerState.PAUSED || !scanAtivo;
+    try {
+      await pararSeguro();
+      await iniciar();
+      if (estavaPausada) pausar();
+      falhasSeguidas = 0;
+    } catch (e) {
+      console.warn('[scanner] recuperacao falhou:', e);
+      if (++falhasSeguidas >= 2) { try { onProblema?.(e); } catch {} }
+    } finally {
+      reiniciando = false;
+    }
   }
 
+  function pausar() {
+    scanAtivo = false;
+    try {
+      if (scanner.getState() === Html5QrcodeScannerState.SCANNING) scanner.pause(false);
+    } catch {}
+  }
+
+  // Volta a ler. Reabre a camera se ela foi liberada ou morreu.
+  async function retomar() {
+    if (parado) return;
+    const st = scanner.getState();
+    if (st === Html5QrcodeScannerState.PAUSED && streamViva()) {
+      try { scanner.resume(); } catch {}
+      scanAtivo = true;
+    } else if (st === Html5QrcodeScannerState.SCANNING && streamViva()) {
+      scanAtivo = true;
+    } else if (st === Html5QrcodeScannerState.NOT_STARTED || st === Html5QrcodeScannerState.UNKNOWN) {
+      if (reiniciando) return;
+      reiniciando = true;
+      try { await iniciar(); falhasSeguidas = 0; }
+      catch (e) { console.warn('[scanner] reabrir falhou:', e); try { onProblema?.(e); } catch {} }
+      finally { reiniciando = false; }
+    } else {
+      await reiniciar();
+    }
+  }
+
+  // Solta a camera de verdade (economiza bateria). retomar() reabre.
+  async function liberar() {
+    scanAtivo = false;
+    await pararSeguro();
+  }
+
+  // Ao voltar pro app (tela desbloqueou, trocou de aba): confere se a camera sobreviveu.
+  function aoVoltar() {
+    if (document.visibilityState !== 'visible' || parado || reiniciando) return;
+    const st = scanner.getState();
+    const ativa = st === Html5QrcodeScannerState.SCANNING || st === Html5QrcodeScannerState.PAUSED;
+    if (ativa && !streamViva()) reiniciar();
+  }
+  document.addEventListener('visibilitychange', aoVoltar);
+  window.addEventListener('pageshow', aoVoltar);
+
+  await iniciar();
   try { onReady?.(); } catch (e) { console.error(e); }
 
   // Botao de troca de camera: lista em background, nao atrasa a abertura.
   (async () => {
     if (cameras.length < 2) cameras = await listarCameras();
-    if (parado || cameras.length < 2) return;
+    if (parado || botaoMontado || cameras.length < 2) return;
+    botaoMontado = true;
     montarBotaoTroca(
       elementId,
       cameras,
@@ -292,19 +383,27 @@ export async function iniciarScanner({
       async (novoId) => {
         deviceIdAtual = novoId;
         lsSet(STORAGE_KEY, novoId);
+        const estavaPausada = !scanAtivo;
         scanAtivo = false;
         await pararSeguro();
-        scanAtivo = true;
-        try { await abrir({ deviceId: { exact: novoId } }); }
-        catch (e) { console.warn('[scanner] troca de camera falhou:', e); }
+        try {
+          await abrir({ deviceId: { exact: novoId } });
+          scanAtivo = true;
+          if (estavaPausada) pausar();
+        } catch (e) { console.warn('[scanner] troca de camera falhou:', e); }
       }
     );
   })();
 
   return {
+    pausar,
+    retomar,
+    liberar,
     stop: async () => {
       parado = true;
       scanAtivo = false;
+      document.removeEventListener('visibilitychange', aoVoltar);
+      window.removeEventListener('pageshow', aoVoltar);
       await pararSeguro();
     }
   };

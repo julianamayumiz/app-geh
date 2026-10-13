@@ -1,0 +1,13 @@
+/* PDV de pagina unica (operador/caixa) */
+.sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+#pdv-banner { display:flex; flex-wrap:wrap; align-items:center; gap:0.5rem; margin-bottom:0.75rem; padding:0.75rem; }
+#pdv-banner span { flex:1 1 100%; font-weight:600; }
+#pdv-banner .btn { flex:1; }
+.venda-sucesso { position:fixed; inset:0; z-index:300; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,0.85); padding:1rem; }
+.venda-sucesso.hidden { display:none; }
+.venda-sucesso-box { width:100%; max-width:360px; text-align:center; background:var(--card, #fff); color:var(--texto, inherit); border-radius:16px; padding:1.5rem 1rem; }
+.venda-sucesso-ic { color:var(--verde); display:inline-flex; }
+.venda-sucesso-tit { font-weight:700; margin-top:0.5rem; }
+.venda-sucesso-val { font-size:1.5rem; font-weight:800; margin:0.25rem 0 0.75rem; }
+.venda-sucesso-sub { font-size:0.85rem; color:var(--cinza); }
+.venda-sucesso-saldo { font-size:1.6rem; font-weight:800; color:var(--azul); margin-bottom:1rem; }

@@ -1,4 +1,4 @@
-const CACHE = 'app-geh-v14';
+const CACHE = 'app-geh-v15';
 const ARQUIVOS = [
   '/',
   '/index.html',
@@ -9,7 +9,15 @@ const ARQUIVOS = [
   '/operador/scanner.html',
   '/operador/vender.html',
   '/operador/consultar.html',
+  '/operador/pdv.html',
+  '/css/vender.css',
+  '/css/pdv.css',
+  '/js/pdv-core.js',
+  '/js/views/venda.js',
+  '/js/views/consulta.js',
   '/caixa/index.html',
+  '/caixa/pdv.html',
+  '/js/views/recarga.js',
   '/caixa/scanner.html',
   '/caixa/carregar.html',
   '/caixa/transferir.html',

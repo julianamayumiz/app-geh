@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1E3A8A">
+  <meta name="theme-color" content="#0F172A" media="(prefers-color-scheme: dark)">
+  <title>Operador — App GEH</title>
+  <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/vender.css">
+  <link rel="manifest" href="../manifest.json">
+  <script src="/js/sw-register.js"></script>
+  <script src="../js/vendor/html5-qrcode.min.js"></script>
+  <link rel="stylesheet" href="../css/pdv.css">
+</head>
+<body>
+  <header class="header">
+    <a href="index.html" class="back" id="pdv-voltar" aria-label="Voltar"><span data-icon="arrow-left" data-size="24"></span></a>
+    <h1 id="pdv-titulo">Escanear QR</h1>
+  </header>
+
+  <main style="padding-bottom: 6rem;">
+    <div id="pdv-banner" class="alert alert-warning hidden"></div>
+
+    <!-- View scan: fica no DOM o tempo todo (a camera nao e recriada) -->
+    <section id="pdv-scan">
+      <div class="card">
+        <p class="text-center text-muted mb-2">Aponte a câmera para o QR code do cliente</p>
+        <div id="dica-scan" class="alert alert-info mb-2">
+          <strong>💡 Dica:</strong> Para QR codes pequenos, aproxime a câmera do código
+        </div>
+        <div id="scanner-container" style="position: relative;">
+          <div id="reader" style="width: 100%;"></div>
+        </div>
+
+        <div id="alerta" class="alert alert-info mt-2 hidden"></div>
+        <div class="text-center text-muted mt-2" style="font-size: 0.9rem;">
+          <span id="status-texto" role="status">Inicializando câmera...</span>
+        </div>
+        <button id="btn-reiniciar-camera" type="button" class="btn btn-secondary mt-2 hidden">
+          <span data-icon="refresh-cw" data-size="18"></span> Reiniciar câmera
+        </button>
+
+        <div class="mt-2">
+          <button id="btn-manual" type="button" class="btn btn-secondary">
+            <span data-icon="keyboard" data-size="18"></span>
+            Digitar ID manualmente
+          </button>
+        </div>
+
+        <div id="manual-form" class="hidden mt-2">
+          <div class="form-group">
+            <label for="id-manual">ID do cliente</label>
+            <input type="text" id="id-manual" placeholder="Ex: GEH001" autocomplete="off">
+          </div>
+          <button class="btn btn-primary" type="button" id="btn-manual-ok">Continuar</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Views venda / consulta sao montadas aqui por js/pdv-core.js -->
+    <section id="pdv-conteudo" class="hidden"></section>
+  </main>
+
+  <script type="module" src="../js/icons.js"></script>
+  <script type="module">
+    import { iniciarPdv } from '../js/pdv-core.js';
+
+    const enc = encodeURIComponent;
+    const p = new URLSearchParams(location.search);
+
+    // Atalho: pdv.html?acao=consultar (alem do hash #/scan?acao=consultar)
+    if (!location.hash && p.get('acao')) history.replaceState(null, '', `#/scan?acao=${enc(p.get('acao'))}`);
+
+    iniciarPdv({
+      papel: 'operador',
+      chave: 'operador',
+      hubUrl: 'index.html',
+      acoes: {
+        vender:    { titulo: 'Vender para cliente', view: 'venda' },
+        consultar: { titulo: 'Consultar saldo',     view: 'consulta' }
+      },
+      viewComRascunho: 'venda',
+      views: {
+        venda:    () => import('../js/views/venda.js'),
+        consulta: () => import('../js/views/consulta.js')
+      },
+      rascunhoBanner: (r) => {
+        if (!r || r.tipo !== 'venda' || !r.temItens) return null;
+        const n = (r.itens || []).reduce((s, i) => s + (i.qtd || 0), 0);
+        return { texto: `Venda em andamento: ${r.clienteId} (${n} ${n === 1 ? 'item' : 'itens'})`, hash: `#/venda/${enc(r.clienteId)}` };
+      }
+    }).catch(err => console.error('[pdv] falha ao iniciar:', err));
+  </script>
+</body>
+</html>

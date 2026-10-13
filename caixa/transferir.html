@@ -430,6 +430,7 @@
     import { icon, renderIcons } from "../js/icons.js";
     import { requireAuth } from "../js/auth-guard.js";
     import { iniciarScanner } from "../js/scanner.js";
+    import { armazenar } from "../js/pdv-core.js";
     import { fmtBRL } from "../js/helpers.js";
 
     const { perfil } = await requireAuth({ papel: ['caixa', 'operador'] });
@@ -687,37 +688,55 @@
     let scannerFila = Promise.resolve(); // aberturas em serie: nunca duas inicializacoes concorrentes
     function abrirScanner(lado) {
       // reabrir com uma abertura anterior ainda em curso: invalida a anterior
-      if (scannerHandle || !$('scanner-overlay').classList.contains('hidden')) fecharScanner();
+      if (!$('scanner-overlay').classList.contains('hidden')) fecharScanner();
       const seq = ++scannerSeq;
       scannerLado = lado;
       $('scanner-sub').textContent = lado === 'origem' ? 'Selecionando origem' : 'Selecionando destino';
-      $('scanner-status').textContent = 'Inicializando câmera…';
+      $('scanner-status').textContent = scannerHandle ? 'Câmera pronta — aproxime o QR code' : 'Inicializando câmera…';
       $('scanner-status').style.color = '';
       $('scanner-overlay').classList.remove('hidden');
       renderIcons($('scanner-overlay'));
       scannerFila = scannerFila.then(() => iniciarScannerSeq(seq));
     }
 
+    // A camera fica viva (so pausa a leitura) enquanto a pagina estiver aberta:
+    // reabrir o overlay nao repete getUserMedia nem o pedido de permissao.
+    // Se ficar 90s sem uso, solta a camera de verdade (retomar() reabre).
+    let scannerIdle = null;
     async function iniciarScannerSeq(seq) {
       if (seq !== scannerSeq) return; // fechado/reaberto antes da vez dele
+      clearTimeout(scannerIdle);
       try {
-        const handle = await iniciarScanner({
-          elementId: 'reader-tx',
-          onDetected: (texto) => { if (seq === scannerSeq) tratarScan(texto); },
-          onReady: () => {
-            if (seq !== scannerSeq) return;
+        if (!scannerHandle) {
+          scannerHandle = await iniciarScanner({
+            elementId: 'reader-tx',
+            manterAberta: true,
+            // scannerLado != null  <=>  overlay aberto
+            onDetected: (texto) => { if (scannerLado) tratarScan(texto); else scannerHandle?.pausar(); },
+            onReady: () => {
+              if (!scannerLado) return;
+              $('scanner-status').textContent = 'Câmera pronta — aproxime o QR code';
+              $('scanner-status').style.color = '#93c5fd';
+            },
+            onProblema: () => {
+              $('scanner-status').textContent = 'Câmera parou — feche e abra o scanner de novo';
+              $('scanner-status').style.color = '#fca5a5';
+            }
+          });
+        } else {
+          await scannerHandle.retomar();
+          if (seq === scannerSeq) {
             $('scanner-status').textContent = 'Câmera pronta — aproxime o QR code';
             $('scanner-status').style.color = '#93c5fd';
           }
-        });
+        }
         if (seq !== scannerSeq) {
-          // overlay foi fechado (ou reaberto) enquanto a camera abria: nao deixa stream ativa
-          try { await handle?.stop?.(); } catch (_) {}
-          document.getElementById('btn-trocar-camera')?.remove();
+          // overlay foi fechado (ou reaberto) enquanto a camera abria: nao deixa ler no escuro
+          if (!scannerLado) scannerHandle?.pausar();
           return;
         }
-        scannerHandle = handle;
       } catch (err) {
+        scannerHandle = null;
         if (seq !== scannerSeq) return;
         console.error('Erro scanner:', err);
         $('scanner-status').textContent = 'Câmera indisponível — use o botão abaixo pra digitar o ID';
@@ -727,14 +746,13 @@
 
     function fecharScanner() {
       scannerSeq++;
-      try { scannerHandle?.stop?.(); } catch (_) {}
-      scannerHandle = null;
-      // O botao de troca de camera tem id fixo dentro do reader; remove
-      // pra que a proxima abertura recrie com closures novos.
-      document.getElementById('btn-trocar-camera')?.remove();
+      try { scannerHandle?.pausar?.(); } catch (_) {}
+      clearTimeout(scannerIdle);
+      scannerIdle = setTimeout(() => { try { scannerHandle?.liberar?.(); } catch (_) {} }, 90000);
       $('scanner-overlay').classList.add('hidden');
       scannerLado = null;
     }
+    window.addEventListener('pagehide', () => { try { scannerHandle?.stop?.(); } catch (_) {} });
 
     async function tratarScan(texto) {
       const lado = scannerLado;
@@ -811,6 +829,9 @@
       .catch(e => { console.warn('[transferir] falha ao ler eventoAtivo:', e); return null; });
     let eventoAtivo = await eventoAtivoPromise;
 
+    let transfOp = null;   // { chave, id } da transferencia em andamento
+    const pendenteTransf = armazenar('pdv-pendente-transferir', 24 * 60 * 60 * 1000);
+
     $('btn-confirmar').onclick = async () => {
       if (!origem || !destino) return showAlerta('Selecione origem e destino.', 'warning');
       if (origem.id === destino.id) return showAlerta('Origem e destino não podem ser iguais.', 'warning');
@@ -829,14 +850,48 @@
         $('btn-confirmar').innerHTML = '<div class="loader"></div> Conexão lenta — aguardando servidor…';
       }, 5000);
 
-      let txIdGerado = null;
+      // Id gerado uma vez por (origem, destino, valor, motivo): se a rede cair e
+      // o operador tentar de novo, a transacao reconhece a transferencia ja
+      // gravada e NAO move o saldo duas vezes.
+      const chaveOp = `${origem.id}|${destino.id}|${valor}|${motivo}`;
+      if (!transfOp || transfOp.chave !== chaveOp) {
+        transfOp = { chave: chaveOp, id: doc(collection(db, 'transferencias_saldo')).id };
+      }
+      const idTransf = transfOp.id;
+      const idOrigem = origem.id;       // captura antes dos awaits
+      const idDestino = destino.id;
+      const txIdGerado = idTransf;
       let saldosFinal = null;
+      let jaRegistrada = false;
 
       try {
-        await runTransaction(db, async (tx) => {
-          const refO = doc(db, 'clientes', origem.id);
-          const refD = doc(db, 'clientes', destino.id);
-          const [snapO, snapD] = await Promise.all([tx.get(refO), tx.get(refD)]);
+        const pend = pendenteTransf.ler();
+        if (pend && pend.id === idTransf) {
+          const snap = await getDoc(doc(db, 'transferencias_saldo', idTransf));
+          if (snap.exists()) {
+            const t = snap.data();
+            jaRegistrada = true;
+            saldosFinal = { origem: t.origemSaldoDepois, destino: t.destinoSaldoDepois };
+          } else {
+            pendenteTransf.limpar();
+          }
+        }
+        if (!jaRegistrada) {
+          pendenteTransf.gravar({ colecao: 'transferencias_saldo', id: idTransf, rotulo: 'Transferência', clienteId: `${idOrigem} → ${idDestino}`, valor });
+        }
+
+        if (!jaRegistrada) await runTransaction(db, async (tx) => {
+          const refO = doc(db, 'clientes', idOrigem);
+          const refD = doc(db, 'clientes', idDestino);
+          const txRef = doc(db, 'transferencias_saldo', idTransf);
+          const [snapO, snapD, snapT] = await Promise.all([tx.get(refO), tx.get(refD), tx.get(txRef)]);
+          if (snapT.exists()) {
+            const t = snapT.data();
+            jaRegistrada = true;
+            saldosFinal = { origem: t.origemSaldoDepois, destino: t.destinoSaldoDepois };
+            return;
+          }
+          jaRegistrada = false;
           if (!snapO.exists()) throw new Error('Cliente origem não existe.');
           if (!snapD.exists()) throw new Error('Cliente destino não existe.');
 
@@ -851,14 +906,12 @@
           tx.update(refO, { saldo: novoO });
           tx.update(refD, { saldo: novoD });
 
-          const txRef = doc(collection(db, 'transferencias_saldo'));
-          txIdGerado = txRef.id;
           tx.set(txRef, {
-            origemId: origem.id,
+            origemId: idOrigem,
             origemNome: origem.nome || null,
             origemSaldoAntes: saldoO,
             origemSaldoDepois: novoO,
-            destinoId: destino.id,
+            destinoId: idDestino,
             destinoNome: destino.nome || null,
             destinoSaldoAntes: saldoD,
             destinoSaldoDepois: novoD,
@@ -876,6 +929,8 @@
         });
 
         clearTimeout(timerLento);
+        pendenteTransf.limpar();
+        transfOp = null;
         try { navigator.vibrate?.([40, 60, 40, 60, 80]); } catch (_) {}
         const idCurto = (txIdGerado || '').slice(-6).toUpperCase();
         alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 18 })} Transferência #${esc(idCurto)} feita — ${fmtBRL(valor)} de ${esc(origem.id)} pra ${esc(destino.id)}.</span>`;
@@ -896,9 +951,13 @@
         const eContencao = err.code === 'failed-precondition'
                        || err.code === 'aborted'
                        || /stored version/i.test(err.message || '');
+        const definitivo = eContencao || /^(Saldo insuficiente|Cliente (origem|destino) não existe)/.test(err.message || '');
+        if (definitivo) pendenteTransf.limpar();
         const msg = eContencao
           ? 'Conflito com outra operação simultânea. Nada foi transferido — tente de novo.'
-          : `Erro: ${err.message}`;
+          : definitivo
+            ? `Erro: ${err.message}`
+            : `Sem confirmação do servidor (${err.message}). Pode confirmar de novo: se já tiver sido registrada, NÃO será transferida duas vezes.`;
         showAlerta(msg, 'danger');
       } finally {
         atualizarBotao();
