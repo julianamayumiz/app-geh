@@ -26,6 +26,12 @@ const precoDe = (d) => (d.promocao && d.precoPromo ? d.precoPromo : d.preco);
 // Cache so serve pra MOSTRAR a lista na hora enquanto a versao fresca chega;
 // toda venda busca de novo (a pagina nao recarrega, entao nao pode confiar nele).
 let produtosCache = null;
+let produtosEm = 0;
+// Dentro dessa janela a lista em memoria vale: nao relê os ~30 produtos do
+// Firestore a cada venda. A transacao revalida preco e estoque de qualquer
+// jeito (PRECO_MUDOU / Estoque insuficiente) e uma falha forca releitura.
+const PRODUTOS_TTL_MS = 60000;
+const cacheFresco = () => !!produtosCache && Date.now() - produtosEm < PRODUTOS_TTL_MS;
 
 async function buscarProdutos() {
   const snap = await getDocs(collection(db, 'produtos'));
@@ -37,6 +43,7 @@ async function buscarProdutos() {
   });
   lista.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   produtosCache = lista;
+  produtosEm = Date.now();
   return lista;
 }
 
@@ -411,8 +418,9 @@ export async function montar(container, ctx) {
   let atualizando = null;
   // Busca produtos frescos (promocao/preco/estoque mudaram). Uma busca por vez;
   // nao mexe na lista durante o envio da venda.
-  function atualizarProdutos() {
+  function atualizarProdutos(forcar = false) {
     if (!ativo || finalizando) return Promise.resolve();
+    if (!forcar && cacheFresco()) return Promise.resolve();
     if (atualizando) return atualizando;
     atualizando = buscarProdutos()
       .then(novos => { if (ativo && !finalizando) aplicarProdutos(novos); })
@@ -755,14 +763,15 @@ export async function montar(container, ctx) {
       ctx.setOcupado(false);
     }
     // Estoque/preco podem ter causado o erro: puxa a versao atual pro operador ver.
-    if (falhou) atualizarProdutos();
+    if (falhou) atualizarProdutos(true);
   };
 
   // ── Carga inicial ─────────────────────────────────
   // Com cache da venda anterior mostra a lista na hora e busca a versao fresca
   // em paralelo; sem cache (1a venda) espera a busca.
   const tinhaCache = !!produtosCache;
-  const frescoPromise = buscarProdutos();
+  const precisaBuscar = !cacheFresco();
+  const frescoPromise = precisaBuscar ? buscarProdutos() : Promise.resolve(produtosCache);
   const [eventoRes, clienteRes, produtosRes] = await Promise.allSettled([
     ctx.getEvento(),
     carregarCliente(),
@@ -790,7 +799,7 @@ export async function montar(container, ctx) {
     atualizarFab();
   }
 
-  if (tinhaCache) {
+  if (tinhaCache && precisaBuscar) {
     // troca pela versao fresca assim que chegar (re-render + aviso se o carrinho mudou)
     frescoPromise
       .then(novos => { if (ativo && !finalizando) aplicarProdutos(novos); })

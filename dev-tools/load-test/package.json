@@ -1,0 +1,15 @@
+{
+  "name": "app-geh-load-test",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Teste de carga do App GEH (somente projeto app-geh-dev).",
+  "scripts": {
+    "seed": "node seed.js",
+    "test": "node run.js"
+  },
+  "dependencies": {
+    "firebase": "^10.12.2",
+    "firebase-admin": "^12.7.0"
+  }
+}

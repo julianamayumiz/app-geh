@@ -26,3 +26,8 @@ dev-tools/poc-qr/
 # Logs de debug do Firebase CLI e bytecode Python
 *.log
 __pycache__/
+
+# Teste de carga: config com credenciais de dev e resultados das rodadas
+dev-tools/load-test/config.dev.json
+dev-tools/load-test/results-*.json
+dev-tools/load-test/node_modules/

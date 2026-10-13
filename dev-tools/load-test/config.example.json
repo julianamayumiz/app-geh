@@ -1,0 +1,10 @@
+{
+  "firebase": {
+    "apiKey": "...",
+    "authDomain": "app-geh-dev.firebaseapp.com",
+    "projectId": "app-geh-dev",
+    "appId": "..."
+  },
+  "operador": { "email": "operador-teste@exemplo.com", "senha": "..." },
+  "caixa": { "email": "caixa-teste@exemplo.com", "senha": "..." }
+}
