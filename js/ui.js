@@ -71,7 +71,7 @@ export function toast(mensagem, { tipo = 'info', duracao = 3000, vibrar } = {}) 
 // hora hh:mm[:ss], número simples. Cai pra string locale-aware no resto.
 //
 // Colunas com <th> vazio são tratadas como ações (não viram sortable).
-export function enhanceTable(wrapper, { search = true, sort = true, csv = true, searchPlaceholder = 'Buscar nesta tabela…', csvNome } = {}) {
+function enhanceTable(wrapper, { search = true, sort = true, csv = true, searchPlaceholder = 'Buscar nesta tabela…', csvNome } = {}) {
   const table = wrapper.querySelector('table');
   if (!table) return;
   const tbody = table.tBodies[0];
@@ -253,7 +253,7 @@ export function autoSkeleton(root = document) {
 
 // Exporta o conteúdo visível (filtrado) de uma tabela como CSV.
 // Lida com BOM pra Excel abrir UTF-8 corretamente.
-export function exportarTabelaCSV(table, nomeArquivo = 'tabela.csv') {
+function exportarTabelaCSV(table, nomeArquivo = 'tabela.csv') {
   const cabecalhos = Array.from(table.tHead?.querySelectorAll('th') || [])
     .map(th => th.textContent.trim());
   const linhas = Array.from(table.tBodies[0]?.rows || [])

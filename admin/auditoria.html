@@ -270,15 +270,12 @@
       onSnapshot
     } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
-    import { fmtBRL } from "../js/helpers.js";
+    import { fmtBRL, esc } from "../js/helpers.js";
 
     montarNav('auditoria.html');
     renderIcons();
 
     const $ = (id) => document.getElementById(id);
-    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({
-      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-    }[c]));
 
 
     const LOTE_FEED = 50;

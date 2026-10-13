@@ -22,3 +22,7 @@ dev-tools/**/*-key.json
 
 # PoC temporaria de leitura de QR (libs vendorizadas, nao entra no repo)
 dev-tools/poc-qr/
+
+# Logs de debug do Firebase CLI e bytecode Python
+*.log
+__pycache__/

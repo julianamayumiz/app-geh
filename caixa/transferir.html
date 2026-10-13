@@ -431,20 +431,13 @@
     import { requireAuth } from "../js/auth-guard.js";
     import { iniciarScanner } from "../js/scanner.js";
     import { armazenar } from "../js/pdv-core.js";
-    import { fmtBRL } from "../js/helpers.js";
+    import { fmtBRL, esc } from "../js/helpers.js";
 
     const { perfil } = await requireAuth({ papel: ['caixa', 'operador'] });
 
     const fmtInput = (v) => Number(v || 0).toFixed(2).replace('.', ',');
     const $ = (id) => document.getElementById(id);
     const alerta = $('alerta');
-
-    // Escapa HTML pra evitar injecao via campos vindos do Firestore
-    // (nome de cliente, motivo, etc). Cadastro e interno mas a defesa
-    // e barata e elimina a classe inteira de bug.
-    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({
-      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-    }[c]));
 
     // Aceita "15,00", "15.00", "1.234,56" — input type=number rejeita
     // virgula em alguns Androids, entao usamos type=text + parser proprio.
