@@ -166,6 +166,46 @@ export async function iniciarPdv(cfg) {
     usarId(texto);
   }
 
+  // ── Captura de QR a pedido de uma view (ex.: destino da transferencia) ──
+  // A view continua montada (estado preservado); so a tela de scan aparece
+  // por cima ate ler um ID, o usuario voltar ou a rota mudar.
+  let captura = null;   // { resolve, titulo }
+  function cancelarCaptura() {
+    const c = captura;
+    if (!c) return;
+    captura = null;
+    c.resolve(null);
+  }
+  function terminarCaptura(valor) {
+    const c = captura;
+    if (!c) return;
+    captura = null;
+    el.titulo.textContent = c.tituloAnterior;
+    el.scan.classList.add('hidden');
+    el.conteudo.classList.remove('hidden');
+    handle?.pausar();
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => { handle?.liberar(); }, IDLE_CAMERA_MS);
+    c.resolve(valor);
+  }
+  async function escanearParaView(titulo) {
+    cancelarCaptura();
+    const meuRender = renderSeq;
+    const resultado = new Promise((resolve) => {
+      captura = { resolve, tituloAnterior: el.titulo.textContent };
+    });
+    el.titulo.textContent = titulo;
+    el.banner?.classList.add('hidden');
+    el.conteudo.classList.add('hidden');
+    el.scan.classList.remove('hidden');
+    clearTimeout(idleTimer);
+    statusScan('Abrindo câmera…');
+    if (handle) await handle.retomar();
+    else await garantirCamera();
+    if (renderSeq === meuRender && captura && handle) statusScan('Câmera pronta - Aproxime o QR code', 'var(--azul)');
+    return resultado;
+  }
+
   async function usarId(bruto) {
     const id = (bruto || '').trim();
     if (!id || id.includes('/')) {
@@ -177,10 +217,12 @@ export async function iniciarPdv(cfg) {
     el.status.style.color = 'var(--verde)';
     try { navigator.vibrate?.(40); } catch {}
 
+    if (captura) { terminarCaptura(id); return; }
+
     const a = cfg.acoes[acao] || cfg.acoes[acaoPadrao];
     // Carrinho de outro cliente em andamento: nao descarta sem perguntar.
     const r = rascunho.ler();
-    if (a.view === cfg.viewComRascunho && r && r.clienteId && r.clienteId !== id && r.temItens) {
+    if ([].concat(cfg.viewComRascunho).includes(a.view) && r && r.clienteId && r.clienteId !== id && r.temItens) {
       const ok = await confirmarAsync(
         `Há uma operação em andamento para ${r.clienteId}. Descartar e continuar com ${id}?`,
         { destrutivo: true, textoOk: 'Descartar' }
@@ -206,6 +248,7 @@ export async function iniciarPdv(cfg) {
   window.addEventListener('popstate', () => render());
 
   el.voltar.addEventListener('click', (e) => {
+    if (captura) { e.preventDefault(); terminarCaptura(null); return; }   // volta pra view
     const n = parseHash().nome;
     if (n === 'inicio') return;          // link normal pra pagina inicial do app
     e.preventDefault();
@@ -243,6 +286,7 @@ export async function iniciarPdv(cfg) {
 
   async function render() {
     if (!authOk) return;   // renderiza assim que o auth confirmar
+    cancelarCaptura();     // mudou de rota: a view que pediu o scan vai ser desmontada
     const meu = ++renderSeq;
     const rota = parseHash();
 
@@ -302,7 +346,8 @@ export async function iniciarPdv(cfg) {
         getEvento: () => getDoc(doc(db, 'config', 'eventoAtivo'))
           .then(s => s.exists() ? s.data() : null)
           .catch(e => { console.warn('[pdv] falha ao ler eventoAtivo:', e); return null; }),
-        setTitulo: (t) => { el.titulo.textContent = t; }
+        setTitulo: (t) => { el.titulo.textContent = t; },
+        escanear: (titulo) => escanearParaView(titulo)
       };
       const v = await mod.montar(el.conteudo, ctx);
       if (meu !== renderSeq) { await v?.desmontar?.(); el.conteudo.replaceChildren(); return; }

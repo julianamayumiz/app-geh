@@ -66,7 +66,7 @@
     {
       "file": "CLAUDE.md",
       "title": "11. Onde ir agora",
-      "description": "Você viu: landing → init/auth → rules → helpers UI → 2 fluxos financeiros. Próximos caminhos:\n\n- Quer entender outros papéis? Ler `recepcao/conferencia.html` (check-in) e `caixa/transferir.html` (transferência entre clientes).\n- Quer mexer? Ler `CLAUDE.md` pra convenções (PT-BR, `fmtBRL`/`esc` em helpers.js, `confirmarAsync` sempre, etc).\n- Quer entender o pipeline de deploy? README seção 'Como fazer deploy'.\n- Achou um bug em rule? Lembre: `firebase deploy --only firestore:rules`, não basta hosting.\n\nO app é pequeno, mas é financeiro. Toda mudança em fluxo de dinheiro merece teste local com `firebase serve` antes do deploy."
+      "description": "Você viu: landing → init/auth → rules → helpers UI → 2 fluxos financeiros. Próximos caminhos:\n\n- Quer entender outros papéis? Ler `recepcao/conferencia.html` (check-in) e `caixa/transferir.html` (agora view do PDV: `js/views/transferir.js`).\n- Quer mexer? Ler `CLAUDE.md` pra convenções (PT-BR, `fmtBRL`/`esc` em helpers.js, `confirmarAsync` sempre, etc).\n- Quer entender o pipeline de deploy? README seção 'Como fazer deploy'.\n- Achou um bug em rule? Lembre: `firebase deploy --only firestore:rules`, não basta hosting.\n\nO app é pequeno, mas é financeiro. Toda mudança em fluxo de dinheiro merece teste local com `firebase serve` antes do deploy."
     }
   ]
 }

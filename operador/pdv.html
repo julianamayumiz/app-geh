@@ -83,20 +83,26 @@
         acoes: [
           { href: '#/scan?acao=vender',    icone: 'shopping-cart',    titulo: 'Vender',          sub: 'Escanear e registrar uma venda',                   estilo: 'btn-primary' },
           { href: '#/scan?acao=consultar', icone: 'eye',              titulo: 'Consultar Saldo', sub: 'Ver quanto o cliente ainda tem',                   estilo: 'btn-secondary' },
-          { href: '../caixa/transferir.html', icone: 'arrow-right-left', titulo: 'Transferir Saldo', sub: 'Juntar crédito de dois QRs pra fechar a venda', estilo: 'btn-secondary' }
+          { href: '#/scan?acao=transferir', icone: 'arrow-right-left', titulo: 'Transferir Saldo', sub: 'Juntar crédito de dois QRs pra fechar a venda', estilo: 'btn-secondary' }
         ]
       },
+      opcoes: { transferencias: true },
       acoes: {
         vender:    { titulo: 'Vender para cliente', view: 'venda' },
-        consultar: { titulo: 'Consultar saldo',     view: 'consulta' }
+        consultar: { titulo: 'Consultar saldo',     view: 'consulta' },
+        transferir: { titulo: 'Transferir: quem envia', view: 'transferir' }
       },
-      viewComRascunho: 'venda',
+      viewComRascunho: ['venda', 'transferir'],
       views: {
         inicio:   () => import('../js/views/inicio.js'),
         venda:    () => import('../js/views/venda.js'),
-        consulta: () => import('../js/views/consulta.js')
+        consulta: () => import('../js/views/consulta.js'),
+        transferir: () => import('../js/views/transferir.js')
       },
       rascunhoBanner: (r) => {
+        if (r && r.tipo === 'transferir' && r.temItens) {
+          return { texto: `Transferência em andamento: ${r.clienteId} → ${r.destinoId}`, hash: `#/transferir/${enc(r.clienteId)}` };
+        }
         if (!r || r.tipo !== 'venda' || !r.temItens) return null;
         const n = (r.itens || []).reduce((s, i) => s + (i.qtd || 0), 0);
         return { texto: `Venda em andamento: ${r.clienteId} (${n} ${n === 1 ? 'item' : 'itens'})`, hash: `#/venda/${enc(r.clienteId)}` };

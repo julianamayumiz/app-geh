@@ -131,7 +131,7 @@ App GEH/
 │   ├── sw-register.js          # Registra o Service Worker e recarrega em nova versão
 │   ├── scanner.js              # Wrapper de câmera/QR sobre html5-qrcode
 │   ├── pdv-core.js             # Shell do PDV de página única (rotas por hash, câmera persistente)
-│   ├── views/                  # Telas do PDV: inicio, venda, recarga, consulta
+│   ├── views/                  # Telas do PDV: inicio, venda, recarga, transferir, consulta
 │   └── vendor/                 # html5-qrcode (hospedado localmente)
 │
 ├── operador/
@@ -141,7 +141,7 @@ App GEH/
 ├── caixa/
 │   ├── index.html              # Home do caixa
 │   ├── pdv.html                # PDV de página única: scan, recarga e consulta
-│   └── transferir.html         # Transferência de saldo entre dois clientes
+│   └── transferir.html         # Redireciona para a view de transferência no PDV (links antigos)
 │
 ├── recepcao/
 │   ├── index.html              # Home da recepção

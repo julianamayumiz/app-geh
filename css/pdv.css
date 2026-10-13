@@ -107,3 +107,25 @@
 @media (min-width: 768px) {
   .grid-acoes { grid-template-columns: 1fr; }
 }
+
+/* ── View transferir (fluxo guiado) ───────────────────────── */
+.tf { display:flex; flex-direction:column; gap:0.75rem; }
+.tf-prog { display:flex; gap:4px; }
+.tf-prog i { flex:1; height:5px; border-radius:3px; background:var(--borda, rgba(128,128,128,0.35)); }
+.tf-prog i.on { background:var(--azul); }
+.tf-tit { font-size:1.2rem; margin:0.25rem 0 0; text-align:center; }
+.tf-card { border-radius:12px; padding:0.75rem 1rem; display:flex; flex-direction:column; gap:0.1rem; border:1px solid transparent; }
+.tf-card b { font-size:1.1rem; }
+.tf-rot { font-size:0.8rem; text-transform:uppercase; letter-spacing:0.04em; opacity:0.8; }
+.tf-o { background:rgba(251,191,36,0.2); border-color:var(--amarelo); }
+.tf-d { background:rgba(34,197,94,0.18); border-color:var(--verde); }
+.tf-depois { font-weight:700; }
+.tf-par { display:flex; align-items:center; gap:0.5rem; }
+.tf-par .tf-card { flex:1; min-width:0; padding:0.5rem 0.75rem; }
+.tf-valor-box { display:flex; align-items:center; gap:0.5rem; justify-content:center; border-bottom:2px solid var(--azul); padding:0.25rem 0; }
+.tf-valor-box span { font-size:1.6rem; font-weight:700; }
+.tf-valor-box input { font-size:2.2rem; font-weight:700; text-align:center; border:0; background:transparent; width:60%; min-height:56px; box-shadow:none; }
+.tf-chips { display:flex; gap:0.5rem; flex-wrap:wrap; justify-content:center; }
+.tf-chip { min-height:48px; min-width:72px; padding:0 1rem; border-radius:12px; border:1px solid var(--azul); background:transparent; color:inherit; font-weight:700; font-size:1rem; cursor:pointer; }
+.tf-link { background:none; border:0; color:var(--azul); text-align:left; padding:0.5rem 0; min-height:44px; cursor:pointer; font-size:1rem; }
+.tf-total { font-size:2.2rem; font-weight:700; text-align:center; }
