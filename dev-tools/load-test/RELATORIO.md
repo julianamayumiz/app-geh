@@ -221,11 +221,47 @@ Critérios de aprovação:
 
 ---
 
+## 7.1. Resultado da rodada realista (2026-10-13)
+
+Cenário: 8 operadores + 4 caixas, 196 s, pausa de 8-20 s, seed limpo (31 produtos / 4 318 un., 300 clientes / R$ 45.000), login real (operador/caixa com rules de produção). Rodada oficial `lt-1791926756563`; uma rodada anterior sobre base já usada deu números equivalentes.
+
+| operação | n | erros genuínos | p50 | p95 |
+|---|---:|---:|---:|---:|
+| consultar | 16 | 0 | 31 ms | 68 ms |
+| carregar | 51 | 0 | 60 ms | 83 ms |
+| vender | 88 | 0 | 81 ms | 113 ms |
+
+- 86 vendas ok + 2 `saldo_insuf` (regra de negócio); nenhum erro genuíno, nenhuma contenção.
+- Vazão do teste: ~0,78 ops/s, **acima do pico projetado do evento (0,49 ops/s)**.
+- **Integridade 4/4:** Δ saldo −R$ 985 = esperado; Δ estoque 277 un. = vendido; docs de venda e de recarga batem com as operações ok.
+- Rules reais funcionaram (operador vende, caixa recarrega). Seed e rodada rodaram em `app-geh-dev`.
+
+**Leituras:** 1.898 na rodada (~22 por venda contando recargas e consultas). Maior parte é a lista de produtos (31 docs por recarga do cache). O cache de 60 s só poupa leituras quando o mesmo aparelho vende mais de uma vez por minuto; no ritmo médio do evento (~1 venda/min por operador) quase toda venda recarrega a lista. Projeção honesta: ~35 leituras/venda × 1.730 ≈ 50-60 mil leituras no dia. Com o Blaze ativo isso custa menos de 1 centavo de dólar acima da cota grátis, então **não é mais risco**. Se quiser reduzir de verdade, aumentar `PRODUTOS_TTL_MS` (ex.: 3-5 min) é a alavanca; a transação revalida preço e estoque de qualquer forma.
+
+## 7.2. Resultado da rodada de estresse (2026-10-13)
+
+Cenário: 33 operadores + 17 caixas (50 VUs), 64 s, pausa de 50-250 ms (sem "pensar"), seed limpo, mesmas rules e logins reais. Rodada `lt-1791927017615`.
+
+| operação | n | erros | p50 | p95 | max |
+|---|---:|---:|---:|---:|---:|
+| consultar | 245 | 0 | 70 ms | 164 ms | 248 ms |
+| carregar | 2 466 | 0 | 233 ms | 381 ms | 3 515 ms |
+| vender | 1 460 | 132 | 214 ms | 5 861 ms | 11 211 ms |
+
+- Vazão: **63 ops/s** (~130× o pico projetado do evento; abril tinha chegado a 41). Em 60 s foram 1 328 vendas e 2 466 recargas, e **4 035 das 4 318 unidades do estoque foram vendidas** (o estoque acabou: 68 `estoque_insuf`, 32 `saldo_insuf`, ambos regra de negócio).
+- **Erros genuínos: 32 (0,84 % das operações; 2,2 % das vendas)**, todos `failed-precondition` (contenção de transação em produto quente). Nenhum outro tipo de erro, nenhuma queda.
+- **Integridade 4/4 mesmo sob estresse:** Δ saldo R$ 75.941 = esperado; Δ estoque 4 035 un. = vendido; 1 328 vendas e 2 466 recargas conferem com os documentos gravados. Nenhuma venda pela metade nem cobrada em dobro.
+- Recarga aguenta bem (p95 381 ms); a degradação é só na venda, pelo mesmo motivo de abril: vários operadores no mesmo produto no mesmo instante, agora com carrinhos de até 4 itens (mais documentos por transação).
+- Leituras 16,6 mil e escritas 10,6 mil em 1 minuto: irrelevante com Blaze.
+
+**Onde racha:** não houve ruptura (nada caiu nem corrompeu); o limite prático é de latência da venda, que sai de ~100 ms para p95 ~6 s entre ~0,8 e ~63 ops/s. Pra chegar nessa região no evento seria preciso ~130× a carga projetada.
+
+**Conclusão:** o app aguenta o evento de 300 pessoas com folga de duas ordens de grandeza, e mantém a integridade mesmo quando levado ao absurdo. Em caso de contenção, o PDV já mostra que a venda não foi cobrada e pode ser refeita.
+
 ## 8. Pendências
 
 - [x] Plano Blaze ativado na produção (confirmar que o alerta de orçamento existe)
 - [ ] Confirmar com a diretoria: expectativa de gasto por pessoa e nº de operadores/caixas (duração já confirmada: 11h30-15h30)
 - [x] Script de carga recriado em `run.js` + `seed.js` (espelham as transacoes do PDV, imitam o cache de 60 s e conferem saldo, estoque e contagem de docs). Uso no cabecalho do `run.js`; so roda em `app-geh-dev`
-- [ ] Rodar a rodada 7 e anexar resultados aqui
-- [x] Reduzir `getDocs(produtos)` por venda: cache de 60 s em `venda.js` (`PRODUTOS_TTL_MS`); falha na venda forca releitura. Cai de ~35 para ~5 leituras por venda no uso normal
-- [ ] Opcional: rodar com 80 VUs só pra achar o ponto de ruptura
+- [x] Rodadas realista (7.1) e de estresse (7.2) executadas
+- [x] Reduzir `getDocs(produtos)` por venda: cache de 60 s em `venda.js` (`PRODUTOS_TTL_MS`); falha na venda forca releitura. Corta a releitura só em ritmo rápido (vendas a menos de 60 s uma da outra no mesmo aparelho); ver 7.1

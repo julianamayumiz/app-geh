@@ -242,10 +242,15 @@ console.log(`Base: ${inicialProdutos.length} produtos (${antes.estoque} un.), ${
 leituras = 0; // zera: conta so a partir da carga
 fim = Date.now() + DURACAO_S * 1000;
 const t0 = Date.now();
+const progresso = setInterval(() => {
+  const falt = Math.max(0, Math.round((fim - Date.now()) / 1000));
+  console.log(`[${String(Math.round((Date.now() - t0) / 1000)).padStart(3)}s] vendas ${cont.vender.ok} ok (${cont.vender.saldo_insuf + cont.vender.estoque_insuf} negocio, ${cont.vender.genuino} erro) | recargas ${cont.carregar.ok} | consultas ${cont.consultar.ok} | faltam ${falt}s`);
+}, 10000);
 const vus = [];
 for (let i = 0; i < N_OPERADORES; i++) vus.push(loopOperador(i, cxOp, antes.ids, evento, inicialProdutos));
 for (let i = 0; i < N_CAIXAS; i++) vus.push(loopCaixa(i, cxCaixa, antes.ids, evento));
 await Promise.all(vus);
+clearInterval(progresso);
 const dur = (Date.now() - t0) / 1000;
 
 // ---------- integridade ----------
