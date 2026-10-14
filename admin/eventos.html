@@ -402,10 +402,29 @@
     // Excluir evento
     async function excluirEvento(id, nome, totalVendas) {
       if (totalVendas > 0) {
-        toast(`Não é possível excluir "${nome}": existem ${totalVendas} venda(s) vinculadas. Mantenha como histórico.`, { tipo: 'erro', duracao: 5000 });
-        return;
-      }
-      if (!(await confirmarAsync(`Excluir definitivamente "${nome}"? Esta ação não pode ser desfeita.`, { destrutivo: true, textoOk: 'Excluir' }))) return;
+        // Evento de teste: apaga o evento junto com tudo que aponta pra ele.
+        // ajustes_saldo e imutavel nas rules (auditoria), entao fica de fora.
+        const colecoes = ['vendas', 'movimentacoes_saldo', 'vendas_porta', 'convites_antecipados', 'despesas'];
+        const ok = await confirmarAsync(
+          `"${nome}" tem ${totalVendas} venda(s). Excluir apaga o evento E todas as vendas, recargas, vendas na porta, convites e despesas dele. Os saldos dos clientes NAO sao revertidos. Nao da pra desfazer. Use so pra eventos de teste.`,
+          { destrutivo: true, textoOk: 'Excluir tudo' }
+        );
+        if (!ok) return;
+        try {
+          for (const col of colecoes) {
+            const snap = await getDocs(query(collection(db, col), where('eventoId', '==', id)));
+            for (let i = 0; i < snap.docs.length; i += 499) {
+              const batch = writeBatch(db);
+              snap.docs.slice(i, i + 499).forEach(d => batch.delete(d.ref));
+              await batch.commit();
+            }
+          }
+          aggCache.delete(id);
+        } catch (err) {
+          toast(`Erro ao apagar dados do evento: ${err.message}`, { tipo: 'erro', duracao: 5000 });
+          return;
+        }
+      } else if (!(await confirmarAsync(`Excluir definitivamente "${nome}"? Esta ação não pode ser desfeita.`, { destrutivo: true, textoOk: 'Excluir' }))) return;
       await deleteDoc(doc(db, 'eventos', id));
       const cfgSnap = await getDoc(doc(db, 'config', 'eventoAtivo'));
       if (cfgSnap.exists() && cfgSnap.data().id === id) {
