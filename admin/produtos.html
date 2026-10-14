@@ -247,10 +247,10 @@ Suco de Laranja, 5.00, 50, Bebidas
           ? `<span style="text-decoration:line-through;color:var(--cinza);font-size:0.85rem;">${fmtBRL(p.preco)}</span> <strong style="color:var(--vermelho);">${fmtBRL(p.precoPromo)}</strong>`
           : fmtBRL(p.preco);
         tr.innerHTML = `
-          <td>${esc(p.nome)}${badgeFav}${badgePromo}${badgeEstoque}</td>
-          <td>${esc(p.categoria) || '—'}</td>
-          <td>${precoHtml}</td>
-          <td>${p.estoque}</td>
+          <td data-sort="${esc(p.nome)}">${esc(p.nome)}${badgeFav}${badgePromo}${badgeEstoque}</td>
+          <td data-sort="${esc(p.categoria)}">${esc(p.categoria) || '—'}</td>
+          <td data-sort="${p.promocao && p.precoPromo ? p.precoPromo : p.preco}">${precoHtml}</td>
+          <td data-sort="${p.estoque}">${p.estoque}</td>
           <td>
             <button class="btn btn-secondary" style="width:auto;padding:0.35rem 0.75rem;font-size:0.85rem;" data-edit="${p.id}">Editar</button>
             <button class="btn btn-danger"   style="width:auto;padding:0.35rem 0.75rem;font-size:0.85rem;" data-del="${p.id}">Excluir</button>

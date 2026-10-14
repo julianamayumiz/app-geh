@@ -136,6 +136,11 @@ function enhanceTable(wrapper, { search = true, sort = true, csv = true, searchP
 
   function valorParaSort(td) {
     if (!td) return '';
+    // data-sort permite a pagina informar o valor exato (ex: nome sem badges)
+    if (td.dataset.sort !== undefined) {
+      const n = Number(td.dataset.sort);
+      return td.dataset.sort !== '' && !isNaN(n) ? n : td.dataset.sort.toLowerCase();
+    }
     const txt = (td.textContent || '').trim();
     const brl = txt.match(/^R\$\s*([\d.]+),(\d+)/);
     if (brl) return parseFloat(brl[1].replace(/\./g, '') + '.' + brl[2]);
@@ -164,6 +169,8 @@ function enhanceTable(wrapper, { search = true, sort = true, csv = true, searchP
       return 0;
     });
     linhas.forEach(l => tbody.appendChild(l));
+    // Reordenar dispara o proprio observer; descarta esses registros pra nao entrar em loop
+    obs.takeRecords();
   }
 
   function aplicarFiltro(count) {
