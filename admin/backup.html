@@ -20,6 +20,8 @@
     .bk-status.ativo   { background: #dcfce7; color: #166534; }
     .bk-status.inativo { background: #f1f5f9; color: #475569; }
     .bk-status.erro    { background: #fee2e2; color: #991b1b; }
+    .bk-status.atencao { background: #fef3c7; color: #78350f; }
+    [data-theme="dark"] .bk-status.atencao { background: #422006; color: #fde68a; }
     [data-theme="dark"] .bk-status.ativo   { background: #14532d; color: #bbf7d0; }
     [data-theme="dark"] .bk-status.inativo { background: #1e293b; color: #cbd5e1; }
     [data-theme="dark"] .bk-status.erro    { background: #7f1d1d; color: #fecaca; }
@@ -77,6 +79,17 @@
     }
     .bk-log .ok  { color: var(--verde); }
     .bk-log .err { color: var(--vermelho); }
+    .bk-log .warn { color: var(--amarelo-acento); }
+    .bk-mon {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 0.75rem;
+    }
+    .bk-mon-rot {
+      display: block; font-size: 0.72rem; color: var(--cinza);
+      text-transform: uppercase; letter-spacing: 0.03em; font-weight: 600;
+    }
+    .bk-mon-val { font-size: 0.95rem; font-weight: 600; overflow-wrap: anywhere; }
     .bk-log-vazio { color: var(--cinza); font-style: italic; }
     .bk-toggle { display: flex; align-items: center; gap: 0.5rem; }
     .bk-arquivos {
@@ -139,11 +152,23 @@
       <span id="bk-status-texto">Carregando…</span>
     </div>
 
-    <div id="bk-precisa-permissao" class="bk-aviso hidden">
-      <strong>Permissão da pasta expirou.</strong> Clique em
-      <strong>Trocar pasta</strong> abaixo (ou em <strong>Iniciar agora</strong>)
-      pra liberar o acesso de novo — o navegador esquece a permissão quando
-      a janela é totalmente fechada.
+    <div id="bk-precisa-permissao" class="bk-aviso erro hidden">
+      <strong>Sem permissão na pasta — nenhum backup está sendo salvo.</strong>
+      O navegador esquece a permissão quando a janela é totalmente fechada.
+      <div style="margin-top:0.5rem;">
+        <button id="bk-reautorizar" class="btn btn-primary" style="width:auto;">Reautorizar pasta</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="color:var(--azul);margin-bottom:0.75rem;">Monitoramento</h3>
+      <div class="bk-mon">
+        <div><span class="bk-mon-rot">Último backup OK</span><span id="bk-m-ultimo" class="bk-mon-val">—</span></div>
+        <div><span class="bk-mon-rot">Próxima execução</span><span id="bk-m-proximo" class="bk-mon-val">—</span></div>
+        <div><span class="bk-mon-rot">Última tentativa</span><span id="bk-m-tentativa" class="bk-mon-val">—</span></div>
+        <div><span class="bk-mon-rot">Documentos / duração</span><span id="bk-m-docs" class="bk-mon-val">—</span></div>
+        <div><span class="bk-mon-rot">Nesta sessão</span><span id="bk-m-sessao" class="bk-mon-val">0 ok · 0 falhas</span></div>
+      </div>
     </div>
 
     <div class="bk-aviso">
@@ -160,7 +185,7 @@
       <p style="font-size:0.8rem;color:var(--cinza);margin-top:0.5rem;">
         Escolha uma vez (ex: <code>Desktop\backups-geh</code>) — depois disso,
         os arquivos vão direto pra ela. Mantém os 30 mais recentes; os antigos
-        são apagados automaticamente.
+        só são apagados depois que o novo backup foi gravado e conferido.
       </p>
       <div id="bk-arquivos" class="bk-arquivos hidden"></div>
     </div>
@@ -181,8 +206,10 @@
 
       <p style="font-size:0.85rem;color:var(--cinza);">
         O backup roda <strong>imediatamente</strong> ao iniciar e depois a cada
-        <strong>10 minutos</strong>. Cada arquivo é independente — abra qualquer
-        um pra ver os dados daquele momento.
+        <strong>10 minutos</strong> (se falhar, tenta de novo em 2 min). Cada arquivo
+        é independente — abra qualquer um pra ver os dados daquele momento.
+        Ao encerrar o evento, é feito um último backup. Enquanto estiver ativo,
+        a tela do computador não apaga sozinha (pra ele não suspender).
       </p>
     </div>
 
@@ -218,7 +245,12 @@
     ];
 
     const INTERVALO_MS    = 10 * 60 * 1000;   // 10 minutos
+    const RETRY_MS        = 2 * 60 * 1000;    // apos falha, tenta de novo em 2 min
+    const ATRASO_MS       = 2 * INTERVALO_MS + 60 * 1000; // sem sucesso ha mais que isso = ATRASADO
     const MANTER_ULTIMOS  = 30;
+    const MAX_CELULA      = 32000;            // limite do Excel e 32767 chars por celula
+    const LOCK_NOME       = 'app-geh-backup'; // lock entre abas/janelas do mesmo navegador
+    const LOCK_OCUPADO    = Symbol('lock-ocupado');
     const IDB_NOME        = 'app-geh-backup';
     const IDB_STORE       = 'kv';
     const IDB_HANDLE_KEY  = 'pastaHandle';
@@ -228,14 +260,32 @@
 
     // ---- estado ----
     let dirHandle        = null;
-    let timerId          = null;
-    let countdownId      = null;
+    let timerId          = null;     // setInterval de 1s: atualiza UI e dispara backup quando vence
+    let ativo            = false;    // agendamento automatico ligado
+    let inicioAtivoEm    = 0;
     let proximoEm        = 0;
-    let rodando          = false;
+    let rodando          = false;    // setado de forma SINCRONA no inicio da execucao
     let eventoAtivo      = null;
+    let ultimoEvento     = null;     // ultimo evento conhecido (pro backup final)
+    let monitorEventoOk  = true;
     let auto             = localStorage.getItem(LS_AUTO_KEY) !== '0';
     let precisaPermissao = false;
+    let wakeLock         = null;
+    let ultimoOk         = null;     // { quando, nome, docs, duracaoMs, tamanho }
+    let ultimaTentativa  = null;     // { quando, ok, msg }
+    let sucessos         = 0;
+    let falhas           = 0;
+    let celulasTruncadas = 0;
     const SUPORTADO      = 'showDirectoryPicker' in window;
+
+    // Erro com etapa e mensagem ja pronta pro operador (detalhe tecnico vai pro console)
+    class BackupErro extends Error {
+      constructor(etapa, mensagem, causa) {
+        super(mensagem);
+        this.etapa = etapa;
+        this.causa = causa;
+      }
+    }
 
     // ---- IndexedDB minimo (pra guardar o handle da pasta) ----
     function idbOpen() {
@@ -280,7 +330,7 @@
         atualizarUI();
         atualizarListaArquivos();
         // Tenta auto-iniciar caso ja tenha evento rolando
-        considerarAutoIniciar();
+        considerarAutoIniciar(eventoAtivo);
       } catch (e) {
         if (e.name !== 'AbortError') console.error(e);
       }
@@ -298,20 +348,25 @@
       return false;
     }
 
-    async function garantirPermissaoPasta() {
+    // comGesto=true so quando a chamada veio de um clique (requestPermission exige).
+    // Nos ticks automaticos apenas consulta: nunca lanca por falta de gesto.
+    async function checarPermissao(comGesto) {
       if (!dirHandle) return false;
       const opts = { mode: 'readwrite' };
-      const perm = await dirHandle.queryPermission(opts);
-      if (perm === 'granted') { precisaPermissao = false; atualizarUI(); atualizarListaArquivos(); return true; }
-      const req = await dirHandle.requestPermission(opts);
-      const ok = req === 'granted';
-      precisaPermissao = !ok;
-      atualizarUI();
-      if (ok) atualizarListaArquivos();
-      return ok;
+      let perm = await dirHandle.queryPermission(opts);
+      if (perm !== 'granted' && comGesto) perm = await dirHandle.requestPermission(opts);
+      precisaPermissao = perm !== 'granted';
+      return !precisaPermissao;
     }
 
     // ---- conversao Firestore -> celula ----
+    function limitarTexto(s) {
+      if (typeof s === 'string' && s.length > MAX_CELULA) {
+        celulasTruncadas++;
+        return s.slice(0, MAX_CELULA) + '…[TRUNCADO]';
+      }
+      return s;
+    }
     function celula(v) {
       if (v === null || v === undefined) return '';
       if (v && typeof v.toDate === 'function') {
@@ -319,55 +374,170 @@
       }
       if (v instanceof Date) return v.toISOString();
       if (typeof v === 'object') {
-        try { return JSON.stringify(v); } catch (e) { return String(v); }
+        try { return limitarTexto(JSON.stringify(v)); } catch (e) { return limitarTexto(String(v)); }
       }
-      return v;
+      return limitarTexto(v);
     }
     function docParaLinha(d) {
       const data = d.data() || {};
       const linha = { _id: d.id };
-      for (const [k, v] of Object.entries(data)) linha[k] = celula(v);
+      // campo do usuario chamado "_id" nao pode sobrescrever o id do documento
+      for (const [k, v] of Object.entries(data)) linha[k === '_id' ? '_id_campo' : k] = celula(v);
       return linha;
+    }
+
+    // ---- erros legiveis ----
+    function descreverErro(e) {
+      if (e instanceof BackupErro) return e.message;
+      const n = e && e.name, c = e && e.code;
+      if (n === 'NotAllowedError' || n === 'SecurityError')
+        return 'O navegador negou o acesso à pasta. Clique em "Reautorizar pasta".';
+      if (n === 'QuotaExceededError') return 'Sem espaço livre no disco.';
+      if (n === 'NotFoundError')
+        return 'A pasta de destino não foi encontrada (foi movida, apagada ou o disco foi removido).';
+      if (c === 'permission-denied') return 'O banco recusou a leitura (faça login de novo como admin).';
+      if (c === 'unavailable' || c === 'deadline-exceeded') return 'Sem conexão com o banco de dados.';
+      return (e && e.message) || String(e);
     }
 
     // ---- geracao do .xlsx ----
     function timestampNome() {
       const d = new Date();
       const p = (n) => String(n).padStart(2, '0');
-      return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;
+      return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
     }
 
-    async function gerarBackup() {
+    // Nome unico: nunca sobrescreve um backup existente (sufixo -2, -3...)
+    async function nomeUnico() {
+      const base = 'backup-' + timestampNome();
+      for (let i = 1; i < 100; i++) {
+        const nome = i === 1 ? `${base}.xlsx` : `${base}-${i}.xlsx`;
+        try {
+          await dirHandle.getFileHandle(nome);       // existe -> tenta o proximo
+        } catch (e) {
+          if (e.name === 'NotFoundError') return nome;
+          throw e;
+        }
+      }
+      throw new BackupErro('gravacao', 'Não foi possível escolher um nome livre pro arquivo.');
+    }
+
+    // Leitura das colecoes em paralelo (encurta a janela entre uma e outra; o SDK
+    // web nao oferece leitura transacional de colecoes inteiras).
+    async function lerColecoes() {
+      const inicio = Date.now();
+      const resultados = await Promise.all(COLECOES.map(async (nome) => {
+        try {
+          const snap = await getDocs(collection(db, nome));
+          if (snap.metadata && snap.metadata.fromCache) throw new Error('dados vieram do cache local');
+          return { nome, linhas: snap.docs.map(docParaLinha) };
+        } catch (e) {
+          console.error('[backup] leitura falhou em', nome, e);
+          throw new BackupErro('leitura', `Falha ao ler "${nome}" do banco: ${descreverErro(e)}`, e);
+        }
+      }));
+      return { resultados, inicio, fim: Date.now() };
+    }
+
+    function montarPlanilha(leitura, origem) {
+      const { resultados, inicio, fim } = leitura;
       const wb = XLSX.utils.book_new();
       const resumo = [];
-      for (const nome of COLECOES) {
-        const snap = await getDocs(collection(db, nome));
-        const linhas = snap.docs.map(docParaLinha);
+      for (const { nome, linhas } of resultados) {
         const ws = linhas.length
           ? XLSX.utils.json_to_sheet(linhas)
           : XLSX.utils.aoa_to_sheet([['(coleção vazia)']]);
         XLSX.utils.book_append_sheet(wb, ws, nome.slice(0, 31));
         resumo.push({ colecao: nome, documentos: linhas.length });
       }
+      const totalDocs = resumo.reduce((s, r) => s + r.documentos, 0);
+      const nomeEvento = eventoAtivo?.nome
+        || (origem === 'final' && ultimoEvento ? `(encerrado) ${ultimoEvento.nome}` : '(nenhum)');
       const wsResumo = XLSX.utils.json_to_sheet([
         { campo: 'gerado_em',        valor: new Date().toISOString() },
-        { campo: 'evento_ativo',     valor: eventoAtivo?.nome || '(nenhum)' },
-        { campo: 'evento_ativo_id',  valor: eventoAtivo?.id   || '' },
+        { campo: 'evento_ativo',     valor: nomeEvento },
+        { campo: 'evento_ativo_id',  valor: eventoAtivo?.id || (origem === 'final' && ultimoEvento?.id) || '' },
         { campo: 'total_colecoes',   valor: resumo.length },
-        { campo: 'total_documentos', valor: resumo.reduce((s, r) => s + r.documentos, 0) },
+        { campo: 'total_documentos', valor: totalDocs },
         {},
         ...resumo.map(r => ({ campo: r.colecao, valor: r.documentos })),
+        {},
+        { campo: 'leitura_inicio',   valor: new Date(inicio).toISOString() },
+        { campo: 'leitura_fim',      valor: new Date(fim).toISOString() },
+        { campo: 'aviso',            valor: 'Colecoes lidas em momentos ligeiramente diferentes (sem snapshot transacional).' },
+        { campo: 'celulas_truncadas', valor: celulasTruncadas },
       ]);
       XLSX.utils.book_append_sheet(wb, wsResumo, '_resumo');
+      return { wb, resumo, totalDocs };
+    }
 
-      const buf  = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-      const nome = 'backup-' + timestampNome() + '.xlsx';
-      const fh   = await dirHandle.getFileHandle(nome, { create: true });
-      const w    = await fh.createWritable();
-      await w.write(buf);
-      await w.close();
-      await podarAntigos();
-      return { nome, totalDocs: resumo.reduce((s, r) => s + r.documentos, 0) };
+    // Reabre o arquivo gravado e confere tamanho, abas e contagem de linhas.
+    async function validarArquivo(fh, bytesEsperados, resumo, totalDocs) {
+      const f = await fh.getFile();
+      if (f.size !== bytesEsperados || f.size < 1024) {
+        throw new Error(`tamanho no disco (${f.size} B) diferente do esperado (${bytesEsperados} B)`);
+      }
+      const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+      if (!wb.SheetNames.includes('_resumo')) throw new Error('aba _resumo ausente');
+      let lidos = 0;
+      for (const { colecao, documentos } of resumo) {
+        const ws = wb.Sheets[colecao.slice(0, 31)];
+        if (!ws) throw new Error(`aba "${colecao}" ausente`);
+        const linhas = ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']).e.r : 0;
+        if (linhas !== documentos) throw new Error(`"${colecao}": ${linhas} linhas no arquivo, ${documentos} lidas do banco`);
+        lidos += linhas;
+      }
+      if (lidos !== totalDocs) throw new Error(`total de documentos diverge (${lidos} x ${totalDocs})`);
+    }
+
+    async function removerSilencioso(nome) {
+      try { await dirHandle.removeEntry(nome); } catch (e) { console.warn('[backup] nao removeu', nome, e); }
+    }
+
+    // Retorna { nome, totalDocs, tamanho, avisos[] }. Lanca BackupErro se algo essencial falhar.
+    async function gerarBackup(origem) {
+      celulasTruncadas = 0;
+      const leitura = await lerColecoes();
+
+      let montado, buf;
+      try {
+        montado = montarPlanilha(leitura, origem);
+        buf = XLSX.write(montado.wb, { bookType: 'xlsx', type: 'array' });
+      } catch (e) {
+        console.error('[backup] montagem falhou', e);
+        throw new BackupErro('montagem', `Falha ao montar a planilha: ${descreverErro(e)}`, e);
+      }
+
+      const nome = await nomeUnico();
+      let fh = null, w = null;
+      try {
+        fh = await dirHandle.getFileHandle(nome, { create: true });
+        w  = await fh.createWritable();
+        await w.write(buf);
+        await w.close();
+        w = null;
+      } catch (e) {
+        console.error('[backup] gravacao falhou', e);
+        if (w) { try { await w.abort(); } catch (_) {} }
+        if (fh) await removerSilencioso(nome);   // nao deixa arquivo de 0 bytes
+        if (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) precisaPermissao = true;
+        throw new BackupErro('gravacao', `Falha ao gravar o arquivo: ${descreverErro(e)}`, e);
+      }
+
+      try {
+        await validarArquivo(fh, buf.byteLength, montado.resumo, montado.totalDocs);
+      } catch (e) {
+        console.error('[backup] validacao falhou', e);
+        await removerSilencioso(nome);
+        throw new BackupErro('validacao', `O arquivo gravado não passou na conferência (${descreverErro(e)}). Foi descartado.`, e);
+      }
+
+      const avisos = [];
+      if (celulasTruncadas > 0) avisos.push(`${celulasTruncadas} célula(s) com texto muito longo foram cortadas (limite do Excel).`);
+      if (ultimoOk && ultimoOk.docs > 20 && montado.totalDocs < ultimoOk.docs * 0.7) {
+        avisos.push(`O total de documentos caiu de ${ultimoOk.docs} para ${montado.totalDocs} desde o último backup — confira se foi esperado.`);
+      }
+      return { nome, totalDocs: montado.totalDocs, tamanho: buf.byteLength, avisos };
     }
 
     async function listarArquivosBackup() {
@@ -390,13 +560,18 @@
       return arquivos;
     }
 
-    async function podarAntigos() {
+    // So chamada DEPOIS do novo backup validado. Nunca apaga o arquivo recem-criado.
+    async function podarAntigos(nomeNovo) {
       if (!MANTER_ULTIMOS || MANTER_ULTIMOS <= 0) return;
       const arquivos = await listarArquivosBackup();
-      const remover = arquivos.slice(MANTER_ULTIMOS);
+      const orfaos = arquivos.filter(a => a.tamanho === 0 && a.nome !== nomeNovo);   // restos de falha antiga
+      const validos = arquivos.filter(a => a.tamanho > 0);
+      const remover = [...orfaos, ...validos.slice(MANTER_ULTIMOS).filter(a => a.nome !== nomeNovo)];
+      let falhou = 0;
       for (const { nome } of remover) {
-        try { await dirHandle.removeEntry(nome); } catch (e) { /* ignore */ }
+        try { await dirHandle.removeEntry(nome); } catch (e) { falhou++; console.warn('[backup] poda falhou em', nome, e); }
       }
+      if (falhou) throw new Error(`${falhou} arquivo(s) antigo(s) não puderam ser apagados`);
     }
 
     function fmtTamanho(bytes) {
@@ -412,80 +587,152 @@
         ? `hoje ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
         : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
     }
+    function fmtHa(ms) {
+      const min = Math.floor(ms / 60000);
+      if (min < 1) return 'menos de 1 min';
+      if (min < 60) return `${min} min`;
+      return `${Math.floor(min / 60)}h ${min % 60}min`;
+    }
+    // Nunca lanca: falha na listagem nao pode ser confundida com falha do backup.
     async function atualizarListaArquivos() {
-      const box = $('bk-arquivos');
-      if (!box) return;
-      if (!dirHandle || precisaPermissao) {
-        box.innerHTML = '';
-        box.classList.add('hidden');
-        return;
+      try {
+        const box = $('bk-arquivos');
+        if (!box) return;
+        if (!dirHandle || precisaPermissao) {
+          box.innerHTML = '';
+          box.classList.add('hidden');
+          return;
+        }
+        const todos = await listarArquivosBackup();
+        box.classList.remove('hidden');
+        if (todos.length === 0) {
+          box.innerHTML = '<div class="bk-arq-vazio">Pasta vazia — nenhum backup salvo ainda.</div>';
+          return;
+        }
+        const top = todos.slice(0, 5);
+        const sufixo = todos.length > 5 ? ` (5 mais recentes)` : '';
+        const titulo = `${todos.length} backup${todos.length > 1 ? 's' : ''} na pasta${sufixo}`;
+        const linhas = top.map(a => `
+          <div class="bk-arq">
+            <span class="bk-arq-nome" title="${esc(a.nome)}">${esc(a.nome)}</span>
+            <span class="bk-arq-meta">${fmtTamanho(a.tamanho)} · ${fmtData(a.mtime)}</span>
+          </div>
+        `).join('');
+        box.innerHTML = `<div class="bk-arq-titulo">${titulo}</div>${linhas}`;
+      } catch (e) {
+        console.warn('[backup] atualizar lista falhou:', e);
       }
-      const todos = await listarArquivosBackup();
-      box.classList.remove('hidden');
-      if (todos.length === 0) {
-        box.innerHTML = '<div class="bk-arq-vazio">Pasta vazia — nenhum backup salvo ainda.</div>';
-        return;
-      }
-      const top = todos.slice(0, 5);
-      const sufixo = todos.length > 5 ? ` (5 mais recentes)` : '';
-      const titulo = `${todos.length} backup${todos.length > 1 ? 's' : ''} na pasta${sufixo}`;
-      const linhas = top.map(a => `
-        <div class="bk-arq">
-          <span class="bk-arq-nome" title="${esc(a.nome)}">${esc(a.nome)}</span>
-          <span class="bk-arq-meta">${fmtTamanho(a.tamanho)} · ${fmtData(a.mtime)}</span>
-        </div>
-      `).join('');
-      box.innerHTML = `<div class="bk-arq-titulo">${titulo}</div>${linhas}`;
     }
 
-    // ---- loop ----
-    async function rodarBackupAgora() {
-      if (rodando) return;
-      if (!dirHandle) {
-        addLog('✗ Escolha uma pasta antes.', 'err');
+    // ---- execucao ----
+    function comLock(fn) {
+      if (!navigator.locks) return fn();
+      return navigator.locks.request(LOCK_NOME, { ifAvailable: true }, (lock) => lock ? fn() : LOCK_OCUPADO);
+    }
+
+    // origem: 'manual' (clique, pode pedir permissao) | 'auto' (timer) | 'final' (fim do evento)
+    async function rodarBackupAgora(origem = 'manual') {
+      if (rodando) {
+        if (origem === 'manual') addLog('⚠ Já existe um backup em andamento — aguarde terminar.', 'warn');
         return;
       }
-      const ok = await garantirPermissaoPasta();
-      if (!ok) {
-        addLog('✗ Permissão da pasta negada.', 'err');
-        return;
-      }
-      rodando = true;
+      rodando = true;                       // sincrono, antes de qualquer await
       atualizarUI();
+      const t0 = Date.now();
+      let ok = false;
       try {
-        const { nome, totalDocs } = await gerarBackup();
-        addLog(`✓ ${nome} (${totalDocs} docs)`, 'ok');
+        if (!dirHandle) throw new BackupErro('pasta', 'Escolha uma pasta antes.');
+        if (!(await checarPermissao(origem === 'manual'))) {
+          throw new BackupErro('permissao', 'Sem permissão pra gravar na pasta. Clique em "Reautorizar pasta".');
+        }
+        const r = await comLock(async () => {
+          const res = await gerarBackup(origem);
+          try {
+            await podarAntigos(res.nome);
+          } catch (e) {
+            console.warn('[backup] poda:', e);
+            res.avisos.push(`Backup salvo, mas a limpeza dos antigos falhou: ${descreverErro(e)}`);
+          }
+          return res;
+        });
+        if (r === LOCK_OCUPADO) {
+          addLog('⚠ Outra aba/janela já está fazendo backup — esta execução foi ignorada.', 'warn');
+          ok = true;
+        } else {
+          const duracaoMs = Date.now() - t0;
+          ultimoOk = { quando: Date.now(), nome: r.nome, docs: r.totalDocs, duracaoMs, tamanho: r.tamanho };
+          ultimaTentativa = { quando: Date.now(), ok: true, msg: r.nome };
+          sucessos++;
+          ok = true;
+          addLog(`✓ ${r.nome} (${r.totalDocs} docs, ${fmtTamanho(r.tamanho)}, ${(duracaoMs/1000).toFixed(1)}s)`, 'ok');
+          r.avisos.forEach(a => addLog(`⚠ ${a}`, 'warn'));
+        }
       } catch (e) {
-        console.error(e);
-        addLog(`✗ Falha: ${e.message || e}`, 'err');
+        console.error('[backup] falha', e);
+        const msg = descreverErro(e);
+        falhas++;
+        ultimaTentativa = { quando: Date.now(), ok: false, msg };
+        addLog(`✗ Falha: ${msg}`, 'err');
       } finally {
         rodando = false;
-        proximoEm = Date.now() + INTERVALO_MS;
-        atualizarUI();
+        proximoEm = Date.now() + (ok ? INTERVALO_MS : RETRY_MS);
+        try { atualizarUI(); } catch (e) { console.warn(e); }
         atualizarListaArquivos();
       }
     }
 
-    function iniciar() {
-      if (timerId) return;
+    async function iniciar(origem = 'manual') {
+      if (ativo) return;
+      ativo = true;
+      inicioAtivoEm = Date.now();
       proximoEm = Date.now() + INTERVALO_MS;
-      timerId      = setInterval(rodarBackupAgora, INTERVALO_MS);
-      countdownId  = setInterval(atualizarUI, 1000);
-      rodarBackupAgora();
+      timerId = setInterval(ciclo, 1000);
+      pedirWakeLock();
       atualizarUI();
+      await rodarBackupAgora(origem);
     }
 
     function parar() {
-      if (timerId)     { clearInterval(timerId);     timerId = null; }
-      if (countdownId) { clearInterval(countdownId); countdownId = null; }
+      ativo = false;
+      if (timerId) { clearInterval(timerId); timerId = null; }
+      liberarWakeLock();
       atualizarUI();
     }
 
-    function considerarAutoIniciar() {
-      if (!auto) return;
-      if (eventoAtivo && !timerId && dirHandle) iniciar();
-      if (!eventoAtivo && timerId) parar();
+    function ciclo() {
+      atualizarUI();
+      if (ativo && !rodando && Date.now() >= proximoEm) rodarBackupAgora('auto');
     }
+
+    const dormir = (ms) => new Promise(r => setTimeout(r, ms));
+    async function encerrarComBackupFinal(houveEvento) {
+      parar();
+      if (!houveEvento || !dirHandle) return;
+      addLog('Evento encerrado — gerando backup final…');
+      for (let i = 0; i < 240 && rodando; i++) await dormir(500);   // espera backup em curso (ate 2 min)
+      await rodarBackupAgora('final');
+    }
+
+    function considerarAutoIniciar(eventoAnterior) {
+      if (!auto) return;
+      if (eventoAtivo && !ativo && dirHandle) iniciar('auto');
+      else if (!eventoAtivo && ativo) encerrarComBackupFinal(!!eventoAnterior);
+    }
+
+    // ---- wake lock (evita o PC suspender e parar o backup) ----
+    async function pedirWakeLock() {
+      try {
+        if (!ativo || wakeLock || !('wakeLock' in navigator) || document.visibilityState !== 'visible') return;
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => { wakeLock = null; });
+      } catch (e) { console.warn('[backup] wakeLock indisponivel:', e); }
+    }
+    function liberarWakeLock() {
+      if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+    }
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') { pedirWakeLock(); atualizarUI(); }
+    });
 
     // ---- UI ----
     function fmtMS(ms) {
@@ -494,31 +741,46 @@
       const r = s % 60;
       return `${m}:${String(r).padStart(2, '0')}`;
     }
-    function atualizarUI() {
-      const status   = $('bk-status');
-      const texto    = $('bk-status-texto');
-      const ativo    = !!timerId;
-      status.classList.toggle('ativo', ativo);
-      status.classList.toggle('inativo', !ativo);
+    const hora = (ms) => new Date(ms).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-      let msg;
-      if (ativo) {
-        const restante = proximoEm - Date.now();
-        msg = rodando
-          ? 'ATIVO • salvando backup agora…'
-          : `ATIVO • próximo backup em ${fmtMS(restante)}`;
-        if (eventoAtivo) msg += ` • evento: ${eventoAtivo.nome}`;
-      } else {
-        msg = eventoAtivo
-          ? `INATIVO • há um evento ativo (${eventoAtivo.nome})`
-          : 'INATIVO • sem evento';
+    // Diferencia backup ATIVO (salvando de verdade) de CONFIGURADO mas sem conseguir salvar.
+    function estadoAtual() {
+      const agora = Date.now();
+      const evt = eventoAtivo ? ` • evento: ${eventoAtivo.nome}` : '';
+      if (!dirHandle) return { classe: 'inativo', texto: 'INATIVO • nenhuma pasta escolhida' };
+      if (precisaPermissao) {
+        return { classe: 'erro', texto: 'SEM PERMISSÃO NA PASTA • nenhum backup está sendo salvo' + (ativo ? ' (agendamento ligado, mas parado)' : '') };
       }
-      texto.textContent = msg;
+      if (rodando) return { classe: 'ativo', texto: 'ATIVO • salvando backup agora…' + evt };
+      if (ativo) {
+        const refMs = ultimoOk ? ultimoOk.quando : inicioAtivoEm;
+        const prox = `próxima tentativa em ${fmtMS(proximoEm - agora)}`;
+        if (ultimaTentativa && !ultimaTentativa.ok) {
+          return { classe: 'erro', texto: `NÃO ESTÁ SALVANDO • última tentativa falhou: ${ultimaTentativa.msg} • ${prox}` };
+        }
+        if (agora - refMs > ATRASO_MS) {
+          return { classe: 'erro', texto: `ATRASADO • sem backup bem-sucedido há ${fmtHa(agora - refMs)} • ${prox}` };
+        }
+        const sufixo = monitorEventoOk ? '' : ' • ⚠ monitor de evento desconectado';
+        return { classe: 'ativo', texto: `ATIVO • salvando normalmente • próximo backup em ${fmtMS(proximoEm - agora)}` + evt + sufixo };
+      }
+      if (eventoAtivo) {
+        return { classe: 'atencao', texto: `PARADO • há um evento ativo (${eventoAtivo.nome}) e o backup automático NÃO está rodando` };
+      }
+      return { classe: 'inativo', texto: 'INATIVO • sem evento' };
+    }
+
+    function atualizarUI() {
+      const status = $('bk-status');
+      const { classe, texto } = estadoAtual();
+      ['ativo', 'inativo', 'erro', 'atencao'].forEach(c => status.classList.toggle(c, c === classe));
+      $('bk-status-texto').textContent = texto;
+      document.title = (classe === 'erro' ? '⚠ ' : '') + 'Backup — Admin GEH';
 
       // Pasta
       const info = $('bk-pasta-info');
       if (dirHandle) {
-        info.innerHTML = `Salvando em: <code>${dirHandle.name}</code>`;
+        info.innerHTML = `Salvando em: <code>${esc(dirHandle.name)}</code>`;
       } else {
         info.textContent = 'Nenhuma pasta escolhida.';
       }
@@ -533,6 +795,21 @@
       $('bk-iniciar').disabled = ativo || !dirHandle;
       $('bk-parar').disabled   = !ativo;
       $('bk-agora').disabled   = rodando || !dirHandle;
+
+      // Monitoramento
+      const agora = Date.now();
+      $('bk-m-ultimo').textContent = ultimoOk
+        ? `${fmtData(ultimoOk.quando)} (há ${fmtHa(agora - ultimoOk.quando)})`
+        : 'nenhum nesta sessão';
+      $('bk-m-proximo').textContent = !ativo ? 'automático desligado'
+        : rodando ? 'em execução…' : `${hora(proximoEm)} (em ${fmtMS(proximoEm - agora)})`;
+      $('bk-m-tentativa').textContent = !ultimaTentativa ? '—'
+        : ultimaTentativa.ok ? `✓ OK às ${hora(ultimaTentativa.quando)}`
+        : `✗ falhou às ${hora(ultimaTentativa.quando)}`;
+      $('bk-m-docs').textContent = ultimoOk
+        ? `${ultimoOk.docs} docs · ${(ultimoOk.duracaoMs / 1000).toFixed(1)}s · ${fmtTamanho(ultimoOk.tamanho)}`
+        : '—';
+      $('bk-m-sessao').textContent = `${sucessos} ok · ${falhas} falha${falhas === 1 ? '' : 's'}`;
     }
 
     function addLog(msg, classe) {
@@ -543,13 +820,23 @@
       linha.className = classe || '';
       linha.textContent = `[${hora}] ${msg}`;
       log.prepend(linha);
+      while (log.children.length > 200) log.lastChild.remove();
     }
 
     // ---- watchers ----
     const unsub = onSnapshot(doc(db, 'config', 'eventoAtivo'), (snap) => {
       const data = snap.exists() ? snap.data() : null;
+      const anterior = eventoAtivo;
       eventoAtivo = (data && data.id) ? data : null;
-      considerarAutoIniciar();
+      if (eventoAtivo) ultimoEvento = eventoAtivo;
+      if (!monitorEventoOk) addLog('✓ Monitor de evento reconectado.', 'ok');
+      monitorEventoOk = true;
+      considerarAutoIniciar(anterior);
+      atualizarUI();
+    }, (err) => {
+      console.error('[backup] listener de evento falhou', err);
+      monitorEventoOk = false;
+      addLog('⚠ Perdi a conexão com o monitor de evento ativo — o início/fim automático pode não funcionar.', 'warn');
       atualizarUI();
     });
 
@@ -557,14 +844,15 @@
 
     // ---- bind ----
     $('bk-escolher-pasta').onclick = escolherPasta;
-    $('bk-iniciar').onclick        = iniciar;
+    $('bk-iniciar').onclick        = () => iniciar('manual');
     $('bk-parar').onclick          = parar;
-    $('bk-agora').onclick          = rodarBackupAgora;
+    $('bk-agora').onclick          = () => rodarBackupAgora('manual');
+    $('bk-reautorizar').onclick    = () => rodarBackupAgora('manual');
     $('bk-auto').checked = auto;
     $('bk-auto').onchange = (e) => {
       auto = e.target.checked;
       localStorage.setItem(LS_AUTO_KEY, auto ? '1' : '0');
-      considerarAutoIniciar();
+      considerarAutoIniciar(eventoAtivo);
       atualizarUI();
     };
 
@@ -573,7 +861,7 @@
       if (!SUPORTADO) {
         $('bk-incompativel').classList.remove('hidden');
         $('bk-status-texto').textContent = 'INDISPONÍVEL neste navegador';
-        ['bk-escolher-pasta','bk-iniciar','bk-parar','bk-agora','bk-auto']
+        ['bk-escolher-pasta','bk-iniciar','bk-parar','bk-agora','bk-auto','bk-reautorizar']
           .forEach(id => { const el = $(id); if (el) el.disabled = true; });
         return;
       }
@@ -584,9 +872,9 @@
       atualizarListaArquivos();
     })();
 
-    // Avisa antes de fechar a aba se o backup automatico estiver rodando
+    // Avisa antes de fechar a aba se o backup automatico estiver ligado
     window.addEventListener('beforeunload', (e) => {
-      if (timerId) {
+      if (ativo) {
         e.preventDefault();
         e.returnValue = '';
       }
