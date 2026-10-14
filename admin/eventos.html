@@ -21,6 +21,7 @@
           <div style="font-size:0.85rem;color:var(--cinza);" id="data-ativo">—</div>
         </div>
         <div style="display:flex;gap:0.5rem;">
+          <button id="btn-zerar-vendidos" class="btn btn-secondary" style="width:auto;padding:0.5rem 1rem;">Zerar vendidos</button>
           <button id="btn-editar-ativo" class="btn btn-secondary" style="width:auto;padding:0.5rem 1rem;">Editar</button>
           <button id="btn-encerrar" class="btn btn-danger" style="width:auto;padding:0.5rem 1rem;">Encerrar</button>
         </div>
@@ -299,6 +300,32 @@
       setTimeout(() => alertaCat.classList.add('hidden'), 2500);
     };
 
+    // `vendidos` e um contador por produto que so a venda soma. Ele pertence ao
+    // evento ativo: zera ao criar evento novo e sob demanda no botao do evento ativo.
+    async function zerarVendidos() {
+      const snap = await getDocs(collection(db, 'produtos'));
+      const comContador = snap.docs.filter(d => (Number(d.data().vendidos) || 0) !== 0);
+      for (let i = 0; i < comContador.length; i += 499) {
+        const batch = writeBatch(db);
+        comContador.slice(i, i + 499).forEach(d => batch.update(d.ref, { vendidos: 0 }));
+        await batch.commit();
+      }
+      return comContador.length;
+    }
+
+    $('btn-zerar-vendidos').onclick = async () => {
+      if (!(await confirmarAsync('Zerar o contador de vendidos de todos os produtos? O painel de vendas do operador recomeca do 0. O historico de vendas nao muda.', { destrutivo: true, textoOk: 'Zerar vendidos' }))) return;
+      const btn = $('btn-zerar-vendidos');
+      btn.disabled = true;
+      try {
+        const n = await zerarVendidos();
+        toast(`Vendidos zerados em ${n} produto(s).`, { tipo: 'sucesso' });
+      } catch (err) {
+        toast(`Erro ao zerar vendidos: ${err.message}`, { tipo: 'erro', duracao: 5000 });
+      }
+      btn.disabled = false;
+    };
+
     $('btn-criar').onclick = async () => {
       const nome = $('ev-nome').value.trim();
       const data = $('ev-data').value;
@@ -316,6 +343,7 @@
           nome, data, status: 'ativo', criadoEm: serverTimestamp()
         });
         await setDoc(doc(db, 'config', 'eventoAtivo'), { id: ref.id, nome, data });
+        await zerarVendidos();
         $('ev-nome').value = '';
         alerta.innerHTML = `<span style="display:inline-flex;align-items:center;gap:0.4rem;">${icon('check-circle', { size: 16 })} Evento "${esc(nome)}" criado e ativado!</span>`;
         alerta.className = 'alert alert-success';
