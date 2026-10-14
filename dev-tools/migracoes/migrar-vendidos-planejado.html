@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<!--
+  Migracao unica: painel de vendas (produtos.vendidos e produtos.estoquePlanejado)
+
+  Por que: a rule de produtos so deixa o operador vender em produto que ja
+  tem o campo `vendidos`. Produtos cadastrados antes do painel nao tem, e a
+  venda deles falharia. Esta pagina completa SO o que falta:
+    - vendidos: 0                 (se nao for numero)
+    - estoquePlanejado: estoque   (se nao for inteiro > 0 e estoque > 0)
+  Nunca sobrescreve valor existente. Cada produto e atualizado numa transacao.
+
+  Como rodar (antes do evento, com o estoque ja informado pela diretoria):
+    1. cp dev-tools/migracoes/migrar-vendidos-planejado.html admin/migrar-vendidos-planejado.html
+    2. firebase use prod   (ou dev, pra testar)  e  firebase serve
+    3. abrir http://localhost:5000/admin/migrar-vendidos-planejado.html logada como admin
+    4. "Simular" e conferir a lista; depois "Aplicar"
+    5. APAGAR admin/migrar-vendidos-planejado.html antes de qualquer deploy
+  A pagina usa o projeto do js/firebase-config.js (producao).
+-->
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Migrar vendidos e planejado — Admin GEH</title>
+  <script>(function(){try{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <header class="header">
+    <a href="dashboard.html" class="back" aria-label="Voltar"><span data-icon="arrow-left" data-size="24"></span></a>
+    <h1>Migrar vendidos e planejado</h1>
+  </header>
+  <main style="max-width:760px;margin:0 auto;">
+    <div class="card" style="margin-bottom:1rem;">
+      <p>Completa <code>vendidos: 0</code> e <code>estoquePlanejado</code> (= estoque atual) <strong>só nos produtos que não têm</strong>. Nada que já existe é alterado.</p>
+      <p class="text-muted" style="font-size:0.85rem;">Rode antes do evento, com o estoque já informado pela diretoria. O estoque atual vira o planejado e o contador começa em 0, então não rode depois que as vendas começarem.</p>
+    </div>
+
+    <div class="card" style="margin-bottom:1rem;">
+      <div id="contexto" class="text-muted" style="margin-bottom:0.75rem;">Carregando…</div>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <button id="btn-simular" class="btn btn-secondary" style="width:auto;">Simular</button>
+        <button id="btn-aplicar" class="btn btn-primary" style="width:auto;display:none;">Aplicar migração</button>
+      </div>
+    </div>
+
+    <div id="resumo" class="card hidden" style="margin-bottom:1rem;"></div>
+    <div class="table-wrapper hidden" id="tabela-wrap">
+      <table>
+        <thead><tr><th>Produto</th><th>Estoque</th><th>vendidos</th><th>estoquePlanejado</th><th>O que será feito</th></tr></thead>
+        <tbody id="tbl"></tbody>
+      </table>
+    </div>
+    <div id="alerta" class="alert hidden" style="margin-top:1rem;"></div>
+  </main>
+
+  <script type="module" src="../js/icons.js"></script>
+  <script type="module">
+    import {
+      db, collection, doc, getDoc, getDocs, runTransaction, query, where,
+      getAggregateFromServer, count
+    } from "../js/firebase-config.js";
+    import { requireAuth } from "../js/auth-guard.js";
+    import { esc } from "../js/helpers.js";
+    import { confirmarAsync } from "../js/ui.js";
+
+    await requireAuth({ papel: 'admin' });
+
+    const $ = (id) => document.getElementById(id);
+    const mostrar = (msg, tipo) => { $('alerta').textContent = msg; $('alerta').className = `alert alert-${tipo}`; };
+
+    // Mesma regra de js/painel-calc.js
+    const vendidosOk = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+    const planejadoOk = (v) => Number.isInteger(v) && v > 0;
+
+    function planoPara(d) {
+      const set = {};
+      if (!vendidosOk(d.vendidos)) set.vendidos = 0;
+      if (!planejadoOk(d.estoquePlanejado) && Number.isInteger(d.estoque) && d.estoque > 0) set.estoquePlanejado = d.estoque;
+      return set;
+    }
+
+    // Contexto: projeto + evento ativo + vendas ja registradas nele
+    const projeto = (await import('../js/firebase-config.js')).firebaseConfig?.projectId || '?';
+    let vendasEvento = 0, eventoNome = '(sem evento ativo)';
+    try {
+      const ev = await getDoc(doc(db, 'config', 'eventoAtivo'));
+      if (ev.exists() && ev.data().id) {
+        eventoNome = ev.data().nome || ev.data().id;
+        const agg = await getAggregateFromServer(query(collection(db, 'vendas'), where('eventoId', '==', ev.data().id)), { n: count() });
+        vendasEvento = agg.data().n;
+      }
+    } catch (e) { console.warn('contexto:', e); }
+    $('contexto').innerHTML = `Projeto: <strong>${esc(projeto)}</strong> · Evento ativo: <strong>${esc(eventoNome)}</strong> · Vendas já registradas nele: <strong>${vendasEvento}</strong>`
+      + (vendasEvento > 0 ? `<div class="alert alert-warning" style="margin-top:0.5rem;">Já existem vendas neste evento. Produtos sem <code>vendidos</code> começariam em 0 mesmo tendo vendido antes, e o painel mostraria menos do que o real.</div>` : '');
+
+    let pendentes = [];
+
+    $('btn-simular').onclick = async () => {
+      $('btn-simular').disabled = true;
+      $('alerta').className = 'alert hidden';
+      try {
+        const snap = await getDocs(collection(db, 'produtos'));
+        pendentes = [];
+        let ok = 0;
+        const linhas = [];
+        snap.forEach(s => {
+          const d = s.data();
+          const set = planoPara(d);
+          const falta = Object.keys(set);
+          if (falta.length) pendentes.push({ id: s.id, nome: d.nome, set });
+          else ok++;
+          const semPlan = !planejadoOk(d.estoquePlanejado) && !('estoquePlanejado' in set);
+          linhas.push(`<tr>
+            <td>${esc(d.nome || s.id)}</td>
+            <td>${esc(d.estoque ?? '—')}</td>
+            <td>${esc(d.vendidos ?? '—')}</td>
+            <td>${esc(d.estoquePlanejado ?? '—')}</td>
+            <td>${falta.length
+              ? esc(falta.map(k => `${k} = ${set[k]}`).join(', '))
+              : (semPlan ? 'Sem planejado (estoque 0): defina no cadastro' : 'Nada a fazer')}</td>
+          </tr>`);
+        });
+        $('tbl').innerHTML = linhas.join('');
+        $('tabela-wrap').classList.remove('hidden');
+        $('resumo').classList.remove('hidden');
+        $('resumo').innerHTML = `<strong>${snap.size}</strong> produtos: <strong>${pendentes.length}</strong> a completar, <strong>${ok}</strong> já corretos. Nenhum dado foi alterado ainda.`;
+        $('btn-aplicar').style.display = pendentes.length ? '' : 'none';
+        if (!pendentes.length) mostrar('Nada a migrar: todos os produtos já têm vendidos e estoquePlanejado.', 'success');
+      } catch (e) {
+        mostrar('Erro ao ler produtos: ' + e.message, 'danger');
+      } finally {
+        $('btn-simular').disabled = false;
+      }
+    };
+
+    $('btn-aplicar').onclick = async () => {
+      if (!pendentes.length) return;
+      const aviso = vendasEvento > 0 ? ` ATENÇÃO: o evento ativo já tem ${vendasEvento} venda(s).` : '';
+      if (!(await confirmarAsync(`Completar ${pendentes.length} produto(s) no projeto ${projeto}?${aviso}`, { textoOk: 'Aplicar' }))) return;
+      $('btn-aplicar').disabled = true; $('btn-simular').disabled = true;
+      let feitos = 0, pulados = 0; const erros = [];
+      for (const p of pendentes) {
+        try {
+          // Transacao: reavalia o doc atual e so grava o que AINDA falta.
+          const mudou = await runTransaction(db, async (tx) => {
+            const ref = doc(db, 'produtos', p.id);
+            const s = await tx.get(ref);
+            if (!s.exists()) return false;
+            const set = planoPara(s.data());
+            if (!Object.keys(set).length) return false;
+            tx.update(ref, set);
+            return true;
+          });
+          mudou ? feitos++ : pulados++;
+        } catch (e) { erros.push(`${p.nome || p.id}: ${e.message}`); }
+      }
+      $('btn-aplicar').disabled = false; $('btn-simular').disabled = false;
+      mostrar(`Migração concluída: ${feitos} atualizado(s), ${pulados} já estavam ok${erros.length ? `, ${erros.length} erro(s): ${erros.join(' | ')}` : ''}. Clique em Simular para conferir.`, erros.length ? 'warning' : 'success');
+      $('btn-aplicar').style.display = 'none';
+    };
+  </script>
+</body>
+</html>

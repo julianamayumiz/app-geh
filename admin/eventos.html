@@ -418,6 +418,7 @@
     limparOrfaos();
 
     let renderGen = 0;
+    const aggCache = new Map(); // eventoId -> { receita, qtd } (so encerrados)
     const unsub = onSnapshot(query(collection(db, 'eventos'), orderBy('criadoEm', 'desc')), async (snap) => {
       const myGen = ++renderGen;
       const tbody = $('tbl');
@@ -425,20 +426,27 @@
         tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Nenhum evento ainda.</td></tr>';
         return;
       }
-      const linhas = [];
-      for (const d of snap.docs) {
-        const ev = { id: d.id, ...d.data() };
-        // Agregação server-side (sum/count) em vez de baixar todos os docs de
-        // vendas do evento — mesmo resultado, custa ~1 leitura por evento em
-        // vez de 1 leitura por venda (era um N+1 caro, disparado a cada
-        // alteração em qualquer evento, ex: contador de vagas da recepção).
+      // Agregação server-side (sum/count) em vez de baixar todos os docs de
+      // vendas do evento. Roda em paralelo (1 round-trip total) e eventos
+      // encerrados ficam em cache (so o ativo ainda recebe vendas).
+      const evs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const aggs = await Promise.all(evs.map(async (ev) => {
+        if (ev.status !== 'ativo' && aggCache.has(ev.id)) return aggCache.get(ev.id);
         const agg = await getAggregateFromServer(
           query(collection(db, 'vendas'), where('eventoId', '==', ev.id)),
           { receita: sum('total'), qtd: count() }
         );
-        if (myGen !== renderGen) return; // snapshot mais novo já está rodando
-        const receita = agg.data().receita || 0;
-        const numVendas = agg.data().qtd || 0;
+        const r = { receita: agg.data().receita || 0, qtd: agg.data().qtd || 0 };
+        // ativo: descarta cache (pode ter sido reativado e receber vendas)
+        if (ev.status === 'ativo') aggCache.delete(ev.id); else aggCache.set(ev.id, r);
+        return r;
+      }));
+      if (myGen !== renderGen) return; // snapshot mais novo já está rodando
+      const linhas = [];
+      for (let i = 0; i < evs.length; i++) {
+        const ev = evs[i];
+        const receita = aggs[i].receita;
+        const numVendas = aggs[i].qtd;
         const dataFmt = ev.data ? new Date(ev.data + 'T12:00').toLocaleDateString('pt-BR') : '—';
         const badge = ev.status === 'ativo'
           ? `<span style="background:var(--verde);color:white;padding:2px 8px;border-radius:999px;font-size:0.8rem;">Ativo</span>`
