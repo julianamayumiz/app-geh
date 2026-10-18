@@ -342,6 +342,21 @@ async function main() {
     }))
   );
 
+  await test('recepção PODE preencher nome de convite sem nome (junto do check-in)', () =>
+    assertSucceeds(updateDoc(doc(recepcaoDb, 'convites_antecipados', 'convFam2'), {
+      nome: 'Maria Silva', presente: true, checkInEm: serverTimestamp(), checkInPor: 'Recepção Teste',
+    }))
+  );
+  await test('recepção NÃO PODE sobrescrever nome já preenchido', () =>
+    assertFails(updateDoc(doc(recepcaoDb, 'convites_antecipados', 'conv1'), { nome: 'Outro Nome' }))
+  );
+  await test('recepção NÃO PODE preencher nome vazio (só espaços)', () =>
+    assertFails(updateDoc(doc(recepcaoDb, 'convites_antecipados', 'convFamOrfao'), { nome: '   ' }))
+  );
+  await test('recepção NÃO PODE alterar categoria junto do nome', () =>
+    assertFails(updateDoc(doc(recepcaoDb, 'convites_antecipados', 'convFamOrfao'), { nome: 'Fulano', categoria: 'Adulto' }))
+  );
+
   console.log('\n== familias / convites por família (Fase 5: acesso público por código) ==');
   await test('não logado PODE listar o próprio convite sabendo o familiaId exato', () =>
     assertSucceeds(getDocs(query(collection(semAuthDb, 'convites_antecipados'), where('familiaId', '==', 'fam1abcdefghij1234567890'))))

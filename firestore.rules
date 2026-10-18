@@ -276,14 +276,26 @@ service cloud.firestore {
 
       allow update: if isAdmin()
         || (
-          // Recepção só pode marcar/desfazer presença — não pode alterar
-          // dados do convite (nome, familia, categoria, pago).
+          // Recepção marca/desfaz presença e, só se o convite estiver SEM
+          // nome, pode preencher o nome na hora. Não altera familia,
+          // categoria, pago, nem sobrescreve um nome já preenchido.
           isRecepcao()
           && request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['presente', 'checkInEm', 'checkInPor'])
+              .hasOnly(['presente', 'checkInEm', 'checkInPor', 'nome'])
           && request.resource.data.presente is bool
           && (request.resource.data.checkInEm is timestamp || request.resource.data.checkInEm == null)
           && (request.resource.data.checkInPor is string || request.resource.data.checkInPor == null)
+          && (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['nome'])
+            || (
+              (!('nome' in resource.data)
+                || resource.data.nome == null
+                || (resource.data.nome is string && resource.data.nome.matches('^\\s*$')))
+              && request.resource.data.nome is string
+              && !request.resource.data.nome.matches('^\\s*$')
+              && request.resource.data.nome.size() <= 100
+            )
+          )
         )
         || (
           // Família preenche o nome e controla a situação (pago/reservado/

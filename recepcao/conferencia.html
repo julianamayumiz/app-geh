@@ -189,6 +189,10 @@
       <h3 id="m-nome">—</h3>
       <div id="m-aviso-aberto" class="alerta-aberto hidden">⚠️ Pagamento em aberto — cobrar antes de liberar.</div>
       <div id="m-aviso-ja" class="alerta-presenca hidden"></div>
+      <div id="m-nome-box" class="hidden" style="margin-bottom:0.75rem;">
+        <label for="m-nome-input" style="font-size:0.85rem;font-weight:600;">Nome do convidado (sem nome no convite)</label>
+        <input type="text" id="m-nome-input" maxlength="100" autocomplete="off" placeholder="Digite o nome completo" style="width:100%;margin-top:0.25rem;">
+      </div>
       <div class="linha"><span class="lbl">Família</span><span class="val" id="m-familia">—</span></div>
       <div class="linha"><span class="lbl">Nº convite</span><span class="val" id="m-numero">—</span></div>
       <div class="linha"><span class="lbl">Categoria</span><span class="val" id="m-categoria">—</span></div>
@@ -240,6 +244,8 @@
         .normalize('NFD').replace(/[̀-ͯ]/g, '');
     }
 
+    const semNome = c => !String(c.nome || '').trim();
+
     function atualizarResumo() {
       $('r-total').textContent = convites.length;
       const pres = convites.filter(c => c.presente).length;
@@ -273,7 +279,7 @@
         <div class="convite-card ${c.presente ? 'presente' : ''}" data-id="${esc(c.id)}">
           <div class="numero">${esc(c.numero)}</div>
           <div class="info">
-            <div class="nome">${esc(c.nome)}${c.categoria ? `<span class="badge-cat">${esc(c.categoria)}</span>` : ''}${c.pago === false ? '<span class="badge-aberto-conv">$ ABERTO</span>' : ''}</div>
+            <div class="nome">${semNome(c) ? '<em style="color:var(--cinza);font-weight:500;">Sem nome</em>' : esc(c.nome)}${c.categoria ? `<span class="badge-cat">${esc(c.categoria)}</span>` : ''}${c.pago === false ? '<span class="badge-aberto-conv">$ ABERTO</span>' : ''}</div>
             <div class="meta">${esc(c.familia || 'Sem família')}</div>
           </div>
           <div class="status ${c.presente ? 'ok' : 'pend'}">${c.presente ? 'Presente' : 'Pendente'}</div>
@@ -288,7 +294,9 @@
       const c = convites.find(x => x.id === id);
       if (!c) return;
       conviteAberto = c;
-      $('m-nome').textContent = c.nome;
+      $('m-nome').textContent = semNome(c) ? `Convite ${c.numero} (sem nome)` : c.nome;
+      $('m-nome-input').value = '';
+      $('m-nome-box').classList.toggle('hidden', !semNome(c) || c.presente);
       $('m-familia').textContent = c.familia || '—';
       $('m-numero').textContent = c.numero;
       $('m-categoria').textContent = c.categoria || '—';
@@ -325,13 +333,20 @@
       // Captura o id no início — o onSnapshot reescreve `convites` quando o
       // doc atualiza, e queremos garantir o id do convite que o usuário viu.
       const conviteId = conviteAberto.id;
+      const dados = {
+        presente: true,
+        checkInEm: serverTimestamp(),
+        checkInPor: perfil.nome || perfil.email || 'recepção',
+      };
+      // Convite sem nome: grava o nome digitado junto do check-in (1 write
+      // atomico). Se deixar em branco, libera a entrada mesmo assim.
+      if (semNome(conviteAberto)) {
+        const nomeDigitado = $('m-nome-input').value.trim();
+        if (nomeDigitado) dados.nome = nomeDigitado;
+      }
       $('btn-marcar').disabled = true;
       try {
-        await updateDoc(doc(db, 'convites_antecipados', conviteId), {
-          presente: true,
-          checkInEm: serverTimestamp(),
-          checkInPor: perfil.nome || perfil.email || 'recepção',
-        });
+        await updateDoc(doc(db, 'convites_antecipados', conviteId), dados);
         fecharModal();
       } catch (err) {
         // Sem catch o operador veria o botão voltar ao normal sem mensagem
