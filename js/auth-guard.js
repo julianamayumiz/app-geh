@@ -38,7 +38,8 @@
 // ============================================================
 
 import {
-  auth, onAuthStateChanged, signOut
+  auth, onAuthStateChanged, signOut,
+  db, doc, setDoc, onSnapshot, serverTimestamp
 } from "./firebase-config.js";
 import { toast } from "./ui.js";
 
@@ -156,6 +157,51 @@ function mostrarTelaProvisionando() {
   return () => div.remove();
 }
 
+// ============================================================
+// TRAVA DE SESSAO UNICA (soft) — operador / caixa / recepcao
+// ============================================================
+// Cada login novo (lastSignInTime diferente do guardado neste aparelho)
+// grava um sid novo em /sessoes/{uid}. Todo aparelho logado na mesma conta
+// escuta esse doc: se o sid mudou, quem ficou pra tras e deslogado.
+// Ultimo login ganha. Nao e barreira de seguranca (as rules nao checam o
+// sid) — so evita duas pessoas vendendo na mesma conta sem querer.
+// Admin fica isento (usa varias abas/aparelhos). Falha aberta: sem rede
+// ou erro de leitura, ninguem e derrubado.
+function iniciarTravaSessao(user, perfil) {
+  if (perfil.papel === 'admin') return;
+  const chave = `geh_sessao_${user.uid}`;
+  const loginAtual = user.metadata?.lastSignInTime || '';
+  let local = null;
+  try { local = JSON.parse(localStorage.getItem(chave) || 'null'); } catch (e) { /* ignora */ }
+
+  const ref = doc(db, 'sessoes', user.uid);
+  if (!local || local.login !== loginAtual) {
+    local = {
+      login: loginAtual,
+      sid: (crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`),
+    };
+    try { localStorage.setItem(chave, JSON.stringify(local)); } catch (e) { /* ignora */ }
+    // Sem await: offline a escrita fica na fila e nao trava a tela.
+    setDoc(ref, {
+      sid: local.sid,
+      papel: perfil.papel,
+      dispositivo: (navigator.userAgent || '').slice(0, 200),
+      atualizadoEm: serverTimestamp(),
+    }).catch(e => console.warn('[sessao] falha ao registrar sessao:', e));
+  }
+
+  const meuSid = local.sid;
+  const unsub = onSnapshot(ref, (snap) => {
+    if (snap.metadata.fromCache || !snap.exists()) return;
+    if (snap.data().sid === meuSid) return;
+    unsub();
+    try { localStorage.removeItem(chave); } catch (e) { /* ignora */ }
+    signOut(auth).finally(() => {
+      window.location.href = loginUrl() + '?erro=sessao';
+    });
+  }, (e) => console.warn('[sessao] listener falhou (segue sem trava):', e));
+}
+
 export function requireAuth({ papel } = {}) {
   return new Promise((resolve) => {
     let resolvido = false;
@@ -220,6 +266,7 @@ export function requireAuth({ papel } = {}) {
         resolvido = true;
         unsub();
         resolve({ user, perfil });
+        iniciarTravaSessao(user, perfil);
 
         // Revalida em background com refresh forçado (chamada ao Auth,
         // não ao Firestore — sem custo de leitura) pra detectar

@@ -129,6 +129,10 @@
     }
 
     const params = new URLSearchParams(location.search);
+    if (params.get('erro') === 'sessao') {
+      alerta.textContent = 'Sua conta foi aberta em outro aparelho, entao esta sessao foi encerrada.';
+      alerta.classList.remove('hidden');
+    }
     if (params.get('erro') === 'sem-acesso') {
       alerta.textContent = 'Sua conta não tem acesso. Fale com a diretoria para ser cadastrada.';
       alerta.classList.remove('hidden');

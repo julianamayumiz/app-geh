@@ -55,6 +55,16 @@ service cloud.firestore {
       return isAdmin() || isOperador() || isCaixa() || isRecepcao();
     }
 
+    // /sessoes/{uid} — trava de sessao unica (soft). Cada usuario le/grava
+    // so o proprio doc (sid do ultimo login). Admin le tudo pra diagnostico.
+    match /sessoes/{uid} {
+      allow read: if isAdmin() || (logado() && request.auth.uid == uid);
+      allow create, update: if logado() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['sid', 'papel', 'dispositivo', 'atualizadoEm'])
+        && request.resource.data.sid is string;
+      allow delete: if isAdmin();
+    }
+
     // /usuarios — gerenciamento de acesso.
     // Cada um lê o próprio doc (pro auth-guard funcionar).
     // Listar, atualizar e excluir: só admin.
