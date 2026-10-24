@@ -37,9 +37,9 @@ section.page.on{visibility:visible;height:auto;overflow:visible;animation:in .25
 .ph h2{font-size:clamp(20px,3vw,27px)}
 .lead{color:var(--navy-2);margin:0 0 20px;max-width:780px}
 .grid{display:grid;gap:14px}
-.g2{grid-template-columns:repeat(auto-fit,minmax(380px,1fr))}
-.g3{grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
-.kpis{grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-bottom:16px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(min(380px,100%),1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(min(250px,100%),1fr))}
+.kpis{grid-template-columns:repeat(auto-fit,minmax(min(170px,100%),1fr));margin-bottom:16px}
 .card{background:var(--card);border:1px solid var(--linha);border-radius:14px;padding:16px 18px;box-shadow:0 2px 6px #5a3a1408;min-width:0}
 .kpi{border-top:4px solid var(--verm)}
 .kpi.g{border-top-color:var(--ouro)}.kpi.n{border-top-color:var(--navy)}.kpi.s{border-top-color:var(--sakura)}
@@ -48,7 +48,8 @@ section.page.on{visibility:visible;height:auto;overflow:visible;animation:in .25
 .kpi .s{font-size:12px;color:var(--navy-2)}
 .card h3{font-size:16.5px;margin-bottom:4px}
 .card .sub{font-size:12.5px;color:var(--navy-2);margin-bottom:10px}
-.cv{position:relative;height:340px}.cv.short{height:260px}
+.cv{position:relative;height:340px;min-width:0;max-width:100%}.cv.short{height:260px}.cv.tall{height:380px}
+.cv canvas{max-width:100%}
 .ctrl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:2px 0 10px}
 .seg{display:inline-flex;border:1px solid var(--linha);border-radius:9px;overflow:hidden;background:#fff}
 .seg button{border:0;background:none;padding:6px 12px;font:600 12.5px 'Noto Sans';cursor:pointer;color:var(--navy-2)}
@@ -89,7 +90,8 @@ li{margin:3px 0}
 footer{color:var(--navy-2);font-size:12.5px;text-align:center;padding:24px 20px 40px}
 .pbtn{background:var(--verm);color:#fff;border:0;border-radius:9px;padding:8px 14px;font:700 13px 'Noto Sans';cursor:pointer}
 .pbtn:hover{background:var(--verm-d)}
-@media(max-width:560px){.g2{grid-template-columns:1fr}.matrix{grid-template-columns:1fr}.cv{height:300px}}
+@media(max-width:560px){.g2{grid-template-columns:1fr}.matrix{grid-template-columns:1fr}.cv{height:290px}.cv.short{height:240px}.cv.tall{height:340px}.wrap{padding:0 14px}.card{padding:14px}.ph{flex-wrap:wrap;gap:6px 10px}.ctrl select,.ctrl input[type=search]{max-width:100%;min-width:0}.ctrl input[type=search]{flex:1 1 140px}.seg{max-width:100%;flex-wrap:wrap}.ins dl{grid-template-columns:1fr}.ins dt{margin-top:4px}th,td{padding:6px}}
+@media(max-width:360px){.kpis{grid-template-columns:1fr 1fr}.kpi .v{font-size:21px}.kpi .l{font-size:11px}nav button{padding:12px 10px;font-size:13px}.cv{height:270px}.cv.short{height:230px}}
 @media print{nav,.ctrl,.pbtn{display:none}section.page{visibility:visible!important;height:auto!important;overflow:visible!important;page-break-before:always}header{-webkit-print-color-adjust:exact;print-color-adjust:exact}.card{break-inside:avoid}.tw{max-height:none}}
 </style>
 </head>
@@ -131,7 +133,7 @@ footer{color:var(--navy-2);font-size:12.5px;text-align:center;padding:24px 20px 
   <h3 id="rk-title"></h3><div class="sub" id="rk-sub"></div>
   <div class="ctrl"><span class="seg" id="rk-metric"><button data-m="r" class="on">Faturamento</button><button data-m="q">Quantidade</button></span>
    <span class="seg" id="rk-n"><button data-n="5">Top 5</button><button data-n="10" class="on">Top 10</button><button data-n="15">Top 15</button></span></div>
-  <div class="cv" style="height:380px"><canvas id="ch-rank"></canvas></div>
+  <div class="cv tall"><canvas id="ch-rank"></canvas></div>
  </div>
  <div class="grid g2" style="margin-top:14px">
   <div class="card"><h3>20 dos 48 itens somam 80% do faturamento</h3><div class="sub">Curva de Pareto — 25 maiores itens: barras = R$, linha = % acumulado</div><div class="cv"><canvas id="ch-pareto"></canvas></div></div>
@@ -150,7 +152,7 @@ footer{color:var(--navy-2);font-size:12.5px;text-align:center;padding:24px 20px 
  <div class="grid kpis" id="cls-kpis"></div>
  <div class="grid g2">
   <div class="card"><h3>Nove em cada dez reais foram vendidos a preço normal</h3><div class="sub">Faturamento por tipo de preço</div><div class="cv short"><canvas id="ch-cls"></canvas></div></div>
-  <div class="card"><h3>Critérios de classificação</h3><table><tbody id="cls-leg"></tbody></table></div>
+  <div class="card"><h3>Critérios de classificação</h3><div class="tw"><table><tbody id="cls-leg"></tbody></table></div></div>
  </div>
  <div class="card" style="margin-top:14px"><h3>As promoções cresceram hora a hora e dominaram o fim do evento</h3><div class="sub">Unidades vendidas por hora, a preço normal e em promoção. Passe o mouse para ver a participação.</div><div class="cv short"><canvas id="ch-phour"></canvas></div></div>
  <div class="card" style="margin-top:14px"><h3>Compare os preços de cada produto</h3><div class="sub">Escolha um produto para ver as unidades e o faturamento em cada preço e quando cada preço foi praticado</div>
@@ -192,7 +194,7 @@ footer{color:var(--navy-2);font-size:12.5px;text-align:center;padding:24px 20px 
  </div>
  <div class="grid g2" style="margin-top:14px">
   <div class="card"><h3>As vendas superaram as recargas — a diferença veio dos vouchers</h3><div class="sub">Entradas de saldo × vendas registradas</div><div class="cv short"><canvas id="ch-flow"></canvas></div></div>
-  <div class="card"><h3>Conferência do saldo</h3><table id="t-recon"></table></div>
+  <div class="card"><h3>Conferência do saldo</h3><div class="tw"><table id="t-recon"></table></div></div>
  </div>
  <div class="call warn" id="fin-call"></div>
  <div id="ins-fin" class="grid" style="margin-top:14px"></div>
@@ -236,9 +238,15 @@ const CATC={Comidas:C.verm,Doces:C.sak,Bebidas:C.navy,Atividades:C.ouro};
 if(window.Chart){Chart.defaults.font.family="'Noto Sans',system-ui,sans-serif";Chart.defaults.color=C.navy2;Chart.defaults.borderColor=C.grid;Chart.defaults.plugins.legend.labels.boxWidth=12;Chart.defaults.maintainAspectRatio=false;Chart.defaults.animation=false;}
 const charts={};
 const pend={};
-function build(id){const cv=$(id);if(!cv||!pend[id])return;if(charts[id])charts[id].destroy();charts[id]=new Chart(cv,pend[id]);}
+const built={},lpos={};
+const mobile=()=>window.innerWidth<560;
+function adapt(id){const o=pend[id].options=pend[id].options||{};const lg=(o.plugins=o.plugins||{}).legend=o.plugins.legend||{};if(lpos[id]===undefined)lpos[id]=lg.position||'top';lg.position=mobile()&&lpos[id]==='right'?'bottom':lpos[id];}
+/* cria o grafico so com o container visivel e medido; se ja existe com a mesma config, so redimensiona */
+function build(id,force){const cv=$(id);if(!cv||!pend[id]||!window.Chart)return;const box=cv.parentElement;if(!box.clientWidth||!box.clientHeight)return;
+ if(charts[id]&&built[id]===pend[id]&&!force){charts[id].resize();return}
+ if(charts[id])charts[id].destroy();Chart.defaults.font.size=mobile()?11:12;adapt(id);charts[id]=new Chart(cv,pend[id]);built[id]=pend[id];}
 function mk(id,cfg){if(!window.Chart)return;pend[id]=cfg;const pg=$(id).closest('section.page');if(pg&&pg.classList.contains('on'))build(id);}
-function buildPage(pg){pg.querySelectorAll('canvas').forEach(c=>build(c.id));}
+function buildPage(pg,force){pg.querySelectorAll('canvas').forEach(c=>build(c.id,force));}
 const prods=D.prods;
 const ord={};
 D.lines.forEach(l=>{const t=l[0],o=l[1],pi=l[2],q=l[3],pu=l[4];const x=ord[o]||(ord[o]={t:t,items:new Set()});x.t=Math.min(x.t,t);x.items.add(pi)});
@@ -293,7 +301,7 @@ const PLAN=[
 const pages=[...document.querySelectorAll('section.page')];
 const tabs=$('tabs');
 pages.forEach(s=>{const b=document.createElement('button');b.textContent=s.dataset.title;b.setAttribute('role','tab');b.onclick=()=>show(s.id);b.dataset.id=s.id;tabs.appendChild(b)});
-function show(id){pages.forEach(s=>s.classList.toggle('on',s.id===id));[...tabs.children].forEach(b=>{const on=b.dataset.id===id;b.classList.toggle('on',on);b.setAttribute('aria-selected',on)});try{history.replaceState(null,'','#'+id)}catch(e){}window.scrollTo({top:0});if(window.Chart){const pg=$(id);requestAnimationFrame(()=>{buildPage(pg);Object.values(charts).forEach(c=>c.resize())})}}
+function show(id){pages.forEach(s=>s.classList.toggle('on',s.id===id));[...tabs.children].forEach(b=>{const on=b.dataset.id===id;b.classList.toggle('on',on);b.setAttribute('aria-selected',on)});try{history.replaceState(null,'','#'+id)}catch(e){}window.scrollTo({top:0});if(window.Chart){const pg=$(id);let done=false;const go=()=>{if(done)return;done=true;buildPage(pg)};requestAnimationFrame(()=>requestAnimationFrame(go));setTimeout(go,120)}}
 function insCards(key){const el=$('ins-'+key);if(!el||!INS[key])return;el.innerHTML='<h3 style="margin-top:6px">Insights</h3>'+INS[key].map(x=>`<div class="card ins ${x.t}"><span class="tag t-${x.t}">${x.t==='fato'?'FATO COMPROVADO':'HIPÓTESE'}</span><h4 style="margin-top:6px">${x.h}</h4><dl><dt>Observado</dt><dd>${x.o}</dd><dt>Evidência</dt><dd>${x.e}</dd><dt>Interpretação</dt><dd>${x.i}</dd><dt>Ação</dt><dd>${x.a}</dd><dt>Confiança</dt><dd class="c-${x.c}"><b>${x.c[0].toUpperCase()+x.c.slice(1)}</b></dd></dl></div>`).join('')}
 
 /* 1 Resumo */
@@ -400,7 +408,15 @@ $('desc').innerHTML=DESC.map((d,i)=>`<div class="it"><span class="num">${i+1}</s
 $('acoes').innerHTML=ACOES.map((d,i)=>`<div class="it"><span class="num n">${i+1}</span><div><b>${d[0]}</b><br><span style="color:var(--navy-2)">${d[1]}</span></div></div>`).join('');
 ['vendas','precos','comport','fin'].forEach(insCards);
 {const h=location.hash.slice(1);show(pages.some(s=>s.id===h)?h:'p-resumo')}
-window.addEventListener('beforeprint',()=>{if(window.Chart){pages.forEach(buildPage);Object.values(charts).forEach(c=>c.resize())}});
+window.addEventListener('beforeprint',()=>{if(window.Chart){pages.forEach(p=>buildPage(p));Object.values(charts).forEach(c=>c.resize())}});
+/* resize/rotacao/fontes: refaz so a aba ativa (legendas e fontes dependem da largura) */
+{let w=innerWidth,t;const active=()=>document.querySelector('section.page.on');
+ const refresh=()=>{if(!window.Chart)return;const pg=active();if(!pg)return;const m=w<560;const was=refresh.m;refresh.m=m;buildPage(pg,was!==undefined&&was!==m)};
+ refresh.m=innerWidth<560;
+ const sched=()=>{w=innerWidth;clearTimeout(t);t=setTimeout(refresh,150)};
+ window.addEventListener('resize',sched);window.addEventListener('orientationchange',sched);
+ if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{const pg=active();if(pg&&window.Chart)buildPage(pg,true)});
+ if(!window.Chart)document.querySelectorAll('.cv').forEach(c=>{c.style.display='grid';c.style.placeItems='center';c.textContent='Gráfico indisponível: verifique a conexão e recarregue a página.'})}
 
 </script>
 </body>
