@@ -235,7 +235,10 @@ const C={verm:'#B3202E',vermL:'#E58A93',navy:'#1B2A49',navy2:'#44506b',sak:'#F2B
 const CATC={Comidas:C.verm,Doces:C.sak,Bebidas:C.navy,Atividades:C.ouro};
 if(window.Chart){Chart.defaults.font.family="'Noto Sans',system-ui,sans-serif";Chart.defaults.color=C.navy2;Chart.defaults.borderColor=C.grid;Chart.defaults.plugins.legend.labels.boxWidth=12;Chart.defaults.maintainAspectRatio=false;Chart.defaults.animation=false;}
 const charts={};
-function mk(id,cfg){if(!window.Chart)return;if(charts[id])charts[id].destroy();charts[id]=new Chart($(id),cfg);}
+const pend={};
+function build(id){const cv=$(id);if(!cv||!pend[id])return;if(charts[id])charts[id].destroy();charts[id]=new Chart(cv,pend[id]);}
+function mk(id,cfg){if(!window.Chart)return;pend[id]=cfg;const pg=$(id).closest('section.page');if(pg&&pg.classList.contains('on'))build(id);}
+function buildPage(pg){pg.querySelectorAll('canvas').forEach(c=>build(c.id));}
 const prods=D.prods;
 const ord={};
 D.lines.forEach(l=>{const t=l[0],o=l[1],pi=l[2],q=l[3],pu=l[4];const x=ord[o]||(ord[o]={t:t,items:new Set()});x.t=Math.min(x.t,t);x.items.add(pi)});
@@ -290,7 +293,7 @@ const PLAN=[
 const pages=[...document.querySelectorAll('section.page')];
 const tabs=$('tabs');
 pages.forEach(s=>{const b=document.createElement('button');b.textContent=s.dataset.title;b.setAttribute('role','tab');b.onclick=()=>show(s.id);b.dataset.id=s.id;tabs.appendChild(b)});
-function show(id){pages.forEach(s=>s.classList.toggle('on',s.id===id));[...tabs.children].forEach(b=>{const on=b.dataset.id===id;b.classList.toggle('on',on);b.setAttribute('aria-selected',on)});try{history.replaceState(null,'','#'+id)}catch(e){}window.scrollTo({top:0});setTimeout(()=>Object.values(charts).forEach(c=>c.resize()),30)}
+function show(id){pages.forEach(s=>s.classList.toggle('on',s.id===id));[...tabs.children].forEach(b=>{const on=b.dataset.id===id;b.classList.toggle('on',on);b.setAttribute('aria-selected',on)});try{history.replaceState(null,'','#'+id)}catch(e){}window.scrollTo({top:0});if(window.Chart){const pg=$(id);requestAnimationFrame(()=>{buildPage(pg);Object.values(charts).forEach(c=>c.resize())})}}
 function insCards(key){const el=$('ins-'+key);if(!el||!INS[key])return;el.innerHTML='<h3 style="margin-top:6px">Insights</h3>'+INS[key].map(x=>`<div class="card ins ${x.t}"><span class="tag t-${x.t}">${x.t==='fato'?'FATO COMPROVADO':'HIPÓTESE'}</span><h4 style="margin-top:6px">${x.h}</h4><dl><dt>Observado</dt><dd>${x.o}</dd><dt>Evidência</dt><dd>${x.e}</dd><dt>Interpretação</dt><dd>${x.i}</dd><dt>Ação</dt><dd>${x.a}</dd><dt>Confiança</dt><dd class="c-${x.c}"><b>${x.c[0].toUpperCase()+x.c.slice(1)}</b></dd></dl></div>`).join('')}
 
 /* 1 Resumo */
@@ -397,7 +400,7 @@ $('desc').innerHTML=DESC.map((d,i)=>`<div class="it"><span class="num">${i+1}</s
 $('acoes').innerHTML=ACOES.map((d,i)=>`<div class="it"><span class="num n">${i+1}</span><div><b>${d[0]}</b><br><span style="color:var(--navy-2)">${d[1]}</span></div></div>`).join('');
 ['vendas','precos','comport','fin'].forEach(insCards);
 {const h=location.hash.slice(1);show(pages.some(s=>s.id===h)?h:'p-resumo')}
-window.addEventListener('beforeprint',()=>Object.values(charts).forEach(c=>c.resize()));
+window.addEventListener('beforeprint',()=>{if(window.Chart){pages.forEach(buildPage);Object.values(charts).forEach(c=>c.resize())}});
 
 </script>
 </body>
