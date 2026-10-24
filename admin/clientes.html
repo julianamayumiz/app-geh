@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="../css/style.css">
   <link rel="manifest" href="../manifest.json">
   <script src="/js/sw-register.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
   <main class="admin">
@@ -40,6 +41,36 @@
     </div>
 
     <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.5rem;">
+        <h3 class="card-title" style="margin:0;">Creditar saldo em lote</h3>
+        <button id="btn-modelo-cred" class="btn btn-secondary" style="width:auto;padding:0.4rem 0.85rem;font-size:0.85rem;">Baixar modelo</button>
+      </div>
+      <p class="text-muted" style="font-size:0.85rem;margin-bottom:0.75rem;">
+        Planilha (.xlsx ou .csv) com as colunas <code>ID cliente | Valor | Motivo</code>, todas obrigatórias.
+        O valor é <strong>somado</strong> ao saldo atual e cada crédito fica registrado em Ajuste de saldo (auditoria).
+        Motivo com no mínimo 5 caracteres.
+      </p>
+      <div class="form-group">
+        <label for="arquivo-cred">Planilha de créditos</label>
+        <input type="file" id="arquivo-cred" accept=".xlsx,.xls,.csv">
+      </div>
+      <div id="alerta-cred" class="alert hidden"></div>
+      <div id="preview-cred" class="hidden">
+        <div id="resumo-cred" style="margin:0.5rem 0;font-size:0.9rem;"></div>
+        <div class="table-wrapper" style="max-height:320px;overflow-y:auto;" data-no-enhance>
+          <table>
+            <thead><tr><th>ID</th><th>Saldo atual</th><th>Crédito</th><th>Saldo depois</th><th>Motivo</th><th></th></tr></thead>
+            <tbody id="tbl-cred"></tbody>
+          </table>
+        </div>
+        <div style="display:flex;gap:0.5rem;margin-top:0.75rem;">
+          <button id="btn-confirmar-cred" class="btn btn-primary" style="max-width:260px;">Confirmar créditos</button>
+          <button id="btn-cancelar-cred" class="btn btn-secondary" style="max-width:160px;">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
       <div class="form-group" style="margin-bottom:0;">
         <label for="busca" style="display:inline-flex;align-items:center;gap:0.35rem;"><span data-icon="search" data-size="16"></span> Buscar cliente</label>
         <input type="text" id="busca" placeholder="Digite o ID...">
@@ -59,12 +90,16 @@
   <script type="module">
     import { montarNav } from "./_nav.js";
     import { fmtBRL, esc } from "../js/helpers.js";
-    import { db, collection, doc, setDoc, getDoc, getDocs, deleteDoc, onSnapshot, writeBatch } from "../js/firebase-config.js";
+    import { db, collection, doc, setDoc, getDoc, getDocs, deleteDoc, onSnapshot, writeBatch, runTransaction, serverTimestamp } from "../js/firebase-config.js";
     import { icon, renderIcons } from "../js/icons.js";
     import { confirmarAsync } from "../js/ui.js";
+    import { requireAuth } from "../js/auth-guard.js";
 
     montarNav('clientes.html');
     renderIcons();
+
+    let perfilAtual = null;
+    requireAuth({ papel: 'admin' }).then(({ perfil }) => { perfilAtual = perfil; });
 
     const $ = (id) => document.getElementById(id);
     const alerta = $('alerta');
@@ -175,6 +210,167 @@
     };
 
     $('busca').oninput = renderizar;
+
+    // ---- Creditar saldo em lote (planilha) ----
+    let creditos = []; // { id, valor, motivo, erro }
+
+    function mostrarCred(msg, tipo) {
+      const el = $('alerta-cred');
+      el.textContent = msg;
+      el.className = `alert alert-${tipo}`;
+    }
+
+    function parseValor(v) {
+      if (typeof v === 'number') return v;
+      let s = String(v).replace(/R\$/gi, '').replace(/\s/g, '');
+      if (!s) return NaN;
+      // "1.234,50" -> 1234.50 ; "10,5" -> 10.5 ; "10.5" fica 10.5
+      if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+      return Number(s);
+    }
+
+    function renderCred() {
+      const saldoDe = Object.fromEntries(todos.map(c => [c.id, c.saldo || 0]));
+      const ok = creditos.filter(c => !c.erro);
+      const total = ok.reduce((s, c) => s + c.valor, 0);
+      $('resumo-cred').innerHTML =
+        `<strong>${ok.length}</strong> válido(s), <strong>${creditos.length - ok.length}</strong> com erro (ignorados). ` +
+        `Total a creditar: <strong>${fmtBRL(total)}</strong>`;
+      $('tbl-cred').innerHTML = creditos.map(c => {
+        const atual = saldoDe[c.id];
+        return `<tr${c.erro ? ' style="opacity:0.75;"' : ''}>
+          <td><strong>${esc(c.id)}</strong></td>
+          <td>${atual === undefined ? '—' : fmtBRL(atual)}</td>
+          <td>${Number.isFinite(c.valor) ? fmtBRL(c.valor) : '—'}</td>
+          <td>${!c.erro ? fmtBRL(atual + c.valor) : '—'}</td>
+          <td>${esc(c.motivo)}</td>
+          <td>${c.erro ? `<span style="color:var(--vermelho);">${esc(c.erro)}</span>` : ''}</td>
+        </tr>`;
+      }).join('');
+      $('btn-confirmar-cred').disabled = ok.length === 0;
+    }
+
+    function limparCred() {
+      creditos = [];
+      $('arquivo-cred').value = '';
+      $('preview-cred').classList.add('hidden');
+    }
+
+    $('arquivo-cred').onchange = async (ev) => {
+      const arq = ev.target.files[0];
+      if (!arq) return;
+      $('alerta-cred').classList.add('hidden');
+      try {
+        const wb = XLSX.read(await arq.arrayBuffer(), { type: 'array' });
+        const linhas = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+        const dados = linhas.slice(1).filter(l => l.some(c => String(c).trim() !== ''));
+        if (dados.length === 0) throw new Error('Planilha vazia.');
+
+        const existentes = new Set(todos.map(c => c.id));
+        const vistos = new Set();
+        creditos = dados.map(l => {
+          const id = String(l[0]).trim();
+          const valor = parseValor(l[1]);
+          const motivo = String(l[2]).trim();
+          let erro = '';
+          if (!id) erro = 'ID vazio';
+          else if (!existentes.has(id)) erro = 'Cliente não existe';
+          else if (vistos.has(id)) erro = 'ID repetido na planilha';
+          else if (!Number.isFinite(valor) || valor <= 0) erro = 'Valor inválido';
+          else if (motivo.length < 5) erro = 'Motivo < 5 caracteres';
+          if (id) vistos.add(id);
+          return { id, valor, motivo, erro };
+        });
+        $('preview-cred').classList.remove('hidden');
+        renderCred();
+      } catch (err) {
+        limparCred();
+        mostrarCred(`Erro ao ler planilha: ${err.message}`, 'danger');
+      }
+    };
+
+    $('btn-cancelar-cred').onclick = () => { limparCred(); $('alerta-cred').classList.add('hidden'); };
+
+    $('btn-modelo-cred').onclick = () => {
+      const ws = XLSX.utils.aoa_to_sheet([
+        ['ID cliente', 'Valor', 'Motivo'],
+        ['GEH001', 50, 'Voucher antecipado'],
+        ['GEH002', 100, 'Voucher antecipado']
+      ]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Creditos');
+      XLSX.writeFile(wb, 'modelo-creditos-saldo.xlsx');
+    };
+
+    $('btn-confirmar-cred').onclick = async () => {
+      if (!perfilAtual) return mostrarCred('Aguardando autenticação…', 'warning');
+      // Captura a lista no início — evita mudar durante os awaits
+      const lote = creditos.filter(c => !c.erro).map(c => ({ id: c.id, valor: c.valor, motivo: c.motivo }));
+      if (lote.length === 0) return;
+      const total = lote.reduce((s, c) => s + c.valor, 0);
+      if (!(await confirmarAsync(
+        `Creditar ${fmtBRL(total)} em ${lote.length} cliente(s)? Cada crédito fica registrado para auditoria.`,
+        { textoOk: 'Creditar' }
+      ))) return;
+
+      const btn = $('btn-confirmar-cred');
+      btn.disabled = true;
+      btn.innerHTML = '<div class="loader"></div> Creditando...';
+
+      let eventoAtivo = null;
+      try {
+        const evSnap = await getDoc(doc(db, 'config', 'eventoAtivo'));
+        if (evSnap.exists()) eventoAtivo = evSnap.data();
+      } catch (e) {
+        console.warn('[clientes] falha ao ler eventoAtivo:', e);
+      }
+
+      const feitos = new Set();
+      const falhas = [];
+      const CONC = 10;
+      for (let i = 0; i < lote.length; i += CONC) {
+        await Promise.all(lote.slice(i, i + CONC).map(async (c) => {
+          try {
+            await runTransaction(db, async (tx) => {
+              const ref = doc(db, 'clientes', c.id);
+              const snap = await tx.get(ref);
+              if (!snap.exists()) throw new Error('Cliente não existe mais.');
+              const saldo = snap.data().saldo || 0;
+              tx.update(ref, { saldo: saldo + c.valor });
+              tx.set(doc(collection(db, 'ajustes_saldo')), {
+                clienteId: c.id,
+                clienteNome: snap.data().nome || null,
+                valor: c.valor,
+                saldoAntes: saldo,
+                saldoDepois: saldo + c.valor,
+                motivo: c.motivo,
+                eventoId: eventoAtivo?.id || null,
+                eventoNome: eventoAtivo?.nome || null,
+                adminId: perfilAtual.uid,
+                adminEmail: perfilAtual.email || null,
+                adminNome: perfilAtual.nome || null,
+                criadoEm: serverTimestamp()
+              });
+            });
+            feitos.add(c.id);
+          } catch (err) {
+            falhas.push(`${c.id} (${err.message})`);
+          }
+        }));
+      }
+
+      // Mantém só o que falhou, pra reenvio sem duplicar crédito
+      creditos = creditos.filter(c => !feitos.has(c.id));
+      if (creditos.length > 0) renderCred(); else limparCred();
+
+      if (falhas.length === 0) {
+        mostrarCred(`${feitos.size} cliente(s) creditado(s) com sucesso.`, 'success');
+      } else {
+        mostrarCred(`${feitos.size} creditado(s). ${falhas.length} falharam: ${falhas.join('; ')}. As linhas com falha continuam na lista — confirme de novo para reenviar só elas.`, 'danger');
+      }
+      btn.innerHTML = 'Confirmar créditos';
+      btn.disabled = false;
+    };
 
     const unsub = onSnapshot(collection(db, 'clientes'), (snap) => {
       todos = [];
