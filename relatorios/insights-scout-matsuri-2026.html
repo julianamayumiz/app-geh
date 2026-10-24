@@ -29,8 +29,8 @@ nav button:hover{color:#fff}
 nav button.on{color:#fff;border-bottom-color:var(--sakura)}
 nav button:focus-visible{outline:3px solid var(--ouro);outline-offset:-3px}
 main{padding:26px 0 60px}
-section.page{display:none}
-section.page.on{display:block;animation:in .25s ease}
+section.page{display:block;visibility:hidden;height:0;overflow:hidden}
+section.page.on{visibility:visible;height:auto;overflow:visible;animation:in .25s ease}
 @keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1}}
 .ph{display:flex;align-items:baseline;gap:12px;margin-bottom:6px}
 .ph .n{font:700 13px 'Noto Serif JP';background:var(--verm);color:#fff;border-radius:20px;padding:2px 11px}
@@ -90,7 +90,7 @@ footer{color:var(--navy-2);font-size:12.5px;text-align:center;padding:24px 20px 
 .pbtn{background:var(--verm);color:#fff;border:0;border-radius:9px;padding:8px 14px;font:700 13px 'Noto Sans';cursor:pointer}
 .pbtn:hover{background:var(--verm-d)}
 @media(max-width:560px){.g2{grid-template-columns:1fr}.matrix{grid-template-columns:1fr}.cv{height:300px}}
-@media print{nav,.ctrl,.pbtn{display:none}section.page{display:block!important;page-break-before:always}header{-webkit-print-color-adjust:exact;print-color-adjust:exact}.card{break-inside:avoid}.tw{max-height:none}}
+@media print{nav,.ctrl,.pbtn{display:none}section.page{visibility:visible!important;height:auto!important;overflow:visible!important;page-break-before:always}header{-webkit-print-color-adjust:exact;print-color-adjust:exact}.card{break-inside:avoid}.tw{max-height:none}}
 </style>
 </head>
 <body>
@@ -233,7 +233,7 @@ const $=id=>document.getElementById(id);
 const E=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const C={verm:'#B3202E',vermL:'#E58A93',navy:'#1B2A49',navy2:'#44506b',sak:'#F2B8C6',ouro:'#C39A2B',grid:'#E8DFCC'};
 const CATC={Comidas:C.verm,Doces:C.sak,Bebidas:C.navy,Atividades:C.ouro};
-if(window.Chart){Chart.defaults.font.family="'Noto Sans',system-ui,sans-serif";Chart.defaults.color=C.navy2;Chart.defaults.borderColor=C.grid;Chart.defaults.plugins.legend.labels.boxWidth=12;Chart.defaults.maintainAspectRatio=false;}
+if(window.Chart){Chart.defaults.font.family="'Noto Sans',system-ui,sans-serif";Chart.defaults.color=C.navy2;Chart.defaults.borderColor=C.grid;Chart.defaults.plugins.legend.labels.boxWidth=12;Chart.defaults.maintainAspectRatio=false;Chart.defaults.animation=false;}
 const charts={};
 function mk(id,cfg){if(!window.Chart)return;if(charts[id])charts[id].destroy();charts[id]=new Chart($(id),cfg);}
 const prods=D.prods;
